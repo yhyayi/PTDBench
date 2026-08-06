@@ -1,0 +1,63 @@
+id: task_hparam_clip_grpo_022
+category: qwen_dapo_hparam
+subcategory: null
+hollow_file: examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh
+hollow_files:
+- examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh
+hollow_hparams:
+- CLIP_RATIO
+- CLIP_RATIO_C
+- NORM_ADV_BY_STD_IN_GRPO
+- ROLLOUT_N
+- LOSS_AGG_MODE
+framework: verl
+locked_environment_list:
+- dapo_math_17k
+settings:
+  framework: verl
+  algo: grpo
+  trainer: fsdp
+  rollout: vllm
+  task: dapo_math_17k
+  model: Qwen2.5-0.5B-Instruct
+  difficulty: medium
+  eval_metric: val-core/math_dapo/acc/mean@1
+  total_training_steps: 200
+  test_freq: 20
+deliverables:
+  run_command: outputs/run_command.sh
+  diagnosis: outputs/diagnosis.txt
+verify:
+  num_gpus: 2
+  max_executions: 10
+  timeout_minutes: 90
+  stop_after_first_step: true
+  max_train_steps: 200
+allowed_write_globs:
+- examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh
+- outputs/**
+allow_slime_writes: false
+allow_training_script_writes: true
+lock_run_command_hparams: true
+require_run_command: true
+require_diagnosis: true
+settings_blurb: '- framework: verl (GRPO + FSDP + vLLM + DAPO-Math-17k + Qwen2.5-0.5B)
+
+  - launch: examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh
+
+  - num_gpus (verify): 2
+
+  - total_training_steps (locked): 200
+
+  - test_freq (locked): 20  → val-core logged every 20 steps
+
+  - hollow_mode: partial
+
+  - hollow_hparams (5): CLIP_RATIO, CLIP_RATIO_C, NORM_ADV_BY_STD_IN_GRPO, ROLLOUT_N,
+  LOSS_AGG_MODE
+
+  - hollow_sentinel: __HOLLOW__
+
+  - only edit the launch script hyperparameter blanks + outputs/'
+launch_script: examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh
+challenge: Clip + GRPO advantage norm.

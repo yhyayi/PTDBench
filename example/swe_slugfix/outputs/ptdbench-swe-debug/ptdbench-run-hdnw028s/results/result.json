@@ -1,0 +1,10 @@
+{
+  "passed": false,
+  "score": 0.0,
+  "metrics": {
+    "hidden_pass_rate": 0.0,
+    "tests_run": 1,
+    "failures": 0,
+    "errors": 1
+  }
+}
