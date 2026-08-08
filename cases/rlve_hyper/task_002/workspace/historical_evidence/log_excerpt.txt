@@ -1,0 +1,1 @@
+step=0 score=-0.687386920 truncated_ratio=0.0859375
