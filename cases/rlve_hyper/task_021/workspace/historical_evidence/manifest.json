@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "historical_failure",
+  "task_id": "task_021",
+  "source_run": "run_4_entropy_coef_0p1",
+  "failure_signature": "eval_truncation",
+  "held_out_eval": {
+    "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "eval_interval": 20,
+    "n_eval_points": 2,
+    "eval_points": [
+      {
+        "step": 0,
+        "eval_score": -0.6112956867996099,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": 0.078125
+      },
+      {
+        "step": 19,
+        "eval_score": -0.9177316621245876,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": 0.96875
+      }
+    ],
+    "eval_first": -0.6112956867996099,
+    "eval_last": -0.9177316621245876,
+    "eval_min": -0.9177316621245876,
+    "eval_max": -0.6112956867996099,
+    "truncate_ratio_max": 0.96875,
+    "source_logs": [
+      {
+        "path": "logs/run.log"
+      },
+      {
+        "path": "wandb/run-20260630_093338-htfsbth9/files/output_9de60c321f47-qt7slqn2.log"
+      },
+      {
+        "path": "wandb/run-20260630_093520-htfsbth9/files/output_9de60c321f47-d19qu6jg.log"
+      }
+    ],
+    "conflicts": []
+  },
+  "raw_reward": {
+    "n_raw_reward_points": 44,
+    "raw_reward_first3": [
+      -0.936489567092082,
+      -0.6017848949435839,
+      -0.6202437272780116
+    ],
+    "raw_reward_last3": [
+      -0.8119120406615934,
+      -0.8934314930083908,
+      -0.9238281214484007
+    ],
+    "raw_reward_mean": -0.6842811258107292,
+    "raw_reward_last5_mean": -0.8327607183820204
+  },
+  "effective_hparams_visible": {
+    "lr": 2e-06,
+    "kl_coef": 0.0,
+    "kl_loss_coef": 0.0,
+    "entropy_coef": 0.1,
+    "eps_clip": 0.2,
+    "eps_clip_high": 0.28,
+    "rollout_temperature": 1.0,
+    "eval_temperature": null,
+    "optimizer": "adam",
+    "attention_dropout": 0.0,
+    "hidden_dropout": 0.0,
+    "gamma": 1.0,
+    "advantage_estimator": "grpo",
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.98,
+    "adam_eps": 1e-08,
+    "clip_grad": 1.0,
+    "weight_decay": 0.01,
+    "tis_clip": 2.0,
+    "n_samples_per_prompt": 16,
+    "rollout_max_response_len": 8192,
+    "eval_max_response_len": null,
+    "rollout_top_p": 1.0,
+    "rollout_top_k": -1,
+    "lr_decay_style": "constant",
+    "lr_warmup_iters": 0,
+    "lr_decay_iters": null
+  },
+  "materialized_hparams": {
+    "lr": 2e-06,
+    "kl_coef": 0,
+    "kl_loss_coef": 0,
+    "entropy_coef": 0.1,
+    "eps_clip": 0.2,
+    "eps_clip_high": 0.28,
+    "rollout_temperature": 1,
+    "optimizer": "adam",
+    "attention_dropout": 0,
+    "hidden_dropout": 0,
+    "gamma": 1,
+    "advantage_estimator": "grpo",
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.98,
+    "adam_eps": 1e-08,
+    "clip_grad": 1,
+    "weight_decay": 0.01,
+    "tis_clip": 2,
+    "n_samples_per_prompt": 8,
+    "rollout_max_response_len": 2048,
+    "num_rollout": 100,
+    "rollout_top_p": 1,
+    "rollout_top_k": -1,
+    "lr_decay_style": "constant",
+    "lr_warmup_iters": 0
+  },
+  "metrics_alignment": {
+    "path": "outputs/metrics.json",
+    "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "metric_status": "available",
+    "n_eval_points": 2
+  }
+}

@@ -1,0 +1,42 @@
+case_id: task_015
+title: 'RLVE historical diagnosis: task_015'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-08'
+domain: post_train
+model:
+  name: Qwen2.5-0.5B-Instruct
+dataset:
+  name: RLVE held-out environments
+training:
+  framework: RLVE / slime + GRPO
+  algo: grpo
+  run_command: bash outputs/run_command.sh
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: training_collapse
+  failure_reason: 'Suspected unhealthy hyperparameters: attention_dropout. Auto-draft only; human must verify.'
+bench_category: rlve_hyper
+bench_subcategory: collapse
+source_task: Benchmark_Evaluation/tasks/task_RLVE_hyper/task_015
+source_run: run_41_attention_dropout_0p3
+evidence_kind: historical_failure
+packaging_tier: B0
+packaging_ready: true
+b1_scoring_ready: false
+label_review: true
+bug_type: hyperparameter/dropout
+buggy_keys: attention_dropout
+verify:
+  num_gpus: 4
+  timeout_minutes: 90
+  eval_interval: 20
+  eval_metric_key: eval/HELD-OUT_ENVIRONMENTS_128
+historical_baseline:
+  eval_last: -0.42111604364774624
+  eval_min: -0.6504572306500847
+  truncate_ratio_max: 0.21875
+  n_eval_points: 6
+failure_signature: boundary_metric_failure

@@ -1,0 +1,14 @@
+[
+  {
+    "step": 0,
+    "eval_score": -0.6112956867996099,
+    "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "truncate_ratio": 0.078125
+  },
+  {
+    "step": 19,
+    "eval_score": -0.9177316621245876,
+    "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "truncate_ratio": 0.96875
+  }
+]
