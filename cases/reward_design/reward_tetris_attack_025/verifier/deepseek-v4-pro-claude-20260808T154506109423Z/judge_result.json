@@ -1,0 +1,13 @@
+{
+  "attribution_match": false,
+  "matched_requirements": [],
+  "missing_requirements": [
+    "Explicitly classify the experiment as healthy.",
+    "The current reward implementation for tetris_attack_025 must be treated as healthy."
+  ],
+  "passed": false,
+  "rationale": "Verdict is unhealthy; standard answer requires healthy classification. Score forced to 0.",
+  "score": 0,
+  "specificity_match": false,
+  "verdict_match": false
+}

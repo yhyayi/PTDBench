@@ -1,0 +1,120 @@
+{
+  "task_id": "task_reward_design/reward_tetris_attack_025",
+  "category": "reward_design",
+  "kind": "baseline",
+  "environment": "TetrisAttack",
+  "baseline_source": "hidden/baseline/environment.py",
+  "created_at": "2026-07-24T15:52:53.592453+00:00",
+  "run": {
+    "ok": true,
+    "returncode": 0,
+    "cuda_visible_devices": "4,5,6,7",
+    "run_node": "g48",
+    "num_rollout": 100,
+    "eval_interval": 20,
+    "first_rollout_ok": true,
+    "startup_failed": false,
+    "failure_reason": null,
+    "use_docker": true,
+    "workspace": "workspace_baseline",
+    "run_name": "baseline_run_20260724T151726Z",
+    "archive_rel": "baseline_runs/20260724T155253Z",
+    "archived": [
+      "logs",
+      "wandb",
+      "outputs"
+    ]
+  },
+  "metrics": {
+    "eval_interval": 20,
+    "eval_scores": [
+      {
+        "step": 0,
+        "score": -0.6312843346982981
+      },
+      {
+        "step": 19,
+        "score": -0.3038495426220978
+      },
+      {
+        "step": 39,
+        "score": -0.31954154703792664
+      },
+      {
+        "step": 59,
+        "score": -0.30728692481688247
+      },
+      {
+        "step": 79,
+        "score": -0.33650125649946866
+      },
+      {
+        "step": 99,
+        "score": -0.24719070753368444
+      }
+    ],
+    "eval_points": [
+      {
+        "step": 0,
+        "eval_score": -0.6312843346982981,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": null,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.6312843346982981,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.09375
+        }
+      },
+      {
+        "step": 19,
+        "eval_score": -0.3038495426220978,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": null,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.3038495426220978,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.1484375
+        }
+      },
+      {
+        "step": 39,
+        "eval_score": -0.31954154703792664,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": null,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.31954154703792664,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.1171875
+        }
+      },
+      {
+        "step": 59,
+        "eval_score": -0.30728692481688247,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": null,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.30728692481688247,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.125
+        }
+      },
+      {
+        "step": 79,
+        "eval_score": -0.33650125649946866,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": null,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.33650125649946866,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.125
+        }
+      },
+      {
+        "step": 99,
+        "eval_score": -0.24719070753368444,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": null,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.24719070753368444,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.0703125
+        }
+      }
+    ]
+  },
+  "notes": "Official Gym implementation; agent-invisible; isolated from agent workspace; fresh run_name each launch."
+}
