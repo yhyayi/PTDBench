@@ -1,0 +1,13 @@
+{
+  "family": "verl_reward_implementation",
+  "cases": [
+    {
+      "case_id": "task_engine_base_025",
+      "family": "verl_reward_implementation",
+      "targets": 1,
+      "metric_status": "log_reconstructed",
+      "eval_last": 0.0,
+      "already_at_baseline": false
+    }
+  ]
+}

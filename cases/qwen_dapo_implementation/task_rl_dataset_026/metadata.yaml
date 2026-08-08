@@ -1,0 +1,41 @@
+case_id: task_rl_dataset_026
+title: 'qwen_dapo_implementation implementation diagnosis: task_rl_dataset_026'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-08'
+domain: post_train
+model:
+  name: Qwen2.5-0.5B-Instruct
+dataset:
+  name: DAPO-Math-17k
+training:
+  framework: verl
+  algo: grpo
+  run_command: bash outputs/run_command.sh
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: implementation_bug
+  failure_reason: Previous Agent implementation requires oracle and metric verification
+bench_category: qwen_dapo_implementation
+source_task: Benchmark_Evaluation/tasks/task_qwen_dapo_math_17k/task_rl_dataset_026
+evidence_kind: dirty_agent_failure
+packaging_tier: B0
+packaging_ready: true
+b1_scoring_ready: false
+target_files: verl/utils/dataset/rl_dataset.py
+validation_stack: DAPO_V4_QWEN
+already_at_baseline: false
+metric_status: metrics_json
+verify:
+  num_gpus: 2
+  timeout_minutes: 90
+  max_train_steps: 200
+  eval_metric_key: val-core/math_dapo/acc/mean@1
+historical_baseline:
+  actual_metric_key: val-core/math_dapo/acc/mean@1
+  eval_last: 0.037430167597765365
+  eval_max: 0.0446927374301676
+  n_eval_points: 11
+  attempt: 2

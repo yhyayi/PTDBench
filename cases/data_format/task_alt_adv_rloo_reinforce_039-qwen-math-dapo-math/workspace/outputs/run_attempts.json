@@ -1,0 +1,26 @@
+[
+  {
+    "ok": true,
+    "returncode": 0,
+    "stdout_tail": "Logging to /workspace/logs/qwen2_5_math_1_5b_instruct_dapo_math_fsdp_20260719_040414.log (no console training output)\nMODEL_PATH=/models/Qwen2.5-Math-1.5B-Instruct\nTRAIN_FILE=/workspace/DAPO-Math-17k_verl/train.parquet TEST_FILE=/workspace/DAPO-Math-17k_verl/test.parquet\nadv=grpo reward_manager=dapo score=0/1(/workspace/examples/grpo_trainer/reward_math_dapo_01.py) resume_mode=disable max_model_len=2048\n",
+    "stderr_tail": "",
+    "started_at": "2026-07-19T04:04:14.435819+00:00",
+    "finished_at": "2026-07-19T04:50:17.329551+00:00",
+    "cuda_visible_devices": "0,1",
+    "command_file": "outputs/run_command.sh",
+    "run_log_dirs": [],
+    "first_rollout_ok": true,
+    "first_step": 1,
+    "latest_step": 1,
+    "startup_failed": false,
+    "failure_reason": null,
+    "early_stopped": false,
+    "agent_interaction_stopped": true,
+    "killed_on_first_step": false,
+    "killed_at_max_steps": false,
+    "max_train_steps": 100,
+    "training_continued_after_first_step": true,
+    "log_path": "/home/test/test06/lyh/Benchmark_Evaluation/tasks/task_qwen_dapo_math_17k/task_alt_adv_rloo_reinforce_039/workspace/outputs/run_once.log",
+    "attempt": 1
+  }
+]

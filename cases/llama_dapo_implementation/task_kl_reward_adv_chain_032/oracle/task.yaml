@@ -1,0 +1,32 @@
+task_id: task_kl_reward_adv_chain_032
+category: llama_dapo_math_17k
+hollow_file: verl/trainer/ppo/ray_trainer.py
+hollow_files:
+- verl/trainer/ppo/ray_trainer.py
+- verl/trainer/ppo/core_algos.py
+hollow_symbols:
+- apply_kl_penalty
+- compute_advantage
+- compute_rewards
+- kl_penalty
+hollow_symbol_map:
+  verl/trainer/ppo/ray_trainer.py:
+  - apply_kl_penalty
+  - compute_advantage
+  verl/trainer/ppo/core_algos.py:
+  - compute_rewards
+  - kl_penalty
+hollowed_symbols:
+- apply_kl_penalty
+- compute_advantage
+- compute_rewards
+- kl_penalty
+baseline_path: hidden/baseline/verl/trainer/ppo/ray_trainer.py
+baselines:
+  verl/trainer/ppo/ray_trainer.py: 2053cf3c4f5685c110fa740f8304cabdce1b935f0db0edd589bb28117218a2cc
+  verl/trainer/ppo/core_algos.py: 9114f9e16c87e4c9ebf2fa016baf733c9bbc819766b53c8968aaa9e8abcd7916
+experiment_name: task_kl_reward_adv_chain_032
+created_at: '2026-07-19T15:33:23.314931+00:00'
+note: verl GRPO/DAPO-Math-17k/Llama mother; no RLVE gym_eval. During _validate, ALL hidden/baseline/*.py are pasted onto workspace then restored; /hidden mounted only for GPU verify (Agent cannot read).
+val_baseline_paste:
+- hidden/baseline/** (all sealed .py; includes hollow + val stack)

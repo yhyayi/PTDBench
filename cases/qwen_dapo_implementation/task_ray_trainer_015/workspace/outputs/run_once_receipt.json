@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "first_rollout_ok": true,
+  "first_step": 1,
+  "latest_step": 1,
+  "startup_failed": false,
+  "returncode": 0,
+  "error": null,
+  "attempt": 4,
+  "attempts_path": "/home/test/test06/lyh/Benchmark_Evaluation/tasks/task_qwen_dapo_math_17k/task_ray_trainer_015/workspace/outputs/run_attempts.json",
+  "cuda_visible_devices": "0,1",
+  "started_at": "2026-07-20T16:03:16.288072+00:00",
+  "finished_at": "2026-07-20T17:28:10.658237+00:00",
+  "early_stopped": false,
+  "agent_interaction_stopped": true,
+  "killed_on_first_step": false,
+  "killed_at_max_steps": false,
+  "max_train_steps": 200,
+  "training_continued_after_first_step": true,
+  "training_continues": false
+}

@@ -1,0 +1,18 @@
+task_id: task_alt_adv_rloo_reinforce_039
+category: qwen_dapo_math_17k
+hollow_file: verl/trainer/ppo/core_algos.py
+hollow_files:
+- verl/trainer/ppo/core_algos.py
+hollow_symbol_map:
+  verl/trainer/ppo/core_algos.py:
+  - compute_rloo_outcome_advantage
+  - compute_reinforce_plus_plus_outcome_advantage
+  - get_adv_estimator_fn
+  - compute_policy_loss
+baseline_path: oracle/code_target/baseline/verl/trainer/ppo/core_algos.py
+baselines:
+  verl/trainer/ppo/core_algos.py: 9114f9e16c87e4c9ebf2fa016baf733c9bbc819766b53c8968aaa9e8abcd7916
+experiment_name: task_alt_adv_rloo_reinforce_039
+created_at: '2026-07-19T03:56:39.210737+00:00'
+val_baseline_paste:
+- hidden/baseline/** (all sealed .py; includes hollow + val stack)

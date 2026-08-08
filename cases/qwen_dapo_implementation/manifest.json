@@ -1,0 +1,29 @@
+{
+  "family": "qwen_dapo_implementation",
+  "cases": [
+    {
+      "case_id": "task_ray_trainer_015",
+      "family": "qwen_dapo_implementation",
+      "targets": 1,
+      "metric_status": "metrics_json",
+      "eval_last": 0.043016759776536316,
+      "already_at_baseline": false
+    },
+    {
+      "case_id": "task_reward_adv_grpo_core_031",
+      "family": "qwen_dapo_implementation",
+      "targets": 1,
+      "metric_status": "metrics_json",
+      "eval_last": 0.049162011173184354,
+      "already_at_baseline": true
+    },
+    {
+      "case_id": "task_rl_dataset_026",
+      "family": "qwen_dapo_implementation",
+      "targets": 1,
+      "metric_status": "metrics_json",
+      "eval_last": 0.037430167597765365,
+      "already_at_baseline": false
+    }
+  ]
+}

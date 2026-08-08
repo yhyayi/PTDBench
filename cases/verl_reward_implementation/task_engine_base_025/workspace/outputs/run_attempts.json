@@ -1,0 +1,26 @@
+[
+  {
+    "ok": true,
+    "returncode": 0,
+    "stdout_tail": "Logging to /workspace/logs/qwen2_5_0.5b_instruct_fsdp_20260717_055203.log (no console training output)\n",
+    "stderr_tail": "",
+    "started_at": "2026-07-17T05:52:02.900576+00:00",
+    "finished_at": "2026-07-17T06:21:09.824151+00:00",
+    "cuda_visible_devices": "0,1",
+    "command_file": "outputs/run_command.sh",
+    "run_log_dirs": [],
+    "first_rollout_ok": true,
+    "first_step": 1,
+    "latest_step": 1,
+    "startup_failed": false,
+    "failure_reason": null,
+    "early_stopped": false,
+    "agent_interaction_stopped": true,
+    "killed_on_first_step": false,
+    "killed_at_max_steps": false,
+    "max_train_steps": 100,
+    "training_continued_after_first_step": true,
+    "log_path": "/home/test/test06/lyh/Benchmark_Evaluation/tasks/task_verl_reward_implementation/task_engine_base_025/workspace/outputs/run_once.log",
+    "attempt": 1
+  }
+]

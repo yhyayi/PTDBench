@@ -1,0 +1,60 @@
+{
+  "cases": [
+    {
+      "case_id": "task_ray_trainer_015",
+      "family": "qwen_dapo_implementation",
+      "targets": 1,
+      "metric_status": "metrics_json",
+      "eval_last": 0.043016759776536316,
+      "already_at_baseline": false
+    },
+    {
+      "case_id": "task_reward_adv_grpo_core_031",
+      "family": "qwen_dapo_implementation",
+      "targets": 1,
+      "metric_status": "metrics_json",
+      "eval_last": 0.049162011173184354,
+      "already_at_baseline": true
+    },
+    {
+      "case_id": "task_rl_dataset_026",
+      "family": "qwen_dapo_implementation",
+      "targets": 1,
+      "metric_status": "metrics_json",
+      "eval_last": 0.037430167597765365,
+      "already_at_baseline": false
+    },
+    {
+      "case_id": "task_monkey_patch_011",
+      "family": "llama_dapo_implementation",
+      "targets": 1,
+      "metric_status": "log_reconstructed",
+      "eval_last": 0.04022346368715084,
+      "already_at_baseline": false
+    },
+    {
+      "case_id": "task_core_algos_013",
+      "family": "llama_dapo_implementation",
+      "targets": 1,
+      "metric_status": "log_reconstructed",
+      "eval_last": 0.061452513966480445,
+      "already_at_baseline": false
+    },
+    {
+      "case_id": "task_kl_reward_adv_chain_032",
+      "family": "llama_dapo_implementation",
+      "targets": 2,
+      "metric_status": "log_reconstructed",
+      "eval_last": 0.05977653631284916,
+      "already_at_baseline": false
+    },
+    {
+      "case_id": "task_engine_base_025",
+      "family": "verl_reward_implementation",
+      "targets": 1,
+      "metric_status": "log_reconstructed",
+      "eval_last": 0.0,
+      "already_at_baseline": false
+    }
+  ]
+}

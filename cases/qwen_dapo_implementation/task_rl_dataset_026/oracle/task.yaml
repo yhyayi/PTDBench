@@ -1,0 +1,41 @@
+task_id: task_rl_dataset_026
+category: qwen_dapo_math_17k
+hollow_file: verl/utils/dataset/rl_dataset.py
+hollow_files:
+- verl/utils/dataset/rl_dataset.py
+hollow_symbols:
+- collate_fn
+- RLHFDataset.__getitem__
+- RLHFDataset._build_messages
+- RLHFDataset.maybe_filter_out_long_prompts
+- RLHFDataset._read_files_and_tokenize
+- RLHFDataset.__init__
+- RLHFDataset.split
+- get_dataset_class
+hollow_symbol_map:
+  verl/utils/dataset/rl_dataset.py:
+  - collate_fn
+  - RLHFDataset.__getitem__
+  - RLHFDataset._build_messages
+  - RLHFDataset.maybe_filter_out_long_prompts
+  - RLHFDataset._read_files_and_tokenize
+  - RLHFDataset.__init__
+  - RLHFDataset.split
+  - get_dataset_class
+hollowed_symbols:
+- collate_fn
+- RLHFDataset.__init__
+- RLHFDataset._read_files_and_tokenize
+- RLHFDataset.maybe_filter_out_long_prompts
+- RLHFDataset._build_messages
+- RLHFDataset.__getitem__
+- RLHFDataset.split
+- get_dataset_class
+baseline_path: hidden/baseline/verl/utils/dataset/rl_dataset.py
+baselines:
+  verl/utils/dataset/rl_dataset.py: 3956aef9b1d40b154021c25791214e9cc1fc33d15f5f882a32866248ae598b87
+experiment_name: task_rl_dataset_026
+created_at: '2026-07-20T03:14:44.813920+00:00'
+note: verl GRPO/DAPO-Math-17k/Qwen2.5-0.5B mother; no RLVE gym_eval. During _validate, ALL hidden/baseline/*.py are pasted onto workspace then restored; /hidden mounted only for GPU verify (Agent cannot read).
+val_baseline_paste:
+- hidden/baseline/** (all sealed .py; includes hollow + val stack)

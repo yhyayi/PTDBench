@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "dirty_agent_failure",
+  "family": "qwen_dapo_implementation",
+  "validation_stack": "DAPO_V4_QWEN",
+  "metrics": {
+    "metric_status": "metrics_json",
+    "expected_metric_key": "val-core/math_dapo/acc/mean@1",
+    "actual_metric_key": "val-core/math_dapo/acc/mean@1",
+    "eval_points": [
+      {
+        "step": 0,
+        "eval_score": 0.03910614525139665,
+        "eval_key": "val-core/math_dapo/acc/mean@1",
+        "truncate_ratio": null,
+        "raw": {
+          "val-core/math_dapo/acc/mean@1": 0.03910614525139665
+        }
+      },
+      {
+        "step": 20,
+        "eval_score": 0.035754189944134075,
+        "eval_key": "val-core/math_dapo/acc/mean@1",
+        "truncate_ratio": null,
+        "raw": {
+          "val-core/math_dapo/acc/mean@1": 0.035754189944134075
+        }
+      },
+      {
+        "step": 40,
+        "eval_score": 0.035754189944134075,
+        "eval_key": "val-core/math_dapo/acc/mean@1",
+        "truncate_ratio": null,
+        "raw": {
+          "val-core/math_dapo/acc/mean@1": 0.035754189944134075
+        }
+      },
+      {
+        "step": 60,
+        "eval_score": 0.04022346368715084,
+        "eval_key": "val-core/math_dapo/acc/mean@1",
+        "truncate_ratio": null,
+        "raw": {
+          "val-core/math_dapo/acc/mean@1": 0.04022346368715084
+        }
+      },
+      {
+        "step": 80,
+        "eval_score": 0.0446927374301676,
+        "eval_key": "val-core/math_dapo/acc/mean@1",
+        "truncate_ratio": null,
+        "raw": {
+          "val-core/math_dapo/acc/mean@1": 0.0446927374301676
+        }
+      },
+      {
+        "step": 100,
+        "eval_score": 0.038547486033519554,
+        "eval_key": "val-core/math_dapo/acc/mean@1",
+        "truncate_ratio": null,
+        "raw": {
+          "val-core/math_dapo/acc/mean@1": 0.038547486033519554
+        }
+      },
+      {
+        "step": 120,
+        "eval_score": 0.03966480446927374,
+        "eval_key": "val-core/math_dapo/acc/mean@1",
+        "truncate_ratio": null,
+        "raw": {
+          "val-core/math_dapo/acc/mean@1": 0.03966480446927374
+        }
+      },
+      {
+        "step": 140,
+        "eval_score": 0.038547486033519554,
+        "eval_key": "val-core/math_dapo/acc/mean@1",
+        "truncate_ratio": null,
+        "raw": {
+          "val-core/math_dapo/acc/mean@1": 0.038547486033519554
+        }
+      },
+      {
+        "step": 160,
+        "eval_score": 0.04357541899441341,
+        "eval_key": "val-core/math_dapo/acc/mean@1",
+        "truncate_ratio": null,
+        "raw": {
+          "val-core/math_dapo/acc/mean@1": 0.04357541899441341
+        }
+      },
+      {
+        "step": 180,
+        "eval_score": 0.038547486033519554,
+        "eval_key": "val-core/math_dapo/acc/mean@1",
+        "truncate_ratio": null,
+        "raw": {
+          "val-core/math_dapo/acc/mean@1": 0.038547486033519554
+        }
+      },
+      {
+        "step": 200,
+        "eval_score": 0.037430167597765365,
+        "eval_key": "val-core/math_dapo/acc/mean@1",
+        "truncate_ratio": null,
+        "raw": {
+          "val-core/math_dapo/acc/mean@1": 0.037430167597765365
+        }
+      }
+    ],
+    "n_eval_points": 11,
+    "eval_first": 0.03910614525139665,
+    "eval_last": 0.037430167597765365,
+    "eval_min": 0.035754189944134075,
+    "eval_max": 0.0446927374301676,
+    "source_logs": [
+      {
+        "path": "wandb/run-20260720_173145-tnlrcquj/files/output.log"
+      },
+      {
+        "path": "logs/qwen2_5_0_5b_instruct_dapo_math_fsdp_20260720_172840.log"
+      }
+    ],
+    "first_rollout_ok": true,
+    "attempt": 2,
+    "run_once": {
+      "executed": true,
+      "ok": true,
+      "returncode": 0,
+      "receipt_path": "outputs/run_once_receipt.json"
+    }
+  },
+  "attempts": {
+    "n_attempts": 2,
+    "n_ok": 1,
+    "n_startup_failed": 1,
+    "final_attempt": 2,
+    "final_ok": true
+  },
+  "annotation_cleanup": {
+    "workspace_files": {
+      "examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh": 2,
+      "verl/trainer/main_ppo_v0.py": 1,
+      "verl/utils/bench_baseline_swap.py": 1,
+      "verl/utils/bench_hooks.py": 2,
+      "verl/utils/dataset/rl_dataset.py": 4,
+      "verl/utils/reward_score/__init__.py": 1
+    },
+    "attribution_annotations": {
+      "examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh": 1
+    },
+    "oracle_baseline_targets": {},
+    "secret_redactions": {
+      "workspace": {
+        "examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh": 1
+      },
+      "oracle": {}
+    },
+    "removed_agent_outputs": [
+      "outputs/diagnosis.txt"
+    ]
+  },
+  "checkpoints": {
+    "excluded_from_case": true,
+    "reason": "Implementation diagnosis does not require 12-148GB checkpoints.",
+    "source_present": true,
+    "top_level_entries": [
+      "verl_grpo_dapo_math_qwen05b"
+    ]
+  },
+  "metrics_alignment": {
+    "path": "outputs/metrics.json",
+    "metric_key": "val-core/math_dapo/acc/mean@1",
+    "metric_status": "metrics_json",
+    "n_eval_points": 11
+  }
+}

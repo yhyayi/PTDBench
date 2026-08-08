@@ -1,0 +1,6 @@
+{"time":"2026-07-18T16:18:43.002814286Z","level":"INFO","msg":"stream: starting","core version":"0.25.0"}
+{"time":"2026-07-18T16:18:43.52060922Z","level":"INFO","msg":"stream: created new stream","id":"uil0uvrc"}
+{"time":"2026-07-18T16:18:43.520847163Z","level":"INFO","msg":"handler: started","stream_id":"uil0uvrc"}
+{"time":"2026-07-18T16:18:43.522816257Z","level":"INFO","msg":"stream: started","id":"uil0uvrc"}
+{"time":"2026-07-18T16:18:43.523040271Z","level":"INFO","msg":"sender: started","stream_id":"uil0uvrc"}
+{"time":"2026-07-18T16:18:43.523041814Z","level":"INFO","msg":"writer: started","stream_id":"uil0uvrc"}

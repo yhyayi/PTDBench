@@ -1,0 +1,40 @@
+case_id: task_agent_loop_022-llama-dapo-math
+title: 'Data-format run assessment: task_agent_loop_022-llama-dapo-math'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-08'
+domain: post_train
+model:
+  name: Llama-3.2-1B-Instruct
+dataset:
+  name: DAPO-Math-17k
+training:
+  framework: verl
+  algo: grpo
+  run_command: bash outputs/run_command.sh
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: run_health_unknown
+  failure_reason: Historical run requires independent evidence-based assessment
+bench_category: data_format
+source_task: Benchmark_Evaluation/tasks/task_data_format/task_agent_loop_022-llama-dapo-math
+canonical_task: task_llama_dapo_math_17k/task_agent_loop_022
+data_format_variant: true
+evidence_kind: dirty_agent_workspace
+packaging_tier: B0
+packaging_ready: true
+b1_scoring_ready: false
+verify:
+  num_gpus: 2
+  timeout_minutes: 90
+  max_train_steps: 100
+  eval_metric_key: val-core/math_dapo/reward/mean@1
+historical_run:
+  metric_status: log_reconstructed
+  eval_first: 0.006148686416992733
+  eval_last: 0.012297372833985467
+  eval_max: 0.012297372833985467
+  n_eval_points: 6
+  attempt: 6

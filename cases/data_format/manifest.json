@@ -1,0 +1,86 @@
+{
+  "family": "data_format",
+  "selected_count": 5,
+  "cases": [
+    {
+      "case_id": "task_agent_loop_022-qwen-math-dapo-math",
+      "canonical_task": "task_qwen_dapo_math_17k/task_agent_loop_022",
+      "model": "Qwen2.5-Math-1.5B-Instruct",
+      "metric": "val-core/math_dapo/reward/mean@1",
+      "targets": [
+        "verl/experimental/agent_loop/agent_loop.py"
+      ],
+      "historical_eval_points": 6,
+      "historical_eval_first": 0.0,
+      "historical_eval_last": 0.0,
+      "historical_eval_max": 0.0,
+      "source_metrics_eval_points": 6,
+      "secret_redactions": 1,
+      "already_at_baseline": false
+    },
+    {
+      "case_id": "task_alt_adv_rloo_reinforce_039-qwen-math-dapo-math",
+      "canonical_task": "task_qwen_dapo_math_17k/task_alt_adv_rloo_reinforce_039",
+      "model": "Qwen2.5-Math-1.5B-Instruct",
+      "metric": "val-core/math_dapo/acc/mean@1",
+      "targets": [
+        "verl/trainer/ppo/core_algos.py"
+      ],
+      "historical_eval_points": 6,
+      "historical_eval_first": 0.0,
+      "historical_eval_last": 0.0,
+      "historical_eval_max": 0.0,
+      "source_metrics_eval_points": 6,
+      "secret_redactions": 1,
+      "already_at_baseline": false
+    },
+    {
+      "case_id": "task_exp_dapo_rm_007-llama-dapo-math",
+      "canonical_task": "task_llama_dapo_math_17k/task_exp_dapo_rm_007",
+      "model": "Llama-3.2-1B-Instruct",
+      "metric": "val-core/math_dapo/acc/mean@1",
+      "targets": [
+        "verl/experimental/reward_loop/reward_manager/dapo.py"
+      ],
+      "historical_eval_points": 6,
+      "historical_eval_first": 0.042481833426495245,
+      "historical_eval_last": 0.05589714924538849,
+      "historical_eval_max": 0.05701509223029626,
+      "source_metrics_eval_points": 6,
+      "secret_redactions": 1,
+      "already_at_baseline": false
+    },
+    {
+      "case_id": "task_core_algos_013-llama-dapo-math",
+      "canonical_task": "task_llama_dapo_math_17k/task_core_algos_013",
+      "model": "Llama-3.2-1B-Instruct",
+      "metric": "val-core/math_dapo/acc/mean@1",
+      "targets": [
+        "verl/trainer/ppo/core_algos.py"
+      ],
+      "historical_eval_points": 6,
+      "historical_eval_first": 0.040804918949133594,
+      "historical_eval_last": 0.05030743432084964,
+      "historical_eval_max": 0.05701509223029626,
+      "source_metrics_eval_points": 6,
+      "secret_redactions": 1,
+      "already_at_baseline": false
+    },
+    {
+      "case_id": "task_agent_loop_022-llama-dapo-math",
+      "canonical_task": "task_llama_dapo_math_17k/task_agent_loop_022",
+      "model": "Llama-3.2-1B-Instruct",
+      "metric": "val-core/math_dapo/reward/mean@1",
+      "targets": [
+        "verl/experimental/agent_loop/agent_loop.py"
+      ],
+      "historical_eval_points": 6,
+      "historical_eval_first": 0.006148686416992733,
+      "historical_eval_last": 0.012297372833985467,
+      "historical_eval_max": 0.012297372833985467,
+      "source_metrics_eval_points": 6,
+      "secret_redactions": 1,
+      "already_at_baseline": false
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+[
+  {
+    "step": 0,
+    "eval_score": 0.024022346368715083,
+    "eval_key": "val-core/math_dapo/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 20,
+    "eval_score": 0.0223463687150838,
+    "eval_key": "val-core/math_dapo/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 40,
+    "eval_score": 0.02346368715083799,
+    "eval_key": "val-core/math_dapo/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 60,
+    "eval_score": 0.034636871508379886,
+    "eval_key": "val-core/math_dapo/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 80,
+    "eval_score": 0.05810055865921788,
+    "eval_key": "val-core/math_dapo/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 100,
+    "eval_score": 0.05810055865921788,
+    "eval_key": "val-core/math_dapo/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 120,
+    "eval_score": 0.05810055865921788,
+    "eval_key": "val-core/math_dapo/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 140,
+    "eval_score": 0.0659217877094972,
+    "eval_key": "val-core/math_dapo/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 160,
+    "eval_score": 0.06256983240223464,
+    "eval_key": "val-core/math_dapo/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 180,
+    "eval_score": 0.06536312849162011,
+    "eval_key": "val-core/math_dapo/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 200,
+    "eval_score": 0.061452513966480445,
+    "eval_key": "val-core/math_dapo/acc/mean@1",
+    "truncate_ratio": null
+  }
+]
