@@ -1,0 +1,13 @@
+runs/
+metrics.json
+result.json
+__pycache__/
+*.pyc
+tests/
+.pytest_cache/
+.coverage
+*.log
+*.tmp
+**
+!agent.Dockerfile
+!README.md

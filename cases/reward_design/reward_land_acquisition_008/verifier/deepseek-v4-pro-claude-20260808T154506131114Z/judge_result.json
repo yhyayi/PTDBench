@@ -1,0 +1,12 @@
+{
+  "attribution_match": true,
+  "matched_requirements": [
+    "Name the land_acquisition_008 environment and identify its reward design or reward function."
+  ],
+  "missing_requirements": [],
+  "passed": true,
+  "rationale": "Agent correctly deems run unhealthy and attributes to a reward-function bug in the rlve_rm for LandAcquisition_008 environment, satisfying the only REQUIRED_ALL item.",
+  "score": 1,
+  "specificity_match": true,
+  "verdict_match": true
+}
