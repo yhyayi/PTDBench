@@ -1,0 +1,15 @@
+step=0 score=-1.000000000 truncated_ratio=1.0
+step=19 score=-1.000000000 truncated_ratio=1.0
+step=39 score=-1.000000000 truncated_ratio=1.0
+step=59 score=-1.000000000 truncated_ratio=1.0
+step=79 score=-1.000000000 truncated_ratio=1.0
+step=99 score=-1.000000000 truncated_ratio=1.0
+step=119 score=-1.000000000 truncated_ratio=1.0
+step=139 score=-1.000000000 truncated_ratio=1.0
+step=159 score=-1.000000000 truncated_ratio=1.0
+step=179 score=-1.000000000 truncated_ratio=1.0
+step=199 score=-1.000000000 truncated_ratio=1.0
+step=219 score=-1.000000000 truncated_ratio=1.0
+step=239 score=-1.000000000 truncated_ratio=1.0
+step=259 score=-1.000000000 truncated_ratio=1.0
+step=279 score=-1.000000000 truncated_ratio=1.0
