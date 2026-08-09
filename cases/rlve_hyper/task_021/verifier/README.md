@@ -26,12 +26,26 @@ case/
 
 ## Evaluation pipeline
 
+The verifier supports two execution paths:
+
+- `standalone`: this verifier runs both Agent A and Judge B.
+- `judge-only`: the central PTDBench evaluator runs Agent A, and this verifier
+  grades the diagnosis already present in the staged workspace.
+
+`--evaluation-mode auto` is the default. It selects `judge-only` only when the
+central evaluator supplied both a non-empty staged `outputs/diagnosis.txt` and
+`agent_trace.json`, proving that central Agent A already ran. If central
+PTDBench did not run Agent A, auto selects `standalone`, so this task verifier
+runs Agent A and Judge B without requiring `--evaluation-mode standalone`.
+
 One invocation performs the following steps:
 
 1. Create a timestamped run directory.
-2. Copy the case `workspace/` into that run directory.
-3. Reuse or acquire the Agent Docker image.
-4. Run Agent A in an isolated container with the staged workspace writable.
+2. Copy either the original case workspace (`standalone`) or
+   `$PTDBENCH_WORKSPACE` (`judge-only`) into that run directory.
+3. In standalone mode, reuse or acquire the Agent Docker image.
+4. Run Agent A locally through central PTDBench or in the standalone isolated
+   container.
 5. Require Agent A to write `workspace/outputs/diagnosis.txt`.
 6. Read `oracle/standard_answer.txt` and the allowed location context from
    `oracle/task.yaml` on the host. The oracle is never mounted into Agent A's
@@ -46,10 +60,10 @@ workspace is not modified.
 
 - Linux or macOS with Bash
 - Python 3.8 or newer
-- A running Docker Engine with permission to run `docker build` and
-  `docker run`
-- Internet access on the first run to download the Docker base image and Agent
-  CLI packages
+- For standalone mode, a running Docker Engine with permission to run
+  `docker build` and `docker run`
+- For the first standalone run, internet access to download the Docker base
+  image and Agent CLI packages
 - API credentials for Agent A and Judge B
 
 Confirm the local prerequisites:
@@ -132,6 +146,105 @@ export PTDBENCH_JUDGE_BASE_URL=https://api.deepseek.com
 ```
 
 CLI options override the corresponding environment variables.
+
+## Central PTDBench workflow
+
+Run schema validation from the repository root, not by executing `schema.py`
+directly:
+
+```bash
+cd <repository>
+
+PYTHONDONTWRITEBYTECODE=1 \
+python3 -m ptdbench validate cases/<family>/<case>
+```
+
+A valid package returns exit code `0` and:
+
+```json
+{
+  "ok": true,
+  "issues": []
+}
+```
+
+For an OpenAI Codex Agent and an OpenAI-compatible Judge using the same model,
+export the API key and use the normal central command:
+
+```bash
+export OPENAI_API_KEY='<your-api-key>'
+
+PYTHONDONTWRITEBYTECODE=1 \
+python3 -m ptdbench evaluate cases/<family>/<case> \
+  --backend local \
+  --agent-backend local \
+  --agent codex \
+  --model gpt-5.5 \
+  --base-url https://api.openai.com/v1 \
+  --api-key "$OPENAI_API_KEY" \
+  --json
+```
+
+Central PTDBench deletes its temporary run directory by default. To retain the
+complete central Agent trace, staged workspace, Judge trace, and reports, append:
+
+```bash
+--keep-artifacts --work-dir /absolute/writable/ptdbench-runs
+```
+
+The central evaluator runs Agent A first. Agent A must write:
+
+```text
+$PTDBENCH_WORKSPACE/outputs/diagnosis.txt
+```
+
+Before invoking the verifier, central PTDBench writes
+`$PTDBENCH_RESULTS/agent_trace.json`. With `--backend local`, it also forwards
+the central `--model`, `--base-url`, and `--api-key` to the verifier subprocess
+as Judge defaults. Auto mode can fall back to the trace and parent environment
+when an option was omitted. Judge B uses the Agent model unless
+`PTDBENCH_JUDGE_MODEL` overrides it.
+
+For better process-list hygiene, expand the key from a protected environment
+variable instead of writing a literal secret:
+
+```bash
+export OPENAI_API_KEY='<your-api-key>'
+```
+
+To use a different Judge:
+
+```bash
+export PTDBENCH_JUDGE_PROVIDER=openai-compatible
+export PTDBENCH_JUDGE_MODEL='<judge-model>'
+export PTDBENCH_JUDGE_API_KEY_ENV=JUDGE_API_KEY
+export PTDBENCH_JUDGE_BASE_URL='https://judge.example/v1'
+export JUDGE_API_KEY='<judge-api-key>'
+```
+
+Central integration currently requires `--backend local`. The central Docker
+backend does not forward host Judge secrets and normally disables verifier
+network access. Judge-only mode never starts a nested Agent Docker container.
+
+The verifier consumes the central contract variables:
+
+```text
+PTDBENCH_WORKSPACE
+PTDBENCH_ORACLE
+PTDBENCH_VERIFIER
+PTDBENCH_RESULTS
+PTDBENCH_CASE_ID
+```
+
+It writes the PTDBench contract outputs to:
+
+```text
+$PTDBENCH_RESULTS/result.json
+$PTDBENCH_RESULTS/metrics.json
+```
+
+Exit code `0` means the validated binary Judge score is `1`. Score `0` or a
+runtime error exits nonzero.
 
 ## Docker image behavior
 
@@ -225,6 +338,7 @@ Endpoint construction:
 ## CLI reference
 
 ```text
+--evaluation-mode     auto | standalone | judge-only
 --agent-harness       codex | claude | gemini | opencode
 --agent-model         model name passed to Agent A
 --agent-image         Docker image; defaults to ptdbench-agent-harness:latest
@@ -246,6 +360,7 @@ Endpoint construction:
 The matching environment variables are:
 
 ```text
+PTDBENCH_EVALUATION_MODE
 PTDBENCH_AGENT_HARNESS
 PTDBENCH_AGENT_MODEL
 PTDBENCH_AGENT_IMAGE
@@ -258,7 +373,11 @@ PTDBENCH_JUDGE_MODEL
 PTDBENCH_JUDGE_API_KEY_ENV
 PTDBENCH_JUDGE_BASE_URL
 PTDBENCH_JUDGE_TIMEOUT
+PTDBENCH_WORKSPACE
+PTDBENCH_ORACLE
+PTDBENCH_VERIFIER
 PTDBENCH_RESULTS
+PTDBENCH_CASE_ID
 ```
 
 ## Timeouts
@@ -298,6 +417,7 @@ agent_prompt.txt                 fully assembled Agent prompt
 agent_stdout.txt
 agent_stderr.txt
 agent_trace.txt
+external_agent_trace.json        central Agent trace in judge-only mode
 agent_status.json
 agent_image_status.json          reused, built, or pulled image status
 agent_image_stdout.txt           Docker build/pull stdout
@@ -351,9 +471,10 @@ $PTDBENCH_RESULTS/result.json
 
 ## Isolation and secret handling
 
-- Agent A receives only the staged workspace, `instruction.md`, and its
-  assembled prompt.
-- `oracle/` is not mounted into the Agent container.
+- In standalone mode, Agent A receives only the staged workspace,
+  `instruction.md`, and its assembled prompt.
+- In central mode, Agent A is isolated by PTDBench before this verifier starts.
+- `oracle/` is never exposed to Agent A.
 - The container drops Linux capabilities, enables `no-new-privileges`, and
   uses a temporary home directory.
 - API key values are passed by environment, never by CLI argument.

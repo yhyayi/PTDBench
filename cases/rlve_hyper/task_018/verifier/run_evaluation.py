@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
 MAX_DIAGNOSIS_BYTES = 64 * 1024
+MAX_AGENT_TRACE_BYTES = 8 * 1024 * 1024
 DEFAULT_AGENT_IMAGE = "ptdbench-agent-harness:latest"
 ALLOWED_TASK_KEYS = {
     "task_id",
@@ -73,6 +74,17 @@ def env_int(name: str, default: int) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = SafeArgumentParser(
         description="Run isolated Agent A and direct-HTTP Judge B attribution evaluation."
+    )
+    parser.add_argument(
+        "--evaluation-mode",
+        choices=("auto", "standalone", "judge-only"),
+        default=os.environ.get("PTDBENCH_EVALUATION_MODE", "auto"),
+        help=(
+            "auto uses judge-only only when central PTDBench supplied both an "
+            "Agent trace and diagnosis; otherwise it uses standalone; standalone "
+            "runs Agent A and Judge B; judge-only grades an existing staged "
+            "diagnosis."
+        ),
     )
     parser.add_argument(
         "--agent-harness",
@@ -900,6 +912,7 @@ def initialize_run_files(run_dir: Path) -> None:
         ("agent_stdout.txt", ""),
         ("agent_stderr.txt", ""),
         ("agent_trace.txt", ""),
+        ("external_agent_trace.json", "{}\n"),
         ("agent_status.json", "{}\n"),
         ("agent_image_status.json", "{}\n"),
         ("agent_image_stdout.txt", ""),
@@ -922,6 +935,10 @@ def write_run_config(
     write_json(
         run_dir / "run_config.json",
         {
+            "evaluation_mode": {
+                "requested": args.evaluation_mode,
+                "effective": effective_evaluation_mode(args),
+            },
             "agent": {
                 "model": args.agent_model,
                 "harness": args.agent_harness,
@@ -936,6 +953,13 @@ def write_run_config(
                 "base_url": args.judge_base_url,
             },
             "start_time": start_time,
+            "ptdbench": {
+                "case_id": os.environ.get("PTDBENCH_CASE_ID", ""),
+                "workspace": os.environ.get("PTDBENCH_WORKSPACE", ""),
+                "oracle": os.environ.get("PTDBENCH_ORACLE", ""),
+                "verifier": os.environ.get("PTDBENCH_VERIFIER", ""),
+                "results": os.environ.get("PTDBENCH_RESULTS", ""),
+            },
             "timeouts": {
                 "agent_seconds": args.agent_timeout,
                 "judge_seconds": args.judge_timeout,
@@ -1034,6 +1058,104 @@ def prepare_run_paths(
     return run_dir, latest_root
 
 
+def central_agent_handoff_available() -> bool:
+    if os.environ.get("PTDBENCH_STAGE", "").strip() != "verifier":
+        return False
+    workspace_value = os.environ.get("PTDBENCH_WORKSPACE", "").strip()
+    results_value = os.environ.get("PTDBENCH_RESULTS", "").strip()
+    if not workspace_value or not results_value:
+        return False
+
+    workspace = Path(workspace_value).expanduser()
+    diagnosis_path = workspace / "outputs" / "diagnosis.txt"
+    trace_path = Path(results_value).expanduser() / "agent_trace.json"
+    try:
+        diagnosis_size = diagnosis_path.stat().st_size
+        trace_size = trace_path.stat().st_size
+    except OSError:
+        return False
+    return (
+        diagnosis_path.is_file()
+        and not diagnosis_path.is_symlink()
+        and not diagnosis_path.parent.is_symlink()
+        and 0 < diagnosis_size <= MAX_DIAGNOSIS_BYTES
+        and trace_path.is_file()
+        and not trace_path.is_symlink()
+        and 0 < trace_size <= MAX_AGENT_TRACE_BYTES
+    )
+
+
+def effective_evaluation_mode(args: argparse.Namespace) -> str:
+    requested = getattr(args, "evaluation_mode", "auto")
+    if requested != "auto":
+        return requested
+    if central_agent_handoff_available():
+        return "judge-only"
+    return "standalone"
+
+
+def load_central_agent_trace() -> Dict[str, Any]:
+    results_value = os.environ.get("PTDBENCH_RESULTS", "").strip()
+    if not results_value:
+        return {}
+    trace_path = Path(results_value).expanduser().resolve() / "agent_trace.json"
+    if not trace_path.is_file() or trace_path.is_symlink():
+        return {}
+    if trace_path.stat().st_size > MAX_AGENT_TRACE_BYTES:
+        raise EvaluationError("central agent_trace.json exceeds 8 MiB")
+    try:
+        value = json.loads(read_text(trace_path))
+    except json.JSONDecodeError as exc:
+        raise EvaluationError("central agent_trace.json is invalid JSON") from exc
+    if not isinstance(value, dict):
+        raise EvaluationError("central agent_trace.json must contain an object")
+    return value
+
+
+def model_from_agent_trace(trace: Dict[str, Any]) -> str:
+    result = trace.get("result")
+    argv = result.get("argv") if isinstance(result, dict) else None
+    if not isinstance(argv, list):
+        return ""
+    for index, item in enumerate(argv):
+        if item == "--model" and index + 1 < len(argv):
+            candidate = argv[index + 1]
+            return candidate if isinstance(candidate, str) else ""
+        if isinstance(item, str) and item.startswith("--model="):
+            return item.split("=", 1)[1]
+    return ""
+
+
+def infer_central_judge_configuration(args: argparse.Namespace) -> None:
+    if effective_evaluation_mode(args) != "judge-only":
+        return
+    trace = load_central_agent_trace()
+    inferred_model = model_from_agent_trace(trace)
+    if not args.judge_model and inferred_model:
+        args.judge_model = inferred_model
+    if not args.agent_model and inferred_model:
+        args.agent_model = inferred_model
+
+    trace_env = trace.get("env")
+    if not isinstance(trace_env, dict):
+        trace_env = {}
+    if not args.judge_base_url:
+        base_key = {
+            "openai-compatible": "OPENAI_BASE_URL",
+            "anthropic": "ANTHROPIC_BASE_URL",
+            "gemini": "GOOGLE_GEMINI_BASE_URL",
+        }[args.judge_provider]
+        candidate = trace_env.get(base_key) or os.environ.get(base_key, "")
+        if isinstance(candidate, str) and candidate and candidate != "<redacted>":
+            args.judge_base_url = candidate
+    if not args.judge_api_key_env:
+        args.judge_api_key_env = {
+            "openai-compatible": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+            "gemini": "GOOGLE_API_KEY",
+        }[args.judge_provider]
+
+
 def normalize_timeouts(args: argparse.Namespace) -> None:
     if args.agent_timeout == 0:
         args.agent_timeout = None
@@ -1050,60 +1172,76 @@ def normalized_env_secret(name: str) -> str:
 
 def validate_configuration(args: argparse.Namespace) -> List[str]:
     normalize_timeouts(args)
+    mode = effective_evaluation_mode(args)
     for value, label in (
         (args.agent_timeout, "agent timeout"),
         (args.judge_timeout, "judge timeout"),
     ):
         if value is not None and value < 0:
             raise EvaluationError(f"{label} must not be negative")
-    if not args.agent_network or "\x00" in args.agent_network:
+    if mode == "standalone" and (
+        not args.agent_network or "\x00" in args.agent_network
+    ):
         raise EvaluationError("agent network must be non-empty")
     if args.agent_command and not args.test_mode:
         raise EvaluationError("--agent-command requires --test-mode")
     if args.judge_command and not args.test_mode:
         raise EvaluationError("--judge-command requires --test-mode")
+    if mode == "judge-only" and not os.environ.get(
+        "PTDBENCH_WORKSPACE", ""
+    ).strip():
+        raise EvaluationError(
+            "judge-only mode requires PTDBENCH_WORKSPACE from the central evaluator"
+        )
     if args.test_mode:
-        if not args.agent_command or not args.judge_command:
+        if not args.judge_command or (
+            mode == "standalone" and not args.agent_command
+        ):
             raise EvaluationError(
-                "--test-mode requires both --agent-command and --judge-command"
+                "--test-mode requires --judge-command and standalone mode also "
+                "requires --agent-command"
             )
         values = []
-        for name, label in (
-            (args.agent_api_key_env, "agent API key env-name"),
-            (args.judge_api_key_env, "judge API key env-name"),
-        ):
+        names = [(args.judge_api_key_env, "judge API key env-name")]
+        if mode == "standalone":
+            names.insert(0, (args.agent_api_key_env, "agent API key env-name"))
+        for name, label in names:
             if name:
                 validate_env_name(name, label)
                 value = normalized_env_secret(name)
                 if value:
                     values.append(value)
         return values
-    for value, label in (
-        (args.agent_model, "agent model"),
-        (args.agent_image, "agent image"),
-        (args.agent_api_key_env, "agent API key env-name"),
+    required = [
         (args.judge_model, "judge model"),
         (args.judge_api_key_env, "judge API key env-name"),
-    ):
+    ]
+    if mode == "standalone":
+        required[0:0] = [
+            (args.agent_model, "agent model"),
+            (args.agent_image, "agent image"),
+            (args.agent_api_key_env, "agent API key env-name"),
+        ]
+    for value, label in required:
         if not value:
             raise EvaluationError(f"{label} is required")
-    validate_env_name(args.agent_api_key_env, "agent API key env-name")
     validate_env_name(args.judge_api_key_env, "judge API key env-name")
-    validate_url(args.agent_base_url, "agent base URL")
     validate_url(args.judge_base_url, "judge base URL")
-    normalized_secrets = {
-        name: normalized_env_secret(name)
-        for name in (args.agent_api_key_env, args.judge_api_key_env)
-    }
+    names = [args.judge_api_key_env]
+    if mode == "standalone":
+        validate_env_name(args.agent_api_key_env, "agent API key env-name")
+        validate_url(args.agent_base_url, "agent base URL")
+        names.insert(0, args.agent_api_key_env)
+    normalized_secrets = {name: normalized_env_secret(name) for name in names}
     missing = [name for name, value in normalized_secrets.items() if not value]
     if missing:
         raise EvaluationError(
-            "required API key environment variable is unset: " + ", ".join(missing)
+            "required API key environment variable is unset: "
+            + ", ".join(missing)
+            + "; export the key in the parent shell (do not pass only "
+            "--api-key to the central PTDBench CLI)"
         )
-    return [
-        normalized_secrets[args.agent_api_key_env],
-        normalized_secrets[args.judge_api_key_env],
-    ]
+    return [normalized_secrets[name] for name in names]
 
 
 def run_evaluation(
@@ -1113,11 +1251,32 @@ def run_evaluation(
     latest_root: Path,
     secret_values: Sequence[str],
 ) -> int:
+    mode = effective_evaluation_mode(args)
     case_root = verifier_dir.parent
-    workspace_source = case_root / "workspace"
+    verifier_contract = os.environ.get("PTDBENCH_VERIFIER", "").strip()
+    if verifier_contract:
+        contract_path = Path(verifier_contract).expanduser().resolve()
+        if contract_path != verifier_dir.resolve():
+            raise EvaluationError(
+                "PTDBENCH_VERIFIER does not identify this verifier directory"
+            )
+
+    if mode == "judge-only":
+        workspace_source = Path(
+            os.environ["PTDBENCH_WORKSPACE"]
+        ).expanduser().resolve()
+        oracle_value = os.environ.get("PTDBENCH_ORACLE", "").strip()
+        oracle_dir = (
+            Path(oracle_value).expanduser().resolve()
+            if oracle_value
+            else case_root / "oracle"
+        )
+    else:
+        workspace_source = case_root / "workspace"
+        oracle_dir = case_root / "oracle"
     instruction_path = case_root / "instruction.md"
-    standard_answer_path = case_root / "oracle" / "standard_answer.txt"
-    task_yaml_path = case_root / "oracle" / "task.yaml"
+    standard_answer_path = oracle_dir / "standard_answer.txt"
+    task_yaml_path = oracle_dir / "task.yaml"
     for path, label in (
         (workspace_source, "workspace"),
         (instruction_path, "instruction.md"),
@@ -1127,7 +1286,7 @@ def run_evaluation(
         if not path.exists():
             raise EvaluationError(f"missing case {label}")
 
-    if not args.test_mode:
+    if mode == "standalone" and not args.test_mode:
         ensure_agent_image(args, verifier_dir, run_dir, secret_values)
 
     workspace = run_dir / "workspace"
@@ -1141,35 +1300,82 @@ def run_evaluation(
             if not path.is_symlink():
                 path.chmod(path.stat().st_mode | (0o700 if path.is_dir() else 0o600))
     diagnosis_path = guarded_diagnosis_path(workspace)
-    if diagnosis_path.is_file():
-        diagnosis_path.unlink()
-    elif diagnosis_path.exists():
-        raise EvaluationError("staged diagnosis path is not a regular file")
+    if mode == "standalone":
+        if diagnosis_path.is_file():
+            diagnosis_path.unlink()
+        elif diagnosis_path.exists():
+            raise EvaluationError("staged diagnosis path is not a regular file")
 
     instruction = read_text(instruction_path)
-    agent_template = read_text(verifier_dir / "agent_prompt.txt")
-    assembled_prompt = assemble_agent_prompt(agent_template, instruction)
     prompt_path = run_dir / "agent_prompt.txt"
-    atomic_write_text(prompt_path, assembled_prompt)
-
-    if args.test_mode:
-        agent_rc = run_agent_fixture(
-            args,
-            run_dir,
-            workspace,
-            instruction_path,
-            prompt_path,
-            secret_values,
+    if mode == "judge-only":
+        central_trace = load_central_agent_trace()
+        trace_text = json.dumps(
+            central_trace, ensure_ascii=False, indent=2, sort_keys=True
+        ) + "\n"
+        safe_trace = redact(trace_text, secret_values)
+        atomic_write_text(run_dir / "external_agent_trace.json", safe_trace)
+        atomic_write_text(run_dir / "agent_trace.txt", safe_trace)
+        central_prompt = central_trace.get("prompt")
+        if isinstance(central_prompt, str) and central_prompt.strip():
+            atomic_write_text(prompt_path, redact(central_prompt, secret_values))
+        else:
+            atomic_write_text(
+                prompt_path,
+                "Agent A was executed by the central PTDBench evaluator. "
+                "See external_agent_trace.json when available.\n",
+            )
+        trace_result = central_trace.get("result")
+        if not isinstance(trace_result, dict):
+            trace_result = {}
+        trace_returncode = trace_result.get("returncode")
+        agent_rc = trace_returncode if type(trace_returncode) is int else 0
+        atomic_write_text(
+            run_dir / "agent_stdout.txt",
+            redact(str(trace_result.get("stdout", "")), secret_values),
+        )
+        atomic_write_text(
+            run_dir / "agent_stderr.txt",
+            redact(str(trace_result.get("stderr", "")), secret_values),
+        )
+        write_json(
+            run_dir / "agent_status.json",
+            {
+                "returncode": agent_rc,
+                "source": "central_ptdbench",
+                "executed_by_verifier": False,
+            },
+        )
+        write_json(
+            run_dir / "agent_image_status.json",
+            {
+                "source": "central_ptdbench",
+                "skipped": True,
+                "reason": "judge-only mode does not start a nested Agent container",
+            },
         )
     else:
-        agent_rc = run_agent_docker(
-            args,
-            run_dir,
-            workspace,
-            instruction_path,
-            prompt_path,
-            secret_values,
-        )
+        agent_template = read_text(verifier_dir / "agent_prompt.txt")
+        assembled_prompt = assemble_agent_prompt(agent_template, instruction)
+        atomic_write_text(prompt_path, assembled_prompt)
+        if args.test_mode:
+            agent_rc = run_agent_fixture(
+                args,
+                run_dir,
+                workspace,
+                instruction_path,
+                prompt_path,
+                secret_values,
+            )
+        else:
+            agent_rc = run_agent_docker(
+                args,
+                run_dir,
+                workspace,
+                instruction_path,
+                prompt_path,
+                secret_values,
+            )
 
     try:
         diagnosis_path = guarded_diagnosis_path(workspace, require_file=True)
@@ -1253,7 +1459,12 @@ def run_self_tests(verifier_dir: Path) -> int:
             "cli-wins",
         ]
     )
-    check(parsed.self_test and parsed.agent_model == "cli-wins", "CLI parser")
+    check(
+        parsed.self_test
+        and parsed.agent_model == "cli-wins"
+        and parsed.evaluation_mode == "auto",
+        "CLI parser",
+    )
     default_timeouts = parser.parse_args([])
     normalize_timeouts(default_timeouts)
     check(
@@ -1283,6 +1494,76 @@ def run_self_tests(verifier_dir: Path) -> int:
         and custom_command == ["docker", "pull", "ghcr.io/example/agent:v1"],
         "custom image auto-pull command",
     )
+    central_env_names = (
+        "PTDBENCH_STAGE",
+        "PTDBENCH_WORKSPACE",
+        "PTDBENCH_RESULTS",
+        "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+    )
+    previous_central_env = {
+        name: os.environ.get(name) for name in central_env_names
+    }
+    with tempfile.TemporaryDirectory() as temporary:
+        central_root = Path(temporary)
+        central_workspace = central_root / "workspace"
+        central_results = central_root / "results"
+        central_workspace.mkdir()
+        central_results.mkdir()
+        write_json(
+            central_results / "agent_trace.json",
+            {
+                "kind": "codex",
+                "env": {"OPENAI_BASE_URL": "https://example.invalid/v1"},
+                "result": {
+                    "argv": ["codex", "exec", "--model", "central-model"],
+                    "returncode": 0,
+                },
+            },
+        )
+        os.environ.update(
+            {
+                "PTDBENCH_STAGE": "verifier",
+                "PTDBENCH_WORKSPACE": str(central_workspace),
+                "PTDBENCH_RESULTS": str(central_results),
+                "OPENAI_API_KEY": " central-secret ",
+            }
+        )
+        try:
+            central_args = parser.parse_args(
+                ["--test-mode", "--judge-command", "true"]
+            )
+            check(
+                effective_evaluation_mode(central_args) == "standalone",
+                "central PTDBench without diagnosis defaults to standalone",
+            )
+            diagnosis_dir = central_workspace / "outputs"
+            diagnosis_dir.mkdir()
+            atomic_write_text(
+                diagnosis_dir / "diagnosis.txt",
+                "VERDICT: healthy\nPRIMARY_ATTRIBUTION: none\n",
+            )
+            central_args = parser.parse_args(
+                ["--test-mode", "--judge-command", "true"]
+            )
+            infer_central_judge_configuration(central_args)
+            central_secrets = validate_configuration(central_args)
+            check(
+                effective_evaluation_mode(central_args) == "judge-only"
+                and central_args.agent_model == "central-model"
+                and central_args.judge_model == "central-model"
+                and central_args.judge_api_key_env == "OPENAI_API_KEY"
+                and central_args.judge_base_url
+                == "https://example.invalid/v1"
+                and central_secrets == ["central-secret"],
+                "central PTDBench judge-only inference",
+            )
+        finally:
+            for name, value in previous_central_env.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
     positive_timeouts = parser.parse_args(
         ["--agent-timeout", "9", "--judge-timeout", "11"]
     )
@@ -1296,6 +1577,8 @@ def run_self_tests(verifier_dir: Path) -> int:
     negative_timeouts = parser.parse_args(
         [
             "--test-mode",
+            "--evaluation-mode",
+            "standalone",
             "--agent-command",
             "true",
             "--judge-command",
@@ -1542,6 +1825,8 @@ oracle:
         test_args = parser.parse_args(
             [
                 "--test-mode",
+                "--evaluation-mode",
+                "standalone",
                 "--agent-command",
                 "true",
                 "--judge-command",
@@ -1787,6 +2072,101 @@ oracle:
             "complete process artifacts initialized in run folder",
         )
 
+        central_workspace = Path(temporary) / "central-workspace"
+        central_outputs = central_workspace / "outputs"
+        central_outputs.mkdir(parents=True)
+        central_diagnosis = (
+            "VERDICT: healthy\nPRIMARY_ATTRIBUTION: none\nEVIDENCE:\n"
+            "central fixture\nCAUSAL_EXPLANATION:\ncentral fixture\n"
+        )
+        (central_outputs / "diagnosis.txt").write_text(
+            central_diagnosis, encoding="utf-8"
+        )
+        central_results = Path(temporary) / "central-results"
+        central_results.mkdir()
+        write_json(
+            central_results / "agent_trace.json",
+            {
+                "kind": "shell",
+                "prompt": "central Agent prompt",
+                "result": {
+                    "argv": ["sh", "-lc", "fixture"],
+                    "returncode": 9,
+                    "stdout": "central stdout",
+                    "stderr": "",
+                },
+            },
+        )
+        contract_env = {
+            "PTDBENCH_STAGE": "verifier",
+            "PTDBENCH_WORKSPACE": str(central_workspace),
+            "PTDBENCH_ORACLE": str(synthetic_case / "oracle"),
+            "PTDBENCH_VERIFIER": str(synthetic_verifier),
+            "PTDBENCH_RESULTS": str(central_results),
+            "PTDBENCH_CASE_ID": "synthetic",
+        }
+        previous_contract_env = {
+            name: os.environ.get(name) for name in contract_env
+        }
+        os.environ.update(contract_env)
+        try:
+            central_fixture_args = parser.parse_args(
+                [
+                    "--test-mode",
+                    "--evaluation-mode",
+                    "judge-only",
+                    "--judge-command",
+                    shlex.quote(sys.executable)
+                    + " -c "
+                    + shlex.quote(judge_code),
+                    "--judge-model",
+                    "fixture",
+                ]
+            )
+            central_fixture_secrets = validate_configuration(
+                central_fixture_args
+            )
+            central_run = central_results / "central-fixture"
+            central_run.mkdir()
+            initialize_run_files(central_run)
+            write_run_config(
+                central_run,
+                central_fixture_args,
+                "2026-08-08T15:30:00.123456+00:00",
+            )
+            central_rc = run_evaluation(
+                central_fixture_args,
+                synthetic_verifier,
+                central_run,
+                central_results,
+                central_fixture_secrets,
+            )
+            central_metrics = json.loads(
+                read_text(central_run / "metrics.json")
+            )
+            central_image_status = json.loads(
+                read_text(central_run / "agent_image_status.json")
+            )
+            check(
+                central_rc == 0
+                and central_metrics.get("agent_returncode") == 9
+                and central_metrics.get("diagnosis_attribution_score") == 1
+                and read_text(
+                    central_run / "workspace" / "outputs" / "diagnosis.txt"
+                )
+                == central_diagnosis
+                and central_image_status.get("skipped") is True
+                and (central_run / "external_agent_trace.json").is_file()
+                and (central_results / "result.json").is_file(),
+                "central staged workspace judge-only contract",
+            )
+        finally:
+            for name, value in previous_contract_env.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
     if failures:
         for failure in failures:
             print("FAIL:", failure, file=sys.stderr)
@@ -1848,6 +2228,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         args = build_parser().parse_args(argv)
         if args.self_test:
             return run_self_tests(verifier_dir)
+        infer_central_judge_configuration(args)
         start_time = dt.datetime.now(dt.timezone.utc).isoformat(timespec="microseconds")
         run_id = make_run_id(args.run_id, args.agent_model, args.agent_harness)
         run_dir, latest_root = prepare_run_paths(verifier_dir, run_id)

@@ -11,7 +11,7 @@ from .agents import AgentExecutionContext, AgentRunner, create_agent_runner, res
 from .executor import CommandSpec, DockerExecutor, DockerImageSpec, DockerMount, LocalExecutor
 from .filesystem import copy_tree, ensure_dir, tree_digest, write_text
 from .schema import SchemaError, load_case_package
-from .types import CasePackage, EvaluationConfig, EvaluationResult
+from .types import AgentSpec, CasePackage, EvaluationConfig, EvaluationResult
 
 
 @dataclass(frozen=True)
@@ -76,7 +76,13 @@ class CaseEvaluator:
                     image_tag=image_tag,
                 )
                 self._ensure_agent_trace(run.results, agent_runner, agent_result)
-            verifier_result = self._run_verifier(package, run, config, image_tag=image_tag)
+            verifier_result = self._run_verifier(
+                package,
+                run,
+                config,
+                image_tag=image_tag,
+                agent_spec=agent_spec,
+            )
             # agent 修改后重新计算 staged workspace 的哈希，用稳定方式记录
             # 这次修复是否真的改动了文件。
             workspace_after_hash = tree_digest(run.workspace)
@@ -170,13 +176,24 @@ class CaseEvaluator:
         }
         write_text(trace_path, json.dumps(payload, indent=2, ensure_ascii=False))
 
-    def _run_verifier(self, package: CasePackage, run: PreparedRun, config: EvaluationConfig, image_tag: Optional[str]) -> Any:
+    def _run_verifier(
+        self,
+        package: CasePackage,
+        run: PreparedRun,
+        config: EvaluationConfig,
+        image_tag: Optional[str],
+        agent_spec: Optional[AgentSpec],
+    ) -> Any:
         if self.backend == "local":
             # local verifier 直接在源 case 目录运行，方便快速迭代。
+            verifier_env = self._common_env(
+                package, run, stage="verifier", container=False
+            )
+            verifier_env.update(self._local_verifier_handoff_env(agent_spec))
             spec = CommandSpec(
                 shell=config.verifier_cmd or "bash verifier/test.sh",
                 cwd=package.paths.root,
-                env=self._common_env(package, run, stage="verifier", container=False),
+                env=verifier_env,
                 timeout_s=config.timeout_s,
             )
             return self.local.run(spec)
@@ -196,6 +213,29 @@ class CaseEvaluator:
         ]
         result = self.docker.run(tag, spec, mounts=mounts, workdir="/workspace", network=config.verifier_network)
         return result
+
+    def _local_verifier_handoff_env(
+        self, agent_spec: Optional[AgentSpec]
+    ) -> Dict[str, str]:
+        """Forward central CLI settings without serializing them into artifacts.
+
+        This handoff is local-only. DockerExecutor places explicit environment
+        values in its argv, so forwarding API keys there would leak secrets into
+        process listings and CommandResult.
+        """
+        if agent_spec is None:
+            return {}
+        env = {"PTDBENCH_CENTRAL_AGENT_KIND": agent_spec.kind}
+        if agent_spec.kind == "codex":
+            env["PTDBENCH_JUDGE_PROVIDER"] = "openai-compatible"
+        if agent_spec.model:
+            env["PTDBENCH_JUDGE_MODEL"] = agent_spec.model
+        if agent_spec.base_url:
+            env["PTDBENCH_JUDGE_BASE_URL"] = agent_spec.base_url
+        if agent_spec.api_key:
+            env["PTDBENCH_JUDGE_API_KEY_ENV"] = "PTDBENCH_JUDGE_API_KEY"
+            env["PTDBENCH_JUDGE_API_KEY"] = agent_spec.api_key
+        return env
 
     def _common_env(self, package: CasePackage, run: PreparedRun, stage: str, container: bool) -> Dict[str, str]:
         if container:

@@ -43,6 +43,21 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
   --json
 ```
 
+在 `--backend local` 下，中央 evaluator 会把 `--model`、`--base-url`
+和 `--api-key` 通过 verifier 子进程环境转交给需要 LLM Judge 的
+self-contained verifier。Codex case 默认让 Judge 使用同一个
+OpenAI-compatible model、base URL 和 API key；task verifier 仍可用
+`PTDBENCH_JUDGE_*` 环境变量覆盖 Judge 设置。该转交不会把 key 写进
+`report.json` 或 agent trace。Docker verifier backend 不转交 key，以免
+secret 出现在 Docker argv 中。
+
+直接写 `--api-key` 可能被同机进程列表看到；在不要求完全复现上述命令时，
+仍建议从受保护的环境变量展开：
+
+```bash
+--api-key "$OPENAI_API_KEY"
+```
+
 如果你只想先看 verifier 是否能跑通，也可以先挂一个空 agent：
 
 ```bash
