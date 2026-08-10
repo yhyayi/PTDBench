@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional, Sequence
 
 @dataclass(frozen=True)
 class CasePaths:
-    # 一个提交包解析后的文件系统布局。
+    """一个 case package 解析后的文件系统布局。"""
+
     root: Path
     instruction_md: Path
     readme_md: Optional[Path]
@@ -23,7 +24,8 @@ class CasePaths:
 
 @dataclass(frozen=True)
 class ValidationIssue:
-    # validator 产出的一条 schema 或目录结构问题。
+    """validator 产出的一条目录或 schema 问题。"""
+
     severity: str
     path: str
     message: str
@@ -31,7 +33,8 @@ class ValidationIssue:
 
 @dataclass
 class ValidationReport:
-    # 汇总所有校验问题，方便贡献者一次性修完。
+    """汇总所有校验问题，方便贡献者一次性修复。"""
+
     issues: List[ValidationIssue] = field(default_factory=list)
 
     @property
@@ -45,15 +48,16 @@ class ValidationReport:
         return {
             "ok": self.ok,
             "issues": [
-                {"severity": i.severity, "path": i.path, "message": i.message}
-                for i in self.issues
+                {"severity": item.severity, "path": item.path, "message": item.message}
+                for item in self.issues
             ],
         }
 
 
 @dataclass(frozen=True)
 class CasePackage:
-    # 加载后的 package：包含解析好的路径、metadata，以及加载时生成的校验报告。
+    """加载后的 case：路径、metadata 和校验报告。"""
+
     paths: CasePaths
     metadata: Dict[str, Any]
     report: ValidationReport
@@ -69,7 +73,8 @@ class CasePackage:
 
 @dataclass(frozen=True)
 class AgentSpec:
-    # 统一后的 agent 描述：先支持 codex 和裸 shell 两种形态，后续可以继续扩展。
+    """统一后的 agent 配置。"""
+
     kind: str = "codex"
     command: Optional[str] = None
     model: Optional[str] = None
@@ -94,7 +99,8 @@ class AgentSpec:
 
 @dataclass(frozen=True)
 class CommandResult:
-    # 一次进程执行的轻量记录，agent 和 verifier 共用。
+    """一次命令执行的统一结果，agent 和 verifier 共用。"""
+
     argv: List[str]
     returncode: int
     stdout: str
@@ -117,7 +123,8 @@ class CommandResult:
 
 @dataclass(frozen=True)
 class StageArtifact:
-    # 给后续阶段预留的 artifact 记录结构。
+    """给后续评测阶段预留的 artifact 记录结构。"""
+
     name: str
     path: Path
     command: Optional[CommandResult] = None
@@ -126,7 +133,8 @@ class StageArtifact:
 
 @dataclass(frozen=True)
 class EvaluationConfig:
-    # 调用方选择的运行时配置，和 case package 自身数据分开。
+    """调用方运行时配置，与 case package 自身数据分开。"""
+
     agent: Optional[AgentSpec] = None
     agent_cmd: Optional[str] = None
     verifier_cmd: Optional[str] = None
@@ -140,7 +148,8 @@ class EvaluationConfig:
 
 @dataclass(frozen=True)
 class EvaluationResult:
-    # PTDBench 输出的最终评测摘要。
+    """PTDBench 输出的最终评测摘要。"""
+
     case_id: str
     passed: bool
     score: Optional[float]

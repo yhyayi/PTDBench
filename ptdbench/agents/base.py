@@ -2,38 +2,54 @@ from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from ..executor import CommandResult, DockerExecutor, LocalExecutor
-from ..filesystem import write_text
-from ..types import AgentSpec
+from ..core.types import AgentSpec, CommandResult
+from ..runtimes import EnvironmentArtifact, SandboxRequest, SandboxRuntime
+from ..utils.filesystem import write_text
 
 
 @dataclass(frozen=True)
 class AgentExecutionContext:
-    # agent 运行时只看这个上下文，不直接依赖 evaluator 内部结构。
+    # agent 运行时只看这个上下文，不直接依赖 evaluator 或具体 runtime。
     case_id: str
     instruction: str
     metadata: Dict[str, Any]
     timeout_s: Optional[int]
-    local_workspace: Path
-    local_visible_case: Path
-    local_results: Path
-    local_env: Dict[str, str] = field(default_factory=dict)
-    container_workspace: str = "/workspace"
-    container_visible_case: str = "/case"
-    container_results: str = "/results"
-    container_env: Dict[str, str] = field(default_factory=dict)
+    case_root: Path
+    workspace: Path
+    visible_case: Path
+    results: Path
+
+    def sandbox_request(
+        self,
+        runtime: SandboxRuntime,
+        *,
+        env: Optional[Dict[str, str]] = None,
+        network: str = "none",
+        workdir: str = "workspace",
+    ) -> SandboxRequest:
+        """为 agent 创建统一的运行请求，路径细节交给 runtime 解析。"""
+        return SandboxRequest(
+            stage="agent",
+            case_id=self.case_id,
+            host_case_root=self.case_root,
+            host_visible_case=self.visible_case,
+            host_workspace=self.workspace,
+            host_results=self.results,
+            env=env or {},
+            network=network,
+            timeout_s=self.timeout_s,
+            workdir=workdir,
+        )
 
 
 class AgentRunner(ABC):
     # 每个具体 agent 都实现这个接口；evaluator 只依赖这里。
     def __init__(self, spec: AgentSpec, default_backend: str = "local"):
         backend = spec.backend or default_backend
-        if backend not in {"docker", "local"}:
-            raise ValueError("agent backend must be 'docker' or 'local'")
         self.spec = spec
         self.backend = backend
 
@@ -43,7 +59,8 @@ class AgentRunner(ABC):
 
     @property
     def needs_environment_image(self) -> bool:
-        return self.backend == "docker"
+        # 兼容旧调用方；正式流程由 SandboxRuntime 决定是否需要镜像。
+        return self.backend != "local"
 
     def _write_agent_trace(self, results_dir: Path, payload: Dict[str, Any]) -> Path:
         # 统一把 agent 的最终轨迹收敛成一个 JSON 文件，减少 results 里的碎片。
@@ -66,9 +83,8 @@ class AgentRunner(ABC):
         self,
         context: AgentExecutionContext,
         *,
-        local: LocalExecutor,
-        docker: DockerExecutor,
-        image_tag: Optional[str],
+        runtime: SandboxRuntime,
+        artifact: Optional[EnvironmentArtifact],
     ) -> CommandResult:
-        # 具体 agent 负责把自己的 spec 和 context 翻译成一次可执行调用。
+        # 具体 agent 只负责把 spec 翻译成命令；执行平台由 runtime 提供。
         raise NotImplementedError

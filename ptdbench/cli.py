@@ -5,8 +5,8 @@ import json
 import sys
 from pathlib import Path
 
-from .evaluator import CaseEvaluator
-from .types import AgentSpec, EvaluationConfig
+from .core.types import AgentSpec, EvaluationConfig
+from .evaluation.evaluator import CaseEvaluator
 
 
 def build_parser() -> argparse.ArgumentParser:

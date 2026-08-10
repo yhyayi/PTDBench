@@ -1,14 +1,7 @@
-"""给本仓库受控 schema 使用的轻量 YAML 读取器。
+"""给 metadata 使用的轻量 YAML 读取器。
 
-它刻意保持小而无依赖，支持：
-- 基于缩进的 mapping
-- 使用 "- " 的 list
-- 嵌套 mapping/list
-- 行内空 dict/list：{} 和 []
-- bool、null、int、float
-- 引号字符串
-
-它不是完整 YAML parser。
+这里只支持 PTDBench schema 实际需要的 YAML 子集，不引入额外依赖，也不
+试图成为完整的 YAML 解析器。
 """
 
 from __future__ import annotations
@@ -19,7 +12,7 @@ from typing import Any, List, Sequence, Tuple
 
 
 class SimpleYamlError(ValueError):
-    pass
+    """轻量 YAML 解析失败。"""
 
 
 @dataclass(frozen=True)
@@ -30,7 +23,7 @@ class _Line:
 
 
 def load_simple_yaml_text(text: str) -> Any:
-    # 解析 metadata 需要的 YAML 子集；目标是稳定可控，不追求完整 YAML 兼容。
+    """解析 mapping、list、嵌套缩进和基础标量类型。"""
     lines = _tokenize(text.splitlines())
     if not lines:
         return {}
@@ -42,58 +35,55 @@ def load_simple_yaml_text(text: str) -> Any:
 
 
 def load_simple_yaml(path: str) -> Any:
-    with open(path, "r", encoding="utf-8") as f:
-        return load_simple_yaml_text(f.read())
+    """读取并解析一个 YAML 文件。"""
+    with open(path, "r", encoding="utf-8") as file:
+        return load_simple_yaml_text(file.read())
 
 
 def _tokenize(raw_lines: Sequence[str]) -> List[_Line]:
     tokens: List[_Line] = []
-    for idx, raw in enumerate(raw_lines, 1):
-        stripped = _strip_comment(raw.rstrip("\n"))
+    for index, raw_line in enumerate(raw_lines, 1):
+        stripped = _strip_comment(raw_line.rstrip("\n"))
         if not stripped.strip():
             continue
         if "\t" in stripped:
-            raise SimpleYamlError(f"tabs are not supported (line {idx})")
+            raise SimpleYamlError(f"tabs are not supported (line {index})")
         indent = len(stripped) - len(stripped.lstrip(" "))
-        content = stripped[indent:]
-        tokens.append(_Line(idx, indent, content))
+        tokens.append(_Line(index, indent, stripped[indent:]))
     return tokens
 
 
 def _strip_comment(line: str) -> str:
-    # 去注释时要识别引号，避免把 "a # b" 这种字符串截断。
+    # 只有不在引号内的 # 才是注释起点。
     in_single = False
     in_double = False
     escaped = False
-    for pos, ch in enumerate(line):
-        if ch == "\\" and in_double and not escaped:
+    for position, char in enumerate(line):
+        if char == "\\" and in_double and not escaped:
             escaped = True
             continue
-        if ch == "'" and not in_double and not escaped:
+        if char == "'" and not in_double and not escaped:
             in_single = not in_single
-        elif ch == '"' and not in_single and not escaped:
+        elif char == '"' and not in_single and not escaped:
             in_double = not in_double
-        elif ch == "#" and not in_single and not in_double:
-            return line[:pos].rstrip()
+        elif char == "#" and not in_single and not in_double:
+            return line[:position].rstrip()
         escaped = False
     return line.rstrip()
 
 
 def _parse_block(lines: Sequence[_Line], index: int, indent: int) -> Tuple[Any, int]:
-    # 根据当前块第一个有效 token 判断是 mapping 还是 list。
     if index >= len(lines):
         return {}, index
-    line = lines[index]
-    if line.indent < indent:
+    if lines[index].indent < indent:
         return {}, index
-    if line.content.startswith("- "):
+    if lines[index].content.startswith("- "):
         return _parse_list(lines, index, indent)
     return _parse_mapping(lines, index, indent)
 
 
 def _parse_mapping(lines: Sequence[_Line], index: int, indent: int) -> Tuple[dict, int]:
-    # 解析器按缩进工作：更深一层缩进代表一个嵌套块。
-    out = {}
+    result = {}
     while index < len(lines):
         line = lines[index]
         if line.indent < indent:
@@ -105,19 +95,18 @@ def _parse_mapping(lines: Sequence[_Line], index: int, indent: int) -> Tuple[dic
         key, value, has_value = _split_key_value(line.content, line.number)
         index += 1
         if has_value:
-            out[key] = _parse_scalar(value)
+            result[key] = _parse_scalar(value)
             continue
         if index < len(lines) and lines[index].indent > indent:
             child, index = _parse_block(lines, index, lines[index].indent)
-            out[key] = child
+            result[key] = child
         else:
-            out[key] = None
-    return out, index
+            result[key] = None
+    return result, index
 
 
 def _parse_list(lines: Sequence[_Line], index: int, indent: int) -> Tuple[list, int]:
-    # list 元素可以是标量，也可以是行内 mapping。
-    out = []
+    result = []
     while index < len(lines):
         line = lines[index]
         if line.indent < indent:
@@ -133,7 +122,7 @@ def _parse_list(lines: Sequence[_Line], index: int, indent: int) -> Tuple[list, 
                 item, index = _parse_block(lines, index, lines[index].indent)
             else:
                 item = None
-            out.append(item)
+            result.append(item)
             continue
         if ":" in payload:
             key, value, has_value = _split_key_value(payload, line.number)
@@ -144,36 +133,39 @@ def _parse_list(lines: Sequence[_Line], index: int, indent: int) -> Tuple[list, 
             elif has_value and index < len(lines) and lines[index].indent > indent:
                 child, index = _parse_block(lines, index, lines[index].indent)
                 if not isinstance(child, dict):
-                    raise SimpleYamlError(f"list item at line {line.number} expects mapping continuation")
+                    raise SimpleYamlError(
+                        f"list item at line {line.number} expects mapping continuation"
+                    )
                 item.update(child)
-            out.append(item)
+            result.append(item)
             continue
-        out.append(_parse_scalar(payload))
+        result.append(_parse_scalar(payload))
         if index < len(lines) and lines[index].indent > indent:
-            raise SimpleYamlError(f"scalar list item at line {line.number} cannot have a nested block")
-    return out, index
+            raise SimpleYamlError(
+                f"scalar list item at line {line.number} cannot have a nested block"
+            )
+    return result, index
 
 
-def _split_key_value(content: str, line_no: int) -> Tuple[str, str, bool]:
-    # 按第一个未被引号包住的冒号分割 key/value。
+def _split_key_value(content: str, line_number: int) -> Tuple[str, str, bool]:
+    # 按第一个不在引号内的冒号切分 key/value。
     in_single = False
     in_double = False
-    for pos, ch in enumerate(content):
-        if ch == "'" and not in_double:
+    for position, char in enumerate(content):
+        if char == "'" and not in_double:
             in_single = not in_single
-        elif ch == '"' and not in_single:
+        elif char == '"' and not in_single:
             in_double = not in_double
-        elif ch == ":" and not in_single and not in_double:
-            key = content[:pos].strip()
-            value = content[pos + 1 :].strip()
+        elif char == ":" and not in_single and not in_double:
+            key = content[:position].strip()
+            value = content[position + 1 :].strip()
             if not key:
-                raise SimpleYamlError(f"missing key before ':' at line {line_no}")
+                raise SimpleYamlError(f"missing key before ':' at line {line_number}")
             return key, value, bool(value)
-    raise SimpleYamlError(f"expected key: value at line {line_no}")
+    raise SimpleYamlError(f"expected key: value at line {line_number}")
 
 
 def _parse_scalar(raw: str) -> Any:
-    # 先尝试解析成字面量类型，最后再退回普通字符串。
     text = raw.strip()
     if text in {"", "~", "null", "Null", "NULL"}:
         return None

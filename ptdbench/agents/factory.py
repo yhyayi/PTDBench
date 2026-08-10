@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable, Dict, Optional, Type
 
-from ..types import AgentSpec
+from ..core.types import AgentSpec
 from .base import AgentRunner
 
 _REGISTRY: Dict[str, Type[AgentRunner]] = {}

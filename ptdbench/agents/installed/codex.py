@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Optional
 
-from ...executor import CommandSpec, DockerExecutor, DockerMount, LocalExecutor
-from ...types import CommandResult
+from ...core.types import CommandResult
+from ...runtimes import CommandSpec, EnvironmentArtifact, SandboxRuntime
 from ..base import AgentExecutionContext, AgentRunner
 from ..factory import register_agent_runner
 
@@ -17,52 +17,25 @@ class CodexAgentRunner(AgentRunner):
         self,
         context: AgentExecutionContext,
         *,
-        local: LocalExecutor,
-        docker: DockerExecutor,
-        image_tag: Optional[str],
+        runtime: SandboxRuntime,
+        artifact: Optional[EnvironmentArtifact],
     ) -> CommandResult:
         prompt = self._build_prompt(context)
-        env = self._build_env(context)
-        runtime_last_message_path = self._runtime_last_message_path(context)
-        last_message_host_path = self._last_message_host_path(context)
-        argv = self._build_argv(prompt, last_message_path=runtime_last_message_path)
-        if self.backend == "local":
-            spec = CommandSpec(
-                argv=argv,
-                cwd=context.local_workspace,
-                env=env,
-                timeout_s=context.timeout_s,
-            )
-            result = local.run(spec)
-            self._write_trajectory(context.local_results, prompt, env, result, last_message_host_path)
-            return result
-
-        if image_tag is None:
-            raise ValueError("docker codex agent needs an environment image")
-
-        spec = CommandSpec(
-            argv=argv,
-            cwd=Path(context.container_workspace),
+        env = self._build_env()
+        request = context.sandbox_request(
+            runtime,
             env=env,
-            timeout_s=context.timeout_s,
-        )
-        mounts = [
-            DockerMount(context.local_workspace, context.container_workspace, read_only=False),
-            DockerMount(context.local_visible_case, context.container_visible_case, read_only=True),
-            DockerMount(context.local_results, context.container_results, read_only=False),
-        ]
-        result = docker.run(
-            image_tag,
-            spec,
-            mounts=mounts,
-            workdir=context.container_workspace,
             network=self.spec.network,
         )
-        self._write_trajectory(context.local_results, prompt, env, result, last_message_host_path)
+        runtime_last_message_path = self._runtime_last_message_path(runtime, request)
+        last_message_host_path = context.results / ".codex_last_message.tmp"
+        argv = self._build_argv(prompt, last_message_path=runtime_last_message_path)
+        result = runtime.run(request, CommandSpec(argv=argv), artifact=artifact)
+        self._write_trajectory(context.results, prompt, env, result, last_message_host_path)
         return result
 
-    def _build_env(self, context: AgentExecutionContext) -> Dict[str, str]:
-        env = dict(context.container_env if self.backend == "docker" else context.local_env)
+    def _build_env(self) -> Dict[str, str]:
+        env: Dict[str, str] = {}
         if self.spec.base_url:
             env["OPENAI_BASE_URL"] = self.spec.base_url
         if self.spec.api_key:
@@ -95,12 +68,8 @@ class CodexAgentRunner(AgentRunner):
             ]
         )
 
-    def _runtime_last_message_path(self, context: AgentExecutionContext) -> str:
-        base = Path(context.container_results) if self.backend == "docker" else context.local_results.resolve()
-        return str(base / ".codex_last_message.tmp")
-
-    def _last_message_host_path(self, context: AgentExecutionContext) -> Path:
-        return context.local_results / ".codex_last_message.tmp"
+    def _runtime_last_message_path(self, runtime: SandboxRuntime, request) -> str:
+        return runtime.path(request, "results") + "/.codex_last_message.tmp"
 
     def _write_trajectory(
         self,

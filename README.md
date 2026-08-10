@@ -27,6 +27,39 @@ example/empty/
     └── resources/
 ```
 
+## Source layout
+
+```text
+ptdbench/
+├── cli.py
+├── core/                       # 稳定的数据模型
+│   └── types.py
+├── cases/                      # case 加载、校验和 schema YAML
+│   ├── loader.py
+│   ├── validator.py
+│   └── yaml.py
+├── evaluation/                 # agent/verifier 流程编排
+│   └── evaluator.py
+├── runtimes/                   # 执行平台抽象和 provider
+│   ├── base.py
+│   ├── factory.py
+│   └── providers/
+│       ├── local.py
+│       └── docker.py
+├── agents/                     # agent 抽象、注册和内置适配器
+│   ├── base.py
+│   ├── factory.py
+│   └── installed/
+│       ├── codex.py
+│       └── shell.py
+└── utils/                      # 不带业务语义的通用工具
+    └── filesystem.py
+```
+
+新增 agent 只需要实现 `agents/base.py` 约定的接口并在 agent factory 中注册；
+新增执行平台只需要实现 `runtimes/base.py` 的 `SandboxRuntime` 并注册 provider。
+两者都不需要修改 `evaluation/evaluator.py`。
+
 ## Visibility
 
 Agent-visible:
@@ -52,6 +85,31 @@ Evaluator metadata:
 
 The Docker evaluator runs agent and verifier in separate container
 invocations. The agent stage does not mount `oracle/` or `verifier/`.
+
+## Runtime abstraction
+
+PTDBench separates the case contract from the execution platform. The current
+runtime implementations are:
+
+- `local`: runs commands on the host and is intended only for development;
+- `docker`: builds `environment/Dockerfile` and runs agent/verifier in separate
+  containers.
+
+The environment image is built once and can be reused by both stages. The two
+stages still use different containers: the agent gets a writable workspace and
+public instruction, while the verifier gets a read-only workspace plus hidden
+`oracle/` and `verifier/` mounts. Reusing one image does not mean sharing one
+container, which is important for keeping hidden grading files inaccessible.
+
+The platform boundary is `ptdbench.runtimes.base.SandboxRuntime`. A future runtime
+such as Harbor or a remote cloud sandbox should implement this interface for
+environment preparation, logical path mapping, and command execution. Agent
+adapters only receive a runtime and an environment artifact; they do not import
+Docker or host-process executors.
+
+The low-level command implementation lives with the corresponding provider under
+`ptdbench.runtimes.providers/`. New platform integrations should depend on
+`SandboxRuntime`, not on the Docker or Local provider classes.
 
 ## Verifier contract
 
@@ -147,7 +205,8 @@ Agent options:
 - `--agent-arg <arg>` for repeatable extra CLI flags
 
 To add a new agent, put its runner under `ptdbench/agents/installed/`, register
-it with the factory, and keep `evaluator.py` untouched.
+it with the factory, and keep `evaluator.py` untouched. Its `run` method should
+only construct a `CommandSpec` and call the supplied `SandboxRuntime`.
 
 The Docker backend builds from `environment/Dockerfile`, mounts the editable
 workspace at `/workspace`, exposes public task text at `/case`, and writes
