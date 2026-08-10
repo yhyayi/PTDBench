@@ -1,3 +1,166 @@
+# PTDBench Judge-only task verifier
+
+This directory contains the self-contained Judge B runtime for one PTDBench
+case. It does not run Agent A, build a Docker image, or modify the workspace.
+
+## Evaluation flow
+
+Central PTDBench is responsible for staging the case and running Agent A:
+
+```text
+central PTDBench
+  -> local Codex Agent A
+  -> $PTDBENCH_WORKSPACE/outputs/diagnosis.txt
+  -> $PTDBENCH_RESULTS/agent_trace.json
+  -> verifier/test.sh
+  -> LLM Judge B
+  -> metrics.json and result.json
+```
+
+The verifier reads:
+
+- `workspace/outputs/diagnosis.txt`, produced by Agent A;
+- `oracle/standard_answer.txt`;
+- an allowlisted subset of location/target fields from `oracle/task.yaml`;
+- `verifier/judge_prompt.txt`.
+
+It sends only the standard answer, allowed task context, and untrusted
+diagnosis to Judge B. The central Agent trace is preserved as a redacted
+artifact but is not included in the Judge prompt.
+
+## Required PTDBench contract
+
+The central evaluator invokes `test.sh` with:
+
+```text
+PTDBENCH_STAGE=verifier
+PTDBENCH_WORKSPACE
+PTDBENCH_ORACLE
+PTDBENCH_VERIFIER
+PTDBENCH_RESULTS
+PTDBENCH_CASE_ID
+```
+
+`diagnosis.txt` and `agent_trace.json` must be non-empty regular files and must
+not be symlinks. Missing, malformed, or escaping inputs fail closed with score
+`0`. The verifier does not impose a character or byte-length limit.
+
+## Central local + Codex example
+
+From the repository root:
+
+```bash
+export OPENAI_API_KEY='<your-api-key>'
+
+PYTHONDONTWRITEBYTECODE=1 \
+python3 -m ptdbench evaluate cases/<family>/<case> \
+  --backend local \
+  --agent-backend local \
+  --agent codex \
+  --model '<model>' \
+  --base-url 'https://api.openai.com/v1' \
+  --api-key "$OPENAI_API_KEY" \
+  --keep-artifacts \
+  --work-dir /absolute/writable/ptdbench-runs \
+  --json
+```
+
+The existing central compatibility handoff supplies the model, base URL, and
+API key to this verifier as `PTDBENCH_JUDGE_*` defaults. A task invocation may
+override Judge B with:
+
+```text
+PTDBENCH_JUDGE_PROVIDER=openai-compatible|anthropic|gemini
+PTDBENCH_JUDGE_MODEL=<model>
+PTDBENCH_JUDGE_API_KEY_ENV=<environment-variable-name>
+PTDBENCH_JUDGE_BASE_URL=<base-url>
+PTDBENCH_JUDGE_TIMEOUT=<seconds; 0 means unlimited>
+```
+
+The value of `PTDBENCH_JUDGE_API_KEY_ENV` is an environment-variable name, not
+the secret itself.
+
+## Direct entrypoint
+
+`test.sh` is the only verifier entrypoint:
+
+```bash
+bash verifier/test.sh
+```
+
+Direct execution is intended for a PTDBench-prepared environment containing
+the required contract variables and Agent A artifacts. There is no standalone
+Agent or Docker fallback.
+
+Supported options:
+
+```text
+--judge-provider
+--judge-model
+--judge-api-key-env
+--judge-base-url
+--judge-timeout
+--run-id
+--self-test
+```
+
+`--test-mode` and `--judge-command` are fixture-only integration-test options.
+
+## Self-test
+
+The self-test uses a temporary workspace, fake central Agent trace, and local
+fake Judge. It does not call an API or use Docker:
+
+```bash
+bash verifier/test.sh --self-test
+```
+
+## Scoring
+
+Judge B must return exactly the schema documented in `judge_prompt.txt`.
+The verifier rejects extra fields, missing fields, wrong types, fractional
+scores, Markdown wrappers, and inconsistent `score`/`passed` values.
+
+The score is strictly binary:
+
+```json
+{"diagnosis_attribution_score": 0}
+```
+
+or:
+
+```json
+{"diagnosis_attribution_score": 1}
+```
+
+Exit code `0` means score `1`. Score `0` and runtime errors exit nonzero.
+
+## Artifacts
+
+Each invocation creates:
+
+```text
+$PTDBENCH_RESULTS/judge-<model>-<UTC timestamp>/
+├── agent_trace.json
+├── judge_request.json
+├── judge_raw_response.txt
+├── judge_result.json
+├── run_config.json
+├── metrics.json
+├── result.json
+└── error.txt
+```
+
+The latest contract outputs are also atomically written to:
+
+```text
+$PTDBENCH_RESULTS/metrics.json
+$PTDBENCH_RESULTS/result.json
+```
+
+The verifier redacts the configured Judge secret from persisted trace,
+responses, requests, and errors. It does not write Agent stdout/stderr, create
+a copied workspace, or generate Agent/Docker artifacts.
 # PTDBench standalone task verifier
 
 This directory contains the complete runtime needed to evaluate one PTDBench
