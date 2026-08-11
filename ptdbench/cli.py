@@ -20,7 +20,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     e = sub.add_parser("evaluate", help="run an agent + verifier for a case package")
     e.add_argument("case_root")
-    e.add_argument("--agent", choices=["codex", "shell"], default=None, help="agent adapter to use")
+    e.add_argument(
+        "--agent",
+        choices=["codex", "opencode", "shell"],
+        default=None,
+        help="agent adapter to use",
+    )
     e.add_argument("--agent-command", default=None, help="agent executable or shell command")
     e.add_argument("--model", default=None, help="agent model name")
     e.add_argument("--base-url", default=None, help="API base URL for hosted agents")

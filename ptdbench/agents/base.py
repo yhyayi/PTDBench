@@ -4,7 +4,7 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Sequence
 
 from ..core.types import AgentSpec, CommandResult
 from ..runtimes import EnvironmentArtifact, SandboxRequest, SandboxRuntime
@@ -66,6 +66,23 @@ class AgentRunner(ABC):
         # 统一把 agent 的最终轨迹收敛成一个 JSON 文件，减少 results 里的碎片。
         path = results_dir / "agent_trace.json"
         write_text(path, json.dumps(payload, indent=2, ensure_ascii=False))
+        return path
+
+    def _write_agent_trace_jsonl(
+        self,
+        results_dir: Path,
+        messages: Sequence[Dict[str, str]],
+    ) -> Path:
+        """按 OpenAI message 风格逐行保存完整 agent 轨迹。"""
+        lines = []
+        for message in messages:
+            role = message.get("role")
+            content = message.get("content")
+            if not isinstance(role, str) or not isinstance(content, str):
+                raise ValueError("trace message needs string role and content")
+            lines.append(json.dumps({"role": role, "content": content}, ensure_ascii=False))
+        path = results_dir / "agent_trace.jsonl"
+        write_text(path, "\n".join(lines) + "\n")
         return path
 
     @staticmethod

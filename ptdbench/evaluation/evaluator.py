@@ -166,9 +166,12 @@ class CaseEvaluator:
         return runner.run(context, runtime=runtime, artifact=artifact)
 
     def _ensure_agent_trace(self, results_dir: Path, runner: AgentRunner, result: Any) -> None:
-        trace_path = results_dir / "agent_trace.json"
-        if trace_path.exists():
+        # runner 可以选择单个 JSON 摘要或逐行 JSONL 轨迹；只要已经写出
+        # 任意一种，就不再生成兜底文件，避免 results 中出现两份 agent 记录。
+        trace_paths = (results_dir / "agent_trace.json", results_dir / "agent_trace.jsonl")
+        if any(path.exists() for path in trace_paths):
             return
+        trace_path = trace_paths[0]
         payload = {
             "kind": runner.kind,
             "backend": runner.backend,
