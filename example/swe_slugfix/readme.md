@@ -2,8 +2,9 @@
 
 This case is a minimal software repair task for PTDBench.
 
-The workspace contains a tiny Python module with a slugification bug. The
-agent should repair the implementation so the hidden verifier tests pass.
+The workspace contains a tiny Python module with a slugification bug. The case
+offers two evaluations: `issue` asks the agent to report the defect without
+editing code, while `solution` asks the agent to repair the implementation.
 
 This file is for human review only. It is not part of the agent-visible
 runtime.

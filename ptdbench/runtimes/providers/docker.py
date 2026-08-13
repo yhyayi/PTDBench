@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -82,9 +84,19 @@ class DockerRuntime(SandboxRuntime):
             "visible_case": "/case",
             "workspace": "/workspace",
             "results": "/results",
-            "oracle": "/case/oracle",
-            "verifier": "/case/verifier",
         }
+        selected_paths = {
+            "oracle": request.host_oracle,
+            "verifier": request.host_verifier,
+        }
+        if name in selected_paths and selected_paths[name] is not None:
+            selected = selected_paths[name]
+            try:
+                relative = selected.resolve().relative_to(request.host_case_root.resolve())
+            except ValueError as exc:
+                raise ValueError(f"{name} must stay under the selected case root") from exc
+            return f"/case/{relative.as_posix()}"
+        paths.update({"oracle": "/case/oracle", "verifier": "/case/verifier"})
         try:
             return paths[name]
         except KeyError as exc:
@@ -180,6 +192,9 @@ class DockerRuntime(SandboxRuntime):
             timeout_s=merged.timeout_s,
             cwd=cwd,
             process_env=process_env,
+            live_log_name=merged.live_log_name,
+            live_log_to_stderr=merged.live_log_to_stderr,
+            results_dir=request.host_results,
         )
 
     def close_sandbox(self, sandbox: SandboxInstance) -> None:
@@ -194,6 +209,9 @@ class DockerRuntime(SandboxRuntime):
         timeout_s: Optional[int],
         cwd: str,
         process_env: Optional[dict[str, str]] = None,
+        live_log_name: Optional[str] = None,
+        live_log_to_stderr: bool = False,
+        results_dir: Optional[Path] = None,
     ) -> CommandResult:
         start = time.monotonic()
         timed_out = False
@@ -204,12 +222,21 @@ class DockerRuntime(SandboxRuntime):
             stderr=subprocess.PIPE,
             text=True,
         )
-        try:
-            stdout, stderr = process.communicate(timeout=timeout_s)
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            process.kill()
-            stdout, stderr = process.communicate()
+        if live_log_name and results_dir is not None:
+            stdout, stderr, timed_out = DockerRuntime._stream_process(
+                process,
+                timeout_s=timeout_s,
+                results_dir=results_dir,
+                log_name=live_log_name,
+                to_stderr=live_log_to_stderr,
+            )
+        else:
+            try:
+                stdout, stderr = process.communicate(timeout=timeout_s)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                process.kill()
+                stdout, stderr = process.communicate()
         return CommandResult(
             argv=DockerRuntime._redact_argv(argv),
             returncode=process.returncode if process.returncode is not None else 124,
@@ -219,6 +246,58 @@ class DockerRuntime(SandboxRuntime):
             duration_s=time.monotonic() - start,
             cwd=cwd,
         )
+
+    @staticmethod
+    def _stream_process(
+        process: subprocess.Popen,
+        *,
+        timeout_s: Optional[int],
+        results_dir: Path,
+        log_name: str,
+        to_stderr: bool = False,
+    ) -> tuple[str, str, bool]:
+        """Capture a process while making long setup commands observable."""
+        results_dir.mkdir(parents=True, exist_ok=True)
+        stdout_path = results_dir / f"{log_name}.stdout.log"
+        stderr_path = results_dir / f"{log_name}.stderr.log"
+        captured = {"stdout": [], "stderr": []}
+
+        def drain(stream, path: Path, key: str) -> None:
+            with open(path, "w", encoding="utf-8") as log_file:
+                for line in iter(stream.readline, ""):
+                    captured[key].append(line)
+                    log_file.write(line)
+                    log_file.flush()
+                    if to_stderr:
+                        sys.stderr.write(line)
+                        sys.stderr.flush()
+            stream.close()
+
+        threads = [
+            threading.Thread(
+                target=drain,
+                args=(process.stdout, stdout_path, "stdout"),
+                daemon=True,
+            ),
+            threading.Thread(
+                target=drain,
+                args=(process.stderr, stderr_path, "stderr"),
+                daemon=True,
+            ),
+        ]
+        for thread in threads:
+            thread.start()
+
+        timed_out = False
+        try:
+            process.wait(timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            process.kill()
+            process.wait()
+        for thread in threads:
+            thread.join()
+        return "".join(captured["stdout"]), "".join(captured["stderr"]), timed_out
 
     @staticmethod
     def _docker_env(env: Mapping[str, str]) -> tuple[list[str], dict[str, str]]:
@@ -243,6 +322,8 @@ class DockerRuntime(SandboxRuntime):
             env=dict(env),
             timeout_s=spec.timeout_s,
             user=spec.user,
+            live_log_name=spec.live_log_name,
+            live_log_to_stderr=spec.live_log_to_stderr,
         )
 
     @staticmethod

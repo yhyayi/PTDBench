@@ -18,6 +18,8 @@ class CommandSpec:
     env: Mapping[str, str] = field(default_factory=dict)
     timeout_s: Optional[int] = None
     user: Optional[str] = None
+    live_log_name: Optional[str] = None
+    live_log_to_stderr: bool = False
 
     def to_argv(self) -> List[str]:
         if self.argv is not None:
@@ -54,6 +56,9 @@ class SandboxRequest:
     host_visible_case: Path
     host_workspace: Path
     host_results: Path
+    evaluation_level: str = "solution"
+    host_oracle: Optional[Path] = None
+    host_verifier: Optional[Path] = None
     workdir: str = "workspace"
     env: Mapping[str, str] = field(default_factory=dict)
     network: str = "none"
@@ -142,6 +147,7 @@ class SandboxRuntime(ABC):
             verifier = self.path(request, "verifier")
         return {
             "PTDBENCH_CASE_ID": request.case_id,
+            "PTDBENCH_EVALUATION_LEVEL": request.evaluation_level,
             "PTDBENCH_CASE_ROOT": case_root,
             "PTDBENCH_VISIBLE_CASE": visible,
             "PTDBENCH_WORKSPACE": workspace,

@@ -33,13 +33,15 @@ class LocalRuntime(SandboxRuntime):
         return EnvironmentArtifact(backend=self.name)
 
     def path(self, request: SandboxRequest, name: str) -> str:
+        oracle = request.host_oracle or request.host_case_root / "oracle"
+        verifier = request.host_verifier or request.host_case_root / "verifier"
         paths = {
             "case_root": request.host_case_root,
             "visible_case": request.host_visible_case,
             "workspace": request.host_workspace,
             "results": request.host_results,
-            "oracle": request.host_case_root / "oracle",
-            "verifier": request.host_case_root / "verifier",
+            "oracle": oracle,
+            "verifier": verifier,
         }
         try:
             return str(paths[name].resolve())

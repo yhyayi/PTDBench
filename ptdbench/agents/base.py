@@ -22,6 +22,8 @@ class AgentExecutionContext:
     workspace: Path
     visible_case: Path
     results: Path
+    evaluation_level: str = "solution"
+    log_level: str = "quiet"
 
     def sandbox_request(
         self,
@@ -39,6 +41,7 @@ class AgentExecutionContext:
             host_visible_case=self.visible_case,
             host_workspace=self.workspace,
             host_results=self.results,
+            evaluation_level=self.evaluation_level,
             env=env or {},
             network=network,
             timeout_s=self.timeout_s,

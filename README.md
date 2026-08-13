@@ -5,27 +5,39 @@ submission of broken post-train tasks, environment specs, and verifier logic.
 
 ## Core idea
 
-1. A case package provides a broken `workspace/` plus public instructions.
-2. A specified model+agent edits a copied workspace.
-3. The evaluator runs `verifier/test.sh` against the edited workspace.
+1. A case package provides a broken `workspace/` plus one or more evaluations.
+2. A specified model+agent follows the selected evaluation's instruction.
+3. The evaluator runs the selected `verifier/test.sh` against the workspace.
 4. The verifier writes structured results to `$PTDBENCH_RESULTS/result.json`.
 
 ## Case layout
 
 ```text
-example/empty/
-├── instruction.md
+case/
 ├── readme.md
 ├── metadata.yaml
 ├── workspace/
-├── oracle/
 ├── environment/
 │   └── Dockerfile
-└── verifier/
-    ├── test.sh
-    ├── tests/
-    └── resources/
+└── evaluations/
+    ├── issue/
+    │   ├── instruction.md
+    │   ├── oracle.md
+    │   └── verifier/
+    │       └── test.sh
+    └── solution/
+        ├── instruction.md
+        ├── oracle/
+        └── verifier/
+            ├── test.sh
+            ├── tests/        # optional
+            └── resources/    # optional
 ```
+
+Cases using `evaluations/` declare `schema_version: 2` in `metadata.yaml`. A
+case may provide `issue`, `solution`, or both. Legacy cases with top-level
+`instruction.md`, `oracle/`, and `verifier/` remain supported and are loaded as
+a `solution` evaluation.
 
 ## Source layout
 
@@ -62,18 +74,16 @@ ptdbench/
 
 ## Visibility
 
-Agent-visible:
+Agent-visible for the selected evaluation:
 
-- `instruction.md`
+- its `instruction.md`, exposed as `/case/instruction.md`
 - a writable copy of `workspace/`
 - the Docker image built from `environment/Dockerfile`
 
 Verifier-only:
 
-- `oracle/`
-- `verifier/`
-- `verifier/tests/`
-- `verifier/resources/`
+- the selected evaluation's `oracle.md` or `oracle/`
+- the selected evaluation's `verifier/`
 
 Human-review only:
 
@@ -84,7 +94,7 @@ Evaluator metadata:
 - `metadata.yaml`
 
 The Docker evaluator runs agent and verifier in separate container
-invocations. The agent stage does not mount `oracle/` or `verifier/`.
+invocations. The agent stage does not mount hidden oracle or verifier files.
 
 ## Runtime abstraction
 
@@ -97,8 +107,8 @@ runtime implementations are:
 
 The environment image is built once and can be reused by both stages. The two
 stages still use different containers: the agent gets a writable workspace and
-public instruction, while the verifier gets a read-only workspace plus hidden
-`oracle/` and `verifier/` mounts. Reusing one image does not mean sharing one
+public instruction, while the verifier gets a read-only workspace plus the
+selected hidden evaluation. Reusing one image does not mean sharing one
 container, which is important for keeping hidden grading files inaccessible.
 
 The platform boundary is `ptdbench.runtimes.base.SandboxRuntime`. A future runtime
@@ -113,13 +123,20 @@ The low-level command implementation lives with the corresponding provider under
 
 ## Verifier contract
 
-`verifier/test.sh` is the single entrypoint. It should read:
+Each evaluation's `verifier/test.sh` is the single entrypoint. It should read:
 
 - `PTDBENCH_WORKSPACE`
 - `PTDBENCH_ORACLE`
 - `PTDBENCH_VERIFIER`
 - `PTDBENCH_RESULTS`
 - `PTDBENCH_CASE_ID`
+- `PTDBENCH_EVALUATION_LEVEL`
+
+For an issue evaluation, the instruction may require the agent to write a
+report such as `$PTDBENCH_RESULTS/agent_answer.md`. This is a case-level output
+contract: the framework does not generate or recover that file from the agent's
+final message. The issue verifier decides how to score it. `tests/` and
+`resources/` are optional for both evaluation levels.
 
 The verifier should exit `0` for success and non-zero for failure. It may also
 write:
@@ -182,6 +199,7 @@ Run Codex as the agent:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/empty \
+  --evaluation-level solution \
   --backend docker \
   --agent-backend docker \
   --agent codex \
@@ -206,6 +224,7 @@ nested bubblewrap user namespace. The local backend retains Codex's
 
 Agent options:
 
+- `--evaluation-level issue|solution`
 - `--agent codex|shell`
 - `--agent-backend local|docker`
 - `--model <name>`
@@ -221,13 +240,31 @@ Agent options:
 PTDBENCH_REASONING_EFFORT=medium ./run.sh
 ```
 
+`run.sh` applies a 3600-second timeout to each long-running stage. Override it
+with `PTDBENCH_TIMEOUT_S`. Terminal progress is quiet by default. Enable it
+with `PTDBENCH_LOG_LEVEL=debug`; setup output is always streamed to
+`results/agent_setup.stdout.log` and `results/agent_setup.stderr.log` while the
+installation is running.
+
+```bash
+PTDBENCH_LOG_LEVEL=debug bash run.sh
+```
+
+Select the issue evaluation in the same way:
+
+```bash
+PTDBENCH_EVALUATION_LEVEL=issue ./run.sh
+```
+
 To add a new agent, put its runner under `ptdbench/agents/installed/`, register
 it with the factory, and keep `evaluator.py` untouched. Its `run` method should
 only construct a `CommandSpec` and call the supplied `SandboxRuntime`.
 
 The Docker backend builds from `environment/Dockerfile`, mounts the editable
 workspace at `/workspace`, exposes public task text at `/case`, and writes
-results to `/results`.
+results to `/results`. The verifier sees its selected evaluation at `/case`;
+`PTDBENCH_ORACLE` and `PTDBENCH_VERIFIER` resolve the evaluation-specific
+paths.
 
 Run artifacts are grouped under `results/`. The main files are:
 

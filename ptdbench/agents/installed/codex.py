@@ -66,23 +66,30 @@ class CodexAgentRunner(AgentRunner):
         bash_install = " ".join(
             [
                 "set -euo pipefail;",
+                "echo '[setup] downloading nvm' >&2;",
                 "export NVM_DIR=/root/.nvm;",
                 "curl --fail --location --show-error --silent --retry 5 --retry-all-errors --connect-timeout 15 --max-time 120 ",
                 "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh -o /tmp/install-nvm.sh;",
                 "test -s /tmp/install-nvm.sh;",
+                "echo '[setup] installing nvm' >&2;",
                 "bash /tmp/install-nvm.sh;",
                 "test -s \"$NVM_DIR/nvm.sh\";",
                 'source "$NVM_DIR/nvm.sh";',
+                "echo '[setup] installing node 22' >&2;",
                 "nvm install 22;",
                 "nvm alias default 22;",
+                "echo '[setup] installing @openai/codex@latest' >&2;",
                 "npm install -g @openai/codex@latest;",
                 'for bin in node npm codex; do path=$(command -v "$bin");',
                 "target=/usr/local/bin/$bin;",
                 '[ "$path" = "$target" ] || ln -sf "$path" "$target";',
                 "done;",
                 "mkdir -p /root/.codex;",
+                "echo '[setup] writing codex config' >&2;",
                 config_command,
+                "echo '[setup] configuring API-key auth' >&2;",
                 auth_command,
+                "echo '[setup] complete' >&2;",
                 "/usr/local/bin/codex --version",
             ]
         )
@@ -106,6 +113,8 @@ class CodexAgentRunner(AgentRunner):
             env=self._build_env(),
             timeout_s=context.timeout_s,
             user="0",
+            live_log_name="agent_setup",
+            live_log_to_stderr=context.log_level == "debug",
         )
 
         return runtime.exec(sandbox, install)

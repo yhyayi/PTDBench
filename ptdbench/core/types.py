@@ -6,20 +6,29 @@ from typing import Any, Dict, List, Optional, Sequence
 
 
 @dataclass(frozen=True)
-class CasePaths:
-    """一个 case package 解析后的文件系统布局。"""
+class EvaluationPaths:
+    """A case evaluation's public instruction and hidden grading paths."""
 
+    level: str
     root: Path
     instruction_md: Path
-    readme_md: Optional[Path]
-    metadata_yaml: Path
-    workspace: Path
     oracle: Path
-    environment: Path
     verifier: Path
     verifier_test: Path
     verifier_tests: Optional[Path]
     verifier_resources: Optional[Path]
+
+
+@dataclass(frozen=True)
+class CasePaths:
+    """一个 case package 解析后的文件系统布局。"""
+
+    root: Path
+    readme_md: Optional[Path]
+    metadata_yaml: Path
+    workspace: Path
+    environment: Path
+    evaluations: Dict[str, EvaluationPaths]
 
 
 @dataclass(frozen=True)
@@ -69,6 +78,10 @@ class CasePackage:
             if isinstance(value, str) and value:
                 return value
         return self.paths.root.name
+
+    @property
+    def evaluation_levels(self) -> Sequence[str]:
+        return tuple(self.paths.evaluations)
 
 
 @dataclass(frozen=True)
@@ -146,6 +159,8 @@ class EvaluationConfig:
     keep_artifacts: bool = False
     image_tag_prefix: str = "ptdbench"
     work_dir: Optional[Path] = None
+    evaluation_level: str = "solution"
+    log_level: str = "quiet"
 
 
 @dataclass(frozen=True)
@@ -153,6 +168,7 @@ class EvaluationResult:
     """PTDBench 输出的最终评测摘要。"""
 
     case_id: str
+    evaluation_level: str
     passed: bool
     score: Optional[float]
     metrics: Dict[str, Any]
@@ -168,6 +184,7 @@ class EvaluationResult:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "case_id": self.case_id,
+            "evaluation_level": self.evaluation_level,
             "passed": self.passed,
             "score": self.score,
             "metrics": self.metrics,

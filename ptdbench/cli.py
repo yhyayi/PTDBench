@@ -22,6 +22,18 @@ def build_parser() -> argparse.ArgumentParser:
     e = sub.add_parser("evaluate", help="run an agent + verifier for a case package")
     e.add_argument("case_root")
     e.add_argument(
+        "--evaluation-level",
+        choices=["issue", "solution"],
+        default="solution",
+        help="case evaluation to run",
+    )
+    e.add_argument(
+        "--log-level",
+        choices=["quiet", "debug"],
+        default="quiet",
+        help="terminal logging level; run artifacts are always written",
+    )
+    e.add_argument(
         "--agent",
         choices=["codex", "opencode", "shell"],
         default=None,
@@ -118,6 +130,8 @@ def main(argv=None) -> int:
                 timeout_s=args.timeout_s,
                 keep_artifacts=args.keep_artifacts,
                 work_dir=None if args.work_dir is None else Path(args.work_dir),
+                evaluation_level=args.evaluation_level,
+                log_level=args.log_level,
             ),
         )
         payload = result.to_dict()

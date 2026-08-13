@@ -3,23 +3,55 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 
-from ..core.types import CasePaths, ValidationReport
+from ..core.types import CasePaths, EvaluationPaths, ValidationReport
 
 
 def validate_case_paths(paths: CasePaths, strict: bool = True) -> ValidationReport:
     """检查 case 的目录和入口文件。"""
     report = ValidationReport()
-    _expect_file(report, paths.instruction_md, "instruction.md")
     _expect_file(report, paths.metadata_yaml, "metadata.yaml")
     _expect_dir(report, paths.workspace, "workspace")
-    _expect_dir(report, paths.oracle, "oracle")
     _expect_dir(report, paths.environment, "environment")
-    _expect_dir(report, paths.verifier, "verifier")
-    _expect_file(report, paths.verifier_test, "verifier/test.sh")
-    if strict:
-        _expect_dir(report, paths.verifier_tests, "verifier/tests", required=False)
-        _expect_dir(report, paths.verifier_resources, "verifier/resources", required=False)
+    if not paths.evaluations:
+        report.add("error", "evaluations", "at least one evaluation is required")
+    for evaluation in paths.evaluations.values():
+        _validate_evaluation_paths(
+            report,
+            evaluation,
+            strict=strict,
+            legacy=evaluation.root == paths.root,
+        )
     return report
+
+
+def _validate_evaluation_paths(
+    report: ValidationReport,
+    evaluation: EvaluationPaths,
+    *,
+    strict: bool,
+    legacy: bool,
+) -> None:
+    prefix = "" if legacy else f"evaluations/{evaluation.level}/"
+    if not legacy:
+        _expect_dir(report, evaluation.root, prefix.rstrip("/"))
+    _expect_file(report, evaluation.instruction_md, f"{prefix}instruction.md")
+    if evaluation.level == "issue":
+        _expect_file(report, evaluation.oracle, f"{prefix}oracle.md")
+    else:
+        _expect_dir(report, evaluation.oracle, f"{prefix}oracle")
+    _expect_dir(report, evaluation.verifier, f"{prefix}verifier")
+    _expect_file(report, evaluation.verifier_test, f"{prefix}verifier/test.sh")
+    if strict:
+        _expect_optional_dir(
+            report,
+            evaluation.verifier_tests,
+            f"{prefix}verifier/tests",
+        )
+        _expect_optional_dir(
+            report,
+            evaluation.verifier_resources,
+            f"{prefix}verifier/resources",
+        )
 
 
 def validate_metadata(metadata: Dict[str, Any]) -> ValidationReport:
@@ -77,6 +109,26 @@ def validate_metadata(metadata: Dict[str, Any]) -> ValidationReport:
     return report
 
 
+def validate_schema_version(paths: CasePaths, metadata: Dict[str, Any]) -> ValidationReport:
+    """Keep directory layout and the declared schema version consistent."""
+    report = ValidationReport()
+    uses_evaluations = (paths.root / "evaluations").is_dir()
+    version = metadata.get("schema_version")
+    if uses_evaluations and version != 2:
+        report.add(
+            "error",
+            "metadata.schema_version",
+            "evaluations/ layout requires schema_version: 2",
+        )
+    elif not uses_evaluations and version not in (None, 1):
+        report.add(
+            "error",
+            "metadata.schema_version",
+            "legacy layout must omit schema_version or use schema_version: 1",
+        )
+    return report
+
+
 def dump_report(report: ValidationReport) -> str:
     """把校验结果转为 CLI 可直接打印的 JSON。"""
     return json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
@@ -97,6 +149,11 @@ def _expect_dir(
     if not path.exists():
         report.add("error" if required else "warning", label, "missing directory")
     elif not path.is_dir():
+        report.add("error", label, "expected a directory")
+
+
+def _expect_optional_dir(report: ValidationReport, path, label: str) -> None:
+    if path.exists() and not path.is_dir():
         report.add("error", label, "expected a directory")
 
 

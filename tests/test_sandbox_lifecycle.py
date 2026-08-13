@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import subprocess
 from unittest.mock import patch
 from pathlib import Path
 
@@ -211,12 +212,69 @@ class SandboxLifecycleTests(unittest.TestCase):
         self.assertIn('"$OPENAI_API_KEY" | /usr/local/bin/codex login', shell)
         self.assertNotIn("secret-key", shell)
         self.assertEqual(runtime.setup_spec.env["OPENAI_API_KEY"], "secret-key")
+        self.assertEqual(runtime.setup_spec.live_log_name, "agent_setup")
+        self.assertFalse(runtime.setup_spec.live_log_to_stderr)
+        self.assertIn("[setup] downloading nvm", shell)
+        self.assertIn("[setup] installing @openai/codex@latest", shell)
+        self.assertIn("[setup] complete", shell)
+
+    def test_docker_stream_process_writes_live_stage_logs(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            process = subprocess.Popen(
+                ["sh", "-lc", "echo setup-out; echo setup-error >&2"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            stdout, stderr, timed_out = DockerRuntime._stream_process(
+                process,
+                timeout_s=5,
+                results_dir=Path(temp_dir),
+                log_name="agent_setup",
+            )
+            self.assertFalse(timed_out)
+            self.assertEqual(stdout, "setup-out\n")
+            self.assertEqual(stderr, "setup-error\n")
+            self.assertEqual(
+                (Path(temp_dir) / "agent_setup.stdout.log").read_text(),
+                stdout,
+            )
+            self.assertEqual(
+                (Path(temp_dir) / "agent_setup.stderr.log").read_text(),
+                stderr,
+            )
+
+    def test_codex_setup_debug_enables_terminal_streaming(self):
+        class SetupRuntime(RecordingRuntime):
+            name = "docker"
+
+            def exec(self, sandbox, spec):
+                self.setup_spec = spec
+                return result("setup")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime = SetupRuntime()
+            context = self.context(Path(temp_dir))
+            context = AgentExecutionContext(
+                **{**context.__dict__, "log_level": "debug"}
+            )
+            runner = CodexAgentRunner(AgentSpec(kind="codex", api_key="secret"))
+            runner.setup(
+                context,
+                runtime=runtime,
+                sandbox=SandboxInstance("recording", "agent", context.sandbox_request(runtime)),
+            )
+
+        self.assertTrue(runtime.setup_spec.live_log_to_stderr)
 
     def test_run_directory_prefix_is_readable_and_safe(self):
-        prefix = CaseEvaluator._run_directory_prefix("swe_slugfix/001: trial")
+        prefix = CaseEvaluator._run_directory_prefix(
+            "swe_slugfix/001: trial",
+            "issue",
+        )
         self.assertRegex(
             prefix,
-            r"^ptdbench-run-swe_slugfix-001-trial-\d{8}-\d{6}-\d{6}-$",
+            r"^ptdbench-run-swe_slugfix-001-trial-issue-\d{8}-\d{6}-\d{6}-$",
         )
 
     def test_codex_uses_outer_docker_sandbox(self):

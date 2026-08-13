@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import sys
 import tempfile
 from datetime import datetime
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from ..core.types import (
     CasePackage,
     CommandResult,
     EvaluationConfig,
+    EvaluationPaths,
     EvaluationResult,
 )
 from ..cases import SchemaError, load_case_package
@@ -49,6 +51,7 @@ class CaseEvaluator:
 
     def __init__(self, backend: str = "docker"):
         self.backend = backend
+        self.log_level = "quiet"
         # evaluator 只选择 runtime，不直接处理 Docker 或本机进程细节。
         self.runtime = create_runtime(backend)
 
@@ -66,12 +69,16 @@ class CaseEvaluator:
     ) -> EvaluationResult:
         """运行一次 agent + verifier 评测。"""
         config = config or EvaluationConfig(backend=self.backend)
+        self.log_level = config.log_level
+        if self.log_level not in {"quiet", "debug"}:
+            raise ValueError("log_level must be 'quiet' or 'debug'")
         if config.backend != self.backend:
             return CaseEvaluator(config.backend).evaluate(case_root, config=config, strict=strict)
 
         package = self.load(case_root, strict=strict)
         if not package.report.ok:
             raise SchemaError("case package failed validation")
+        evaluation = self._select_evaluation(package, config.evaluation_level)
 
         agent_spec = resolve_agent_spec(config.agent, config.agent_cmd)
         agent_runner = (
@@ -79,11 +86,12 @@ class CaseEvaluator:
             if agent_spec
             else None
         )
-        run = self._prepare_run(package, config)
+        run = self._prepare_run(package, evaluation, config)
         agent_runtime = create_runtime(agent_runner.backend) if agent_runner else None
         self._append_run_log(
             run.results,
             f"PTDBench case={package.case_id} backend={self.runtime.name} "
+            f"evaluation_level={evaluation.level} "
             f"agent={agent_runner.kind if agent_runner else 'none'} "
             f"agent_backend={agent_runtime.name if agent_runtime else 'none'}",
         )
@@ -113,7 +121,7 @@ class CaseEvaluator:
             agent_setup_result = None
             agent_result = None
             if agent_runner is not None:
-                context = self._build_agent_context(package, run, config)
+                context = self._build_agent_context(package, evaluation, run, config)
                 outcome = self._run_agent(
                     agent_runner,
                     context,
@@ -131,6 +139,7 @@ class CaseEvaluator:
 
             verifier_result = self._run_verifier(
                 package,
+                evaluation,
                 run,
                 config,
                 artifact=artifacts.get(self.runtime.name),
@@ -144,6 +153,7 @@ class CaseEvaluator:
             )
             result = EvaluationResult(
                 case_id=package.case_id,
+                evaluation_level=evaluation.level,
                 passed=stages_ok
                 and bool(metrics.get("passed", verifier_result.returncode == 0)),
                 score=self._extract_score(metrics) if stages_ok else 0.0,
@@ -173,7 +183,25 @@ class CaseEvaluator:
             if not config.keep_artifacts:
                 shutil.rmtree(run.root, ignore_errors=True)
 
-    def _prepare_run(self, package: CasePackage, config: EvaluationConfig) -> PreparedRun:
+    @staticmethod
+    def _select_evaluation(
+        package: CasePackage,
+        level: str,
+    ) -> EvaluationPaths:
+        try:
+            return package.paths.evaluations[level]
+        except KeyError as exc:
+            available = ", ".join(package.evaluation_levels) or "none"
+            raise SchemaError(
+                f"evaluation level {level!r} is unavailable; available levels: {available}"
+            ) from exc
+
+    def _prepare_run(
+        self,
+        package: CasePackage,
+        evaluation: EvaluationPaths,
+        config: EvaluationConfig,
+    ) -> PreparedRun:
         """创建运行目录，只向 agent 暴露 instruction 和 workspace 副本。"""
         parent = config.work_dir
         if parent is not None:
@@ -181,7 +209,7 @@ class CaseEvaluator:
             parent.mkdir(parents=True, exist_ok=True)
         root = Path(
             tempfile.mkdtemp(
-                prefix=self._run_directory_prefix(package.case_id),
+                prefix=self._run_directory_prefix(package.case_id, evaluation.level),
                 dir=None if parent is None else str(parent),
             )
         ).resolve()
@@ -191,33 +219,36 @@ class CaseEvaluator:
         copy_tree(package.paths.workspace, workspace)
         write_text(
             visible_case / "instruction.md",
-            package.paths.instruction_md.read_text(encoding="utf-8"),
+            evaluation.instruction_md.read_text(encoding="utf-8"),
         )
         return PreparedRun(root, visible_case, workspace, results)
 
     @staticmethod
-    def _run_directory_prefix(case_id: str) -> str:
+    def _run_directory_prefix(case_id: str, evaluation_level: str) -> str:
         """Build a readable, sortable prefix while retaining mkdtemp uniqueness."""
         safe_case_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", case_id).strip("-._")
         safe_case_id = safe_case_id or "case"
         timestamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S-%f")
-        return f"ptdbench-run-{safe_case_id}-{timestamp}-"
+        return f"ptdbench-run-{safe_case_id}-{evaluation_level}-{timestamp}-"
 
     def _build_agent_context(
         self,
         package: CasePackage,
+        evaluation: EvaluationPaths,
         run: PreparedRun,
         config: EvaluationConfig,
     ) -> AgentExecutionContext:
         return AgentExecutionContext(
             case_id=package.case_id,
-            instruction=package.paths.instruction_md.read_text(encoding="utf-8"),
+            instruction=evaluation.instruction_md.read_text(encoding="utf-8"),
             metadata=dict(package.metadata),
             timeout_s=config.timeout_s,
             case_root=package.paths.root,
             workspace=run.workspace,
             visible_case=run.visible_case,
             results=run.results,
+            evaluation_level=evaluation.level,
+            log_level=config.log_level,
         )
 
     def _run_agent(
@@ -290,6 +321,7 @@ class CaseEvaluator:
     def _run_verifier(
         self,
         package: CasePackage,
+        evaluation: EvaluationPaths,
         run: PreparedRun,
         config: EvaluationConfig,
         artifact: Optional[EnvironmentArtifact],
@@ -300,17 +332,20 @@ class CaseEvaluator:
         request = SandboxRequest(
             stage="verifier",
             case_id=package.case_id,
-            host_case_root=package.paths.root,
+            host_case_root=evaluation.root,
             host_visible_case=run.visible_case,
             host_workspace=run.workspace,
             host_results=run.results,
+            evaluation_level=evaluation.level,
+            host_oracle=evaluation.oracle,
+            host_verifier=evaluation.verifier,
             env=self._legacy_verifier_handoff_env(agent_spec),
             network=config.verifier_network,
             timeout_s=config.timeout_s,
             workdir="case_root",
         )
         command = CommandSpec(
-            shell=config.verifier_cmd or "bash verifier/test.sh",
+            shell=config.verifier_cmd or 'bash "$PTDBENCH_VERIFIER/test.sh"',
             timeout_s=config.timeout_s,
         )
         if artifact is None:
@@ -327,11 +362,12 @@ class CaseEvaluator:
         finally:
             self.runtime.close_sandbox(sandbox)
 
-    @staticmethod
-    def _append_run_log(results_dir: Path, line: str) -> None:
+    def _append_run_log(self, results_dir: Path, line: str) -> None:
         path = results_dir / "run.log"
         existing = path.read_text(encoding="utf-8") if path.exists() else ""
         write_text(path, existing + line.rstrip() + "\n")
+        if self.log_level == "debug":
+            print(line.rstrip(), file=sys.stderr, flush=True)
 
     @staticmethod
     def _write_stage_logs(
