@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from ...core.types import CommandResult
-from ..base import CommandSpec, EnvironmentArtifact, SandboxRequest, SandboxRuntime
+from ..base import CommandSpec, EnvironmentArtifact, SandboxInstance, SandboxRequest, SandboxRuntime
 from ..factory import register_runtime
 
 
@@ -83,3 +83,17 @@ class LocalRuntime(SandboxRuntime):
             duration_s=time.monotonic() - start,
             cwd=str(spec.cwd or Path.cwd()),
         )
+
+    def create_sandbox(
+        self,
+        request: SandboxRequest,
+        *,
+        artifact: EnvironmentArtifact,
+    ) -> SandboxInstance:
+        return SandboxInstance(self.name, str(request.host_workspace), request)
+
+    def exec(self, sandbox: SandboxInstance, spec: CommandSpec) -> CommandResult:
+        return self.run(sandbox.request, spec)
+
+    def close_sandbox(self, sandbox: SandboxInstance) -> None:
+        return None

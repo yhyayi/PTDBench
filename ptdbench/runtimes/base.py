@@ -17,6 +17,7 @@ class CommandSpec:
     cwd: Optional[Path] = None
     env: Mapping[str, str] = field(default_factory=dict)
     timeout_s: Optional[int] = None
+    user: Optional[str] = None
 
     def to_argv(self) -> List[str]:
         if self.argv is not None:
@@ -32,6 +33,15 @@ class EnvironmentArtifact:
 
     backend: str
     reference: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class SandboxInstance:
+    """A running, mutable sandbox created from an environment artifact."""
+
+    backend: str
+    reference: str
+    request: "SandboxRequest"
 
 
 @dataclass(frozen=True)
@@ -94,6 +104,27 @@ class SandboxRuntime(ABC):
     ) -> CommandResult:
         """在指定阶段执行命令。"""
 
+    def create_sandbox(
+        self,
+        request: SandboxRequest,
+        *,
+        artifact: EnvironmentArtifact,
+    ) -> SandboxInstance:
+        """Create and start a mutable sandbox for one workflow stage."""
+        raise NotImplementedError(f"{self.name} does not support persistent sandboxes")
+
+    def exec(
+        self,
+        sandbox: SandboxInstance,
+        spec: CommandSpec,
+    ) -> CommandResult:
+        """Execute a command inside an existing sandbox."""
+        raise NotImplementedError(f"{self.name} does not support sandbox exec")
+
+    def close_sandbox(self, sandbox: SandboxInstance) -> None:
+        """Stop and remove a sandbox, best effort after failures."""
+        raise NotImplementedError(f"{self.name} does not support sandbox cleanup")
+
     def standard_env(self, request: SandboxRequest) -> Dict[str, str]:
         """生成 agent/verifier 都可以依赖的 PTDBench 环境变量。"""
         visible_case = self.path(request, "visible_case")
@@ -124,5 +155,6 @@ class SandboxRuntime(ABC):
         """合并标准变量和调用方变量，避免 agent 重复处理路径。"""
         env = self.standard_env(request)
         env.update({str(key): str(value) for key, value in request.env.items()})
+        env.update({str(key): str(value) for key, value in spec.env.items()})
         timeout_s = spec.timeout_s if spec.timeout_s is not None else request.timeout_s
         return replace(spec, env=env, timeout_s=timeout_s)

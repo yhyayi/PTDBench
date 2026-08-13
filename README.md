@@ -183,26 +183,43 @@ Run Codex as the agent:
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/empty \
   --backend docker \
-  --agent-backend local \
+  --agent-backend docker \
   --agent codex \
   --model gpt-5 \
+  --reasoning-effort high \
   --json
 ```
 
 The Codex adapter turns `instruction.md` into the initial prompt and runs
-`codex exec` in the staged workspace. `--agent-backend local` is usually the
-right first choice for CLI agents installed on the host, while `--backend docker`
-keeps verifier execution isolated.
+`codex exec` in the staged workspace. With `--agent-backend docker`, PTDBench
+starts a fresh task container, installs `@openai/codex@latest`, and runs Codex
+in that same container. The verifier runs in a separate clean container built
+from the original task environment. Agent installation is not cached yet.
+After installation, PTDBench creates a Codex model-provider entry from
+`--base-url` and runs `codex login --with-api-key` via stdin. The credential is
+not embedded in the command line or setup logs. The generated provider uses
+the generic internal name `ptdbench`.
+For the Docker backend, the container is the outer security boundary, so Codex
+runs with `--dangerously-bypass-approvals-and-sandbox` to avoid an unsupported
+nested bubblewrap user namespace. The local backend retains Codex's
+`workspace-write` sandbox.
 
 Agent options:
 
 - `--agent codex|shell`
 - `--agent-backend local|docker`
 - `--model <name>`
+- `--reasoning-effort minimal|low|medium|high|xhigh`
 - `--base-url <url>`
 - `--api-key <key>`
 - `--agent-command <command-or-executable>`
 - `--agent-arg <arg>` for repeatable extra CLI flags
+
+`run.sh` defaults to `high`; override it without editing the script:
+
+```bash
+PTDBENCH_REASONING_EFFORT=medium ./run.sh
+```
 
 To add a new agent, put its runner under `ptdbench/agents/installed/`, register
 it with the factory, and keep `evaluator.py` untouched. Its `run` method should
@@ -222,6 +239,19 @@ Docker container network defaults:
 
 - Docker agent stage: `bridge`, so API-backed agents can reach their model endpoint
 - Docker verifier stage: `none`, so hidden grading logic stays offline by default
+
+Docker Desktop does not automatically pass a host GUI/system proxy into a
+container. If the host network requires Clash, opt in explicitly with a
+host-reachable proxy URL (the port must match the Clash configuration):
+
+```bash
+export PTDBENCH_DOCKER_PROXY=http://host.docker.internal:7890
+export PTDBENCH_DOCKER_NO_PROXY=localhost,127.0.0.1,host.docker.internal
+./run.sh
+```
+
+Without `PTDBENCH_DOCKER_PROXY`, PTDBench leaves the default Docker bridge
+network unchanged and does not require Clash.
 
 ## Toy SWE Example
 

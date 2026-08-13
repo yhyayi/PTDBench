@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
+import shlex
 from pathlib import Path
 from typing import Dict, Optional
 
 from ...core.types import CommandResult
-from ...runtimes import CommandSpec, EnvironmentArtifact, SandboxRuntime
+from ...runtimes import CommandSpec, EnvironmentArtifact, SandboxInstance, SandboxRuntime
 from ..base import AgentExecutionContext, AgentRunner
 from ..factory import register_agent_runner
 
@@ -12,6 +14,101 @@ from ..factory import register_agent_runner
 @register_agent_runner("codex")
 class CodexAgentRunner(AgentRunner):
     # 第一版 Codex 适配器：把任务说明拼成 prompt，然后按 CLI 调用。
+    provider_name = "ptdbench"
+
+    def setup(
+        self,
+        context: AgentExecutionContext,
+        *,
+        runtime: SandboxRuntime,
+        sandbox: SandboxInstance,
+    ) -> CommandResult:
+        if runtime.name != "docker":
+            return CommandResult([], 0, "", "", False, 0.0, "")
+        config_lines = [
+            f"model = {self._toml_string(self.spec.model)}" if self.spec.model else None,
+            (
+                f"model_reasoning_effort = {self._toml_string(self.spec.reasoning_effort)}"
+                if self.spec.reasoning_effort
+                else None
+            ),
+            'disable_response_storage = true',
+            'preferred_auth_method = "apikey"',
+        ]
+        if self.spec.base_url:
+            config_lines.extend(
+                [
+                    f'model_provider = "{self.provider_name}"',
+                    "",
+                    f"[model_providers.{self.provider_name}]",
+                    f'name = "{self.provider_name}"',
+                    f"base_url = {self._toml_string(self.spec.base_url)}",
+                    'wire_api = "responses"',
+                    "requires_openai_auth = true",
+                ]
+            )
+        config_lines.extend(
+            [
+                "",
+                '[projects."/workspace"]',
+                'trust_level = "trusted"',
+            ]
+        )
+        config_lines = [line for line in config_lines if line is not None]
+        config_command = "printf '%s\\n' " + " ".join(
+            shlex.quote(line) for line in config_lines
+        ) + " > /root/.codex/config.toml;"
+        auth_command = (
+            "test -n \"${OPENAI_API_KEY:-}\"; "
+            "printf '%s' \"$OPENAI_API_KEY\" | /usr/local/bin/codex login --with-api-key; "
+            "/usr/local/bin/codex login status;"
+        )
+        bash_install = " ".join(
+            [
+                "set -euo pipefail;",
+                "export NVM_DIR=/root/.nvm;",
+                "curl --fail --location --show-error --silent --retry 5 --retry-all-errors --connect-timeout 15 --max-time 120 ",
+                "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh -o /tmp/install-nvm.sh;",
+                "test -s /tmp/install-nvm.sh;",
+                "bash /tmp/install-nvm.sh;",
+                "test -s \"$NVM_DIR/nvm.sh\";",
+                'source "$NVM_DIR/nvm.sh";',
+                "nvm install 22;",
+                "nvm alias default 22;",
+                "npm install -g @openai/codex@latest;",
+                'for bin in node npm codex; do path=$(command -v "$bin");',
+                "target=/usr/local/bin/$bin;",
+                '[ "$path" = "$target" ] || ln -sf "$path" "$target";',
+                "done;",
+                "mkdir -p /root/.codex;",
+                config_command,
+                auth_command,
+                "/usr/local/bin/codex --version",
+            ]
+        )
+        install = CommandSpec(
+            shell=(
+                "set -e; "
+                "if command -v apk >/dev/null 2>&1; then "
+                "apk add --no-cache ca-certificates curl bash nodejs npm ripgrep; "
+                "else "
+                "if command -v apt-get >/dev/null 2>&1; then "
+                "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "
+                "ca-certificates curl bash ripgrep; "
+                "elif command -v dnf >/dev/null 2>&1; then "
+                "dnf install -y ca-certificates curl bash ripgrep; "
+                "elif command -v yum >/dev/null 2>&1; then "
+                "yum install -y ca-certificates curl bash ripgrep; "
+                "fi; "
+                "fi; "
+                f"exec bash -lc {shlex.quote(bash_install)}"
+            ),
+            env=self._build_env(),
+            timeout_s=context.timeout_s,
+            user="0",
+        )
+
+        return runtime.exec(sandbox, install)
 
     def run(
         self,
@@ -19,6 +116,7 @@ class CodexAgentRunner(AgentRunner):
         *,
         runtime: SandboxRuntime,
         artifact: Optional[EnvironmentArtifact],
+        sandbox: Optional[SandboxInstance] = None,
     ) -> CommandResult:
         prompt = self._build_prompt(context)
         env = self._build_env()
@@ -29,10 +127,24 @@ class CodexAgentRunner(AgentRunner):
         )
         runtime_last_message_path = self._runtime_last_message_path(runtime, request)
         last_message_host_path = context.results / ".codex_last_message.tmp"
-        argv = self._build_argv(prompt, last_message_path=runtime_last_message_path)
-        result = runtime.run(request, CommandSpec(argv=argv), artifact=artifact)
+        argv = self._build_argv(
+            prompt,
+            last_message_path=runtime_last_message_path,
+            externally_sandboxed=runtime.name == "docker",
+        )
+        command = CommandSpec(argv=argv, env=env)
+        result = (
+            runtime.exec(sandbox, command)
+            if sandbox is not None
+            else runtime.run(request, command, artifact=artifact)
+        )
         self._write_trajectory(context.results, prompt, env, result, last_message_host_path)
         return result
+
+    @staticmethod
+    def _toml_string(value: str) -> str:
+        """Encode a value as a TOML basic string without shell interpolation."""
+        return json.dumps(value, ensure_ascii=False)
 
     def _build_env(self) -> Dict[str, str]:
         env: Dict[str, str] = {}
@@ -42,12 +154,30 @@ class CodexAgentRunner(AgentRunner):
             env["OPENAI_API_KEY"] = self.spec.api_key
         return env
 
-    def _build_argv(self, prompt: str, *, last_message_path: str) -> list[str]:
+    def _build_argv(
+        self,
+        prompt: str,
+        *,
+        last_message_path: str,
+        externally_sandboxed: bool,
+    ) -> list[str]:
         argv = [self.spec.command or "codex", "exec"]
         argv.append("--skip-git-repo-check")
-        argv.extend(["--sandbox", "workspace-write"])
+        if externally_sandboxed:
+            # Docker is the security boundary. Codex's Linux bubblewrap sandbox
+            # cannot create a nested user namespace in a default container.
+            argv.append("--dangerously-bypass-approvals-and-sandbox")
+        else:
+            argv.extend(["--sandbox", "workspace-write"])
         if self.spec.model:
             argv.extend(["--model", self.spec.model])
+        if self.spec.reasoning_effort:
+            argv.extend(
+                [
+                    "-c",
+                    f"model_reasoning_effort={self._toml_string(self.spec.reasoning_effort)}",
+                ]
+            )
         argv.append("--json")
         argv.extend(["--output-last-message", last_message_path])
         argv.extend(list(self.spec.extra_args))

@@ -78,6 +78,7 @@ class AgentSpec:
     kind: str = "codex"
     command: Optional[str] = None
     model: Optional[str] = None
+    reasoning_effort: Optional[str] = None
     base_url: Optional[str] = None
     api_key: Optional[str] = None
     extra_args: Sequence[str] = field(default_factory=tuple)
@@ -89,6 +90,7 @@ class AgentSpec:
             "kind": self.kind,
             "command": self.command,
             "model": self.model,
+            "reasoning_effort": self.reasoning_effort,
             "base_url": self.base_url,
             "api_key": None if self.api_key is None else "<redacted>",
             "extra_args": list(self.extra_args),
@@ -156,6 +158,7 @@ class EvaluationResult:
     metrics: Dict[str, Any]
     report_dir: Path
     agent_spec: Optional[AgentSpec]
+    agent_setup: Optional[CommandResult]
     agent: Optional[CommandResult]
     verifier: Optional[CommandResult]
     workspace_before_hash: str
@@ -170,6 +173,7 @@ class EvaluationResult:
             "metrics": self.metrics,
             "report_dir": str(self.report_dir),
             "agent_spec": None if self.agent_spec is None else self.agent_spec.to_dict(),
+            "agent_setup": None if self.agent_setup is None else self.agent_setup.to_dict(),
             "agent": None if self.agent is None else self.agent.to_dict(),
             "verifier": None if self.verifier is None else self.verifier.to_dict(),
             "workspace_before_hash": self.workspace_before_hash,
