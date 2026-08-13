@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -23,8 +24,19 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--agent", choices=["codex", "shell"], default=None, help="agent adapter to use")
     e.add_argument("--agent-command", default=None, help="agent executable or shell command")
     e.add_argument("--model", default=None, help="agent model name")
+    e.add_argument(
+        "--reasoning-effort",
+        choices=["minimal", "low", "medium", "high", "xhigh"],
+        default=None,
+        help="reasoning effort for agents that support it",
+    )
     e.add_argument("--base-url", default=None, help="API base URL for hosted agents")
     e.add_argument("--api-key", default=None, help="API key for hosted agents")
+    e.add_argument(
+        "--api-key-env",
+        default=None,
+        help="read the API key from this environment variable (keeps it out of argv)",
+    )
     e.add_argument("--agent-arg", action="append", default=[], help="extra agent argument, repeatable")
     e.add_argument("--agent-cmd", default=None, help=argparse.SUPPRESS)
     e.add_argument("--verifier-cmd", default=None, help="override verifier entrypoint")
@@ -53,20 +65,38 @@ def main(argv=None) -> int:
 
     if args.command == "evaluate":
         agent_command = args.agent_command or args.agent_cmd
+        if args.api_key is not None and args.api_key_env is not None:
+            raise SystemExit("--api-key and --api-key-env are mutually exclusive")
+        api_key = args.api_key
+        if args.api_key_env:
+            api_key = os.environ.get(args.api_key_env)
+            if not api_key:
+                raise SystemExit(
+                    f"API key environment variable is unset or empty: {args.api_key_env}"
+                )
         agent_kind = args.agent
         if agent_kind is None:
-            if args.model or args.base_url or args.api_key or args.agent_arg:
+            if args.model or args.reasoning_effort or args.base_url or api_key or args.agent_arg:
                 agent_kind = "codex"
             elif agent_command:
                 agent_kind = "shell"
         agent_spec = None
-        if agent_kind is not None or agent_command or args.model or args.base_url or args.api_key or args.agent_arg:
+        if (
+            agent_kind is not None
+            or agent_command
+            or args.model
+            or args.reasoning_effort
+            or args.base_url
+            or api_key
+            or args.agent_arg
+        ):
             agent_spec = AgentSpec(
                 kind=agent_kind or "codex",
                 command=agent_command,
                 model=args.model,
+                reasoning_effort=args.reasoning_effort,
                 base_url=args.base_url,
-                api_key=args.api_key,
+                api_key=api_key,
                 extra_args=tuple(args.agent_arg),
                 backend=args.agent_backend,
                 network=args.agent_network,

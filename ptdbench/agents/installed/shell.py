@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from ...core.types import CommandResult
-from ...runtimes import CommandSpec, EnvironmentArtifact, SandboxRuntime
+from ...runtimes import CommandSpec, EnvironmentArtifact, SandboxInstance, SandboxRuntime
 from ..base import AgentExecutionContext, AgentRunner
 from ..factory import register_agent_runner
 
@@ -12,12 +12,22 @@ from ..factory import register_agent_runner
 class ShellAgentRunner(AgentRunner):
     # 最轻量的兜底 runner：直接执行一条 shell 命令。
 
+    def setup(
+        self,
+        context: AgentExecutionContext,
+        *,
+        runtime: SandboxRuntime,
+        sandbox: SandboxInstance,
+    ) -> CommandResult:
+        return CommandResult([], 0, "", "", False, 0.0, "")
+
     def run(
         self,
         context: AgentExecutionContext,
         *,
         runtime: SandboxRuntime,
         artifact: Optional[EnvironmentArtifact],
+        sandbox: Optional[SandboxInstance] = None,
     ) -> CommandResult:
         command = self.spec.command
         if not command:
@@ -27,7 +37,12 @@ class ShellAgentRunner(AgentRunner):
             runtime,
             network=self.spec.network,
         )
-        result = runtime.run(request, CommandSpec(shell=command), artifact=artifact)
+        spec = CommandSpec(shell=command)
+        result = (
+            runtime.exec(sandbox, spec)
+            if sandbox is not None
+            else runtime.run(request, spec, artifact=artifact)
+        )
         self._write_agent_trace(
             context.results,
             {

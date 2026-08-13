@@ -24,9 +24,9 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench validate example/swe_slugfix
 
 ### 2. 再跑本地 + Codex
 
-当前框架已经支持的主流程就是 `local + codex`：
+本地开发时仍可使用 `local + codex`：
 
-- `--backend local`：评测和 verifier 都在本机跑
+- `--backend local`：评测和 verifier 都在本机跑，仅建议用于开发和调试
 - `--agent codex`：用 Codex 作为 agent
 - `--agent-backend local`：Codex 在本机直接启动
 
@@ -57,6 +57,62 @@ secret 出现在 Docker argv 中。
 ```bash
 --api-key "$OPENAI_API_KEY"
 ```
+
+### Docker agent + verifier
+
+`run.sh` 现在默认让 Codex agent 和 verifier 都在 Docker 中运行。每次评测都会从 task
+基础镜像启动一个新的 agent 容器，在容器内安装最新 Codex，然后在同一个容器内执行 rollout；
+verifier 使用另一个干净容器。当前版本不缓存 agent 安装镜像。
+
+```bash
+export OPENAI_API_KEY='你的 API key'
+./run.sh
+```
+
+它等价于：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
+  --backend docker \
+  --agent-backend docker \
+  --agent codex \
+  --model gpt-5.5 \
+  --reasoning-effort high \
+  --base-url "${OPENAI_BASE_URL:-https://yeysai.com/v1}" \
+  --api-key-env OPENAI_API_KEY \
+  --work-dir outputs/ptdbench-swe-debug \
+  --keep-artifacts \
+  --json
+```
+
+运行前需要确保 Docker daemon 已启动，并允许 Docker Desktop 访问当前仓库目录。
+评测器会自动读取 case 的 `environment/Dockerfile`，构建 task 基础镜像，并分别启动 agent/verifier
+容器。task 镜像不需要预装 Codex，框架会在 agent 容器启动后安装 `@openai/codex@latest`。
+安装完成后，框架会根据 `--base-url` 在容器内生成 Codex model provider 配置，并通过 stdin
+执行 `codex login --with-api-key`；API key 不会写入命令参数或运行日志。例如默认的
+`https://yeysai.com/v1` 会配置为使用 Responses API 的通用 `ptdbench` provider。
+`run.sh` 默认使用 `high` 推理强度，可以通过环境变量覆盖而不必修改脚本：
+
+```bash
+PTDBENCH_REASONING_EFFORT=medium ./run.sh
+```
+
+CLI 支持 `minimal`、`low`、`medium`、`high` 和 `xhigh`。
+Docker 已经作为 agent 的外层安全边界，因此 Docker backend 会使用 Codex 的
+`--dangerously-bypass-approvals-and-sandbox`，避免 bubblewrap 在容器内创建嵌套 user namespace
+失败。本地 backend 仍使用 Codex 的 `workspace-write` 沙盒。
+
+Docker 默认使用 bridge 网络直连外网；宿主机开启 Clash 不会自动让容器使用 Clash。
+如果当前网络必须通过 Clash，先确认 Clash 对 Docker Desktop 可访问（通常开启局域网访问），
+然后显式设置宿主机可访问的代理地址。常见配置如下，端口以 Clash 实际配置为准：
+
+```bash
+export PTDBENCH_DOCKER_PROXY=http://host.docker.internal:7890
+export PTDBENCH_DOCKER_NO_PROXY=localhost,127.0.0.1,host.docker.internal
+./run.sh
+```
+
+不设置 `PTDBENCH_DOCKER_PROXY` 时，框架不会修改容器网络或代理环境，适用于本身可以直连外网的环境。
 
 如果你只想先看 verifier 是否能跑通，也可以先挂一个空 agent：
 

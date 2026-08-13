@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from ..core.types import AgentSpec, CommandResult
-from ..runtimes import EnvironmentArtifact, SandboxRequest, SandboxRuntime
+from ..runtimes import EnvironmentArtifact, SandboxInstance, SandboxRequest, SandboxRuntime
 from ..utils.filesystem import write_text
 
 
@@ -79,12 +79,24 @@ class AgentRunner(ABC):
         return redacted
 
     @abstractmethod
+    def setup(
+        self,
+        context: AgentExecutionContext,
+        *,
+        runtime: SandboxRuntime,
+        sandbox: SandboxInstance,
+    ) -> CommandResult:
+        """Install/prep this agent in the already-created sandbox."""
+        raise NotImplementedError
+
+    @abstractmethod
     def run(
         self,
         context: AgentExecutionContext,
         *,
         runtime: SandboxRuntime,
         artifact: Optional[EnvironmentArtifact],
+        sandbox: Optional[SandboxInstance] = None,
     ) -> CommandResult:
         # 具体 agent 只负责把 spec 翻译成命令；执行平台由 runtime 提供。
         raise NotImplementedError

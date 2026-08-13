@@ -1,16 +1,30 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import tempfile
+from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from ..agents import AgentExecutionContext, AgentRunner, create_agent_runner, resolve_agent_spec
-from ..core.types import AgentSpec, CasePackage, EvaluationConfig, EvaluationResult
+from ..core.types import (
+    AgentSpec,
+    CasePackage,
+    CommandResult,
+    EvaluationConfig,
+    EvaluationResult,
+)
 from ..cases import SchemaError, load_case_package
-from ..runtimes import CommandSpec, EnvironmentArtifact, SandboxRequest, SandboxRuntime, create_runtime
+from ..runtimes import (
+    CommandSpec,
+    EnvironmentArtifact,
+    SandboxRequest,
+    SandboxRuntime,
+    create_runtime,
+)
 from ..utils.filesystem import copy_tree, ensure_dir, tree_digest, write_text
 
 
@@ -22,6 +36,12 @@ class PreparedRun:
     visible_case: Path
     workspace: Path
     results: Path
+
+
+@dataclass(frozen=True)
+class AgentRunOutcome:
+    setup: CommandResult
+    execution: Optional[CommandResult]
 
 
 class CaseEvaluator:
@@ -61,31 +81,53 @@ class CaseEvaluator:
         )
         run = self._prepare_run(package, config)
         agent_runtime = create_runtime(agent_runner.backend) if agent_runner else None
-
-        # agent 和 verifier 若使用同一种需要镜像的 runtime，只构建一次镜像。
-        artifacts: Dict[str, EnvironmentArtifact] = {}
-        for runtime in (agent_runtime, self.runtime):
-            if runtime is None or not runtime.needs_environment_image:
-                continue
-            if runtime.name not in artifacts:
+        self._append_run_log(
+            run.results,
+            f"PTDBench case={package.case_id} backend={self.runtime.name} "
+            f"agent={agent_runner.kind if agent_runner else 'none'} "
+            f"agent_backend={agent_runtime.name if agent_runtime else 'none'}",
+        )
+        try:
+            artifacts: Dict[str, EnvironmentArtifact] = {}
+            for runtime in (agent_runtime, self.runtime):
+                if runtime is None or not runtime.needs_environment_image:
+                    continue
+                if runtime.name in artifacts:
+                    continue
+                self._append_run_log(
+                    run.results,
+                    f"[START] environment_prepare backend={runtime.name}",
+                )
                 artifacts[runtime.name] = runtime.build_environment(
                     package.paths.environment,
-                    dockerfile="Dockerfile",
+                    dockerfile=self._environment_dockerfile(package),
                     tag_prefix=config.image_tag_prefix,
                 )
+                self._append_run_log(
+                    run.results,
+                    f"[OK] environment_prepare backend={runtime.name} "
+                    f"artifact={artifacts[runtime.name].reference or '-'}",
+                )
 
-        workspace_before_hash = tree_digest(package.paths.workspace)
-        agent_result = None
-        try:
+            workspace_before_hash = tree_digest(package.paths.workspace)
+            agent_setup_result = None
+            agent_result = None
             if agent_runner is not None:
                 context = self._build_agent_context(package, run, config)
-                agent_result = self._run_agent(
+                outcome = self._run_agent(
                     agent_runner,
                     context,
                     runtime=agent_runtime,
                     artifact=artifacts.get(agent_runtime.name) if agent_runtime else None,
                 )
-                self._ensure_agent_trace(run.results, agent_runner, agent_result)
+                agent_setup_result = outcome.setup
+                agent_result = outcome.execution
+                self._ensure_agent_trace(
+                    run.results,
+                    agent_runner,
+                    agent_result or agent_setup_result,
+                    stage="agent" if agent_result is not None else "agent_setup",
+                )
 
             verifier_result = self._run_verifier(
                 package,
@@ -96,13 +138,19 @@ class CaseEvaluator:
             )
             workspace_after_hash = tree_digest(run.workspace)
             metrics = self._extract_metrics(run.results, verifier_result)
+            stages_ok = (
+                (agent_setup_result is None or agent_setup_result.returncode == 0)
+                and (agent_result is None or agent_result.returncode == 0)
+            )
             result = EvaluationResult(
                 case_id=package.case_id,
-                passed=bool(metrics.get("passed", verifier_result.returncode == 0)),
-                score=self._extract_score(metrics),
+                passed=stages_ok
+                and bool(metrics.get("passed", verifier_result.returncode == 0)),
+                score=self._extract_score(metrics) if stages_ok else 0.0,
                 metrics=metrics,
                 report_dir=run.results,
                 agent_spec=agent_spec,
+                agent_setup=agent_setup_result,
                 agent=agent_result,
                 verifier=verifier_result,
                 workspace_before_hash=workspace_before_hash,
@@ -110,7 +158,17 @@ class CaseEvaluator:
                 metadata=package.metadata,
             )
             self._write_report(run.results / "report.json", result)
+            self._append_run_log(
+                run.results,
+                f"[RESULT] passed={str(result.passed).lower()} score={result.score}",
+            )
             return result
+        except Exception as exc:
+            self._append_run_log(
+                run.results,
+                f"[ERROR] orchestration {type(exc).__name__}: {exc}",
+            )
+            raise
         finally:
             if not config.keep_artifacts:
                 shutil.rmtree(run.root, ignore_errors=True)
@@ -123,7 +181,7 @@ class CaseEvaluator:
             parent.mkdir(parents=True, exist_ok=True)
         root = Path(
             tempfile.mkdtemp(
-                prefix="ptdbench-run-",
+                prefix=self._run_directory_prefix(package.case_id),
                 dir=None if parent is None else str(parent),
             )
         ).resolve()
@@ -136,6 +194,14 @@ class CaseEvaluator:
             package.paths.instruction_md.read_text(encoding="utf-8"),
         )
         return PreparedRun(root, visible_case, workspace, results)
+
+    @staticmethod
+    def _run_directory_prefix(case_id: str) -> str:
+        """Build a readable, sortable prefix while retaining mkdtemp uniqueness."""
+        safe_case_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", case_id).strip("-._")
+        safe_case_id = safe_case_id or "case"
+        timestamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S-%f")
+        return f"ptdbench-run-{safe_case_id}-{timestamp}-"
 
     def _build_agent_context(
         self,
@@ -160,18 +226,62 @@ class CaseEvaluator:
         context: AgentExecutionContext,
         runtime: Optional[SandboxRuntime],
         artifact: Optional[EnvironmentArtifact],
-    ) -> Any:
+    ) -> AgentRunOutcome:
         if runtime is None:
             raise ValueError("agent runtime is required when an agent is configured")
-        return runner.run(context, runtime=runtime, artifact=artifact)
+        request = context.sandbox_request(
+            runtime,
+            network=runner.spec.network,
+        )
+        if artifact is None:
+            if runtime.needs_environment_image:
+                raise ValueError("agent runtime needs a built environment artifact")
+            artifact = EnvironmentArtifact(backend=runtime.name)
+        sandbox = runtime.create_sandbox(request, artifact=artifact)
+        try:
+            self._append_run_log(context.results, "[START] agent_setup")
+            setup_result = runner.setup(context, runtime=runtime, sandbox=sandbox)
+            self._write_stage_logs(context.results, "agent_setup", setup_result)
+            if setup_result.returncode != 0:
+                self._append_command_summary(
+                    context.results,
+                    "agent_setup",
+                    setup_result,
+                )
+                self._append_run_log(
+                    context.results,
+                    "[SKIP] agent reason=agent_setup_failed",
+                )
+                return AgentRunOutcome(setup=setup_result, execution=None)
+            self._append_command_summary(context.results, "agent_setup", setup_result)
+            self._append_run_log(context.results, "[START] agent")
+            execution = runner.run(
+                context,
+                runtime=runtime,
+                artifact=artifact,
+                sandbox=sandbox,
+            )
+            self._write_stage_logs(context.results, "agent", execution)
+            self._append_command_summary(context.results, "agent", execution)
+            return AgentRunOutcome(setup=setup_result, execution=execution)
+        finally:
+            runtime.close_sandbox(sandbox)
 
-    def _ensure_agent_trace(self, results_dir: Path, runner: AgentRunner, result: Any) -> None:
+    def _ensure_agent_trace(
+        self,
+        results_dir: Path,
+        runner: AgentRunner,
+        result: Any,
+        *,
+        stage: str,
+    ) -> None:
         trace_path = results_dir / "agent_trace.json"
         if trace_path.exists():
             return
         payload = {
             "kind": runner.kind,
             "backend": runner.backend,
+            "stage": stage,
             "result": result.to_dict() if hasattr(result, "to_dict") else result,
         }
         write_text(trace_path, json.dumps(payload, indent=2, ensure_ascii=False))
@@ -202,7 +312,59 @@ class CaseEvaluator:
             shell=config.verifier_cmd or "bash verifier/test.sh",
             timeout_s=config.timeout_s,
         )
-        return self.runtime.run(request, command, artifact=artifact)
+        if artifact is None:
+            if self.runtime.needs_environment_image:
+                raise ValueError("verifier runtime needs a built environment artifact")
+            artifact = EnvironmentArtifact(backend=self.runtime.name)
+        sandbox = self.runtime.create_sandbox(request, artifact=artifact)
+        try:
+            self._append_run_log(run.results, "[START] verifier")
+            result = self.runtime.exec(sandbox, command)
+            self._write_stage_logs(run.results, "verifier", result)
+            self._append_command_summary(run.results, "verifier", result)
+            return result
+        finally:
+            self.runtime.close_sandbox(sandbox)
+
+    @staticmethod
+    def _append_run_log(results_dir: Path, line: str) -> None:
+        path = results_dir / "run.log"
+        existing = path.read_text(encoding="utf-8") if path.exists() else ""
+        write_text(path, existing + line.rstrip() + "\n")
+
+    @staticmethod
+    def _write_stage_logs(
+        results_dir: Path,
+        stage: str,
+        result: CommandResult,
+    ) -> None:
+        write_text(results_dir / f"{stage}.stdout.log", result.stdout or "")
+        write_text(results_dir / f"{stage}.stderr.log", result.stderr or "")
+
+    def _append_command_summary(
+        self,
+        results_dir: Path,
+        stage: str,
+        result: CommandResult,
+    ) -> None:
+        status = "OK" if result.returncode == 0 and not result.timed_out else "FAIL"
+        self._append_run_log(
+            results_dir,
+            f"[{status}] {stage} exit={result.returncode} "
+            f"timed_out={str(result.timed_out).lower()} "
+            f"duration={result.duration_s:.2f}s",
+        )
+        error = (result.stderr or "").strip()
+        if not error and result.returncode != 0:
+            error = (result.stdout or "").strip()
+        if error:
+            tail = " | ".join(error.splitlines()[-5:])
+            self._append_run_log(results_dir, f"  error_tail: {tail}")
+        if status == "FAIL":
+            self._append_run_log(
+                results_dir,
+                f"  logs: {stage}.stdout.log, {stage}.stderr.log",
+            )
 
     def _legacy_verifier_handoff_env(self, agent_spec: Optional[AgentSpec]) -> Dict[str, str]:
         """兼容旧 verifier 的 Judge-B 配置；它不是新的 agent workflow 接口。"""
@@ -215,10 +377,31 @@ class CaseEvaluator:
             env["PTDBENCH_JUDGE_MODEL"] = agent_spec.model
         if agent_spec.base_url:
             env["PTDBENCH_JUDGE_BASE_URL"] = agent_spec.base_url
-        if agent_spec.api_key:
+        # A Docker verifier must not receive secrets through ``docker run -e``;
+        # its argv can be observed by other host processes. Local verifier
+        # runs retain the legacy handoff for backwards compatibility.
+        if agent_spec.api_key and self.runtime.name == "local":
             env["PTDBENCH_JUDGE_API_KEY_ENV"] = "PTDBENCH_JUDGE_API_KEY"
             env["PTDBENCH_JUDGE_API_KEY"] = agent_spec.api_key
         return env
+
+    @staticmethod
+    def _environment_dockerfile(package: CasePackage) -> str:
+        """Resolve metadata's case-relative Dockerfile to a context-relative path."""
+        environment = package.metadata.get("environment")
+        declared = environment.get("dockerfile") if isinstance(environment, dict) else None
+        value = str(declared or "environment/Dockerfile")
+        prefix = "environment/"
+        if value == "environment":
+            value = "Dockerfile"
+        elif value.startswith(prefix):
+            value = value[len(prefix) :]
+        path = Path(value)
+        if path.is_absolute() or ".." in path.parts:
+            raise SchemaError(f"metadata.environment.dockerfile must stay under environment/: {value}")
+        if not (package.paths.environment / path).is_file():
+            raise SchemaError(f"Dockerfile not found: {package.paths.environment / path}")
+        return value
 
     def _write_report(self, path: Path, result: EvaluationResult) -> None:
         write_text(path, json.dumps(result.to_dict(), indent=2, ensure_ascii=False))
