@@ -1,0 +1,16 @@
+task_id: task_hparam_clip_grpo_022
+category: qwen_dapo_hparam
+launch_script: examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh
+hollow_hparams:
+- CLIP_RATIO
+- CLIP_RATIO_C
+- NORM_ADV_BY_STD_IN_GRPO
+- ROLLOUT_N
+- LOSS_AGG_MODE
+baseline_path: hidden/baseline/examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh
+experiment_name: task_hparam_clip_grpo_022
+created_at: '2026-07-20T07:55:47.411104+00:00'
+note: 'qwen_dapo_hparam: Agent fills launch-script hyperparameter blanks. During _validate, sealed reward-stack .py under hidden/baseline are pasted; the Agent-edited launch script is NOT overwritten.'
+val_baseline_paste:
+- hidden/baseline/**/*.py (reward stack only; not the .sh)
+eval_metric: val-core/math_dapo/acc/mean@1 every test_freq=20 through 200 steps

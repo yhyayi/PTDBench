@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 @dataclass(frozen=True)
 class EvaluationPaths:
-    """A case evaluation's public instruction and hidden grading paths."""
+    """A task evaluation's public instruction and hidden grading paths."""
 
     level: str
     root: Path
@@ -20,8 +20,8 @@ class EvaluationPaths:
 
 
 @dataclass(frozen=True)
-class CasePaths:
-    """一个 case package 解析后的文件系统布局。"""
+class TaskPaths:
+    """一个 task package 解析后的文件系统布局。"""
 
     root: Path
     readme_md: Optional[Path]
@@ -64,19 +64,15 @@ class ValidationReport:
 
 
 @dataclass(frozen=True)
-class CasePackage:
-    """加载后的 case：路径、metadata 和校验报告。"""
+class TaskPackage:
+    """加载后的 task：路径、metadata 和校验报告。"""
 
-    paths: CasePaths
+    paths: TaskPaths
     metadata: Dict[str, Any]
     report: ValidationReport
 
     @property
-    def case_id(self) -> str:
-        for key in ("case_id", "id", "task_id"):
-            value = self.metadata.get(key)
-            if isinstance(value, str) and value:
-                return value
+    def task_id(self) -> str:
         return self.paths.root.name
 
     @property
@@ -148,7 +144,7 @@ class StageArtifact:
 
 @dataclass(frozen=True)
 class EvaluationConfig:
-    """调用方运行时配置，与 case package 自身数据分开。"""
+    """调用方运行时配置，与 task package 自身数据分开。"""
 
     agent: Optional[AgentSpec] = None
     agent_cmd: Optional[str] = None
@@ -167,7 +163,7 @@ class EvaluationConfig:
 class EvaluationResult:
     """PTDBench 输出的最终评测摘要。"""
 
-    case_id: str
+    task_id: str
     evaluation_level: str
     passed: bool
     score: Optional[float]
@@ -183,7 +179,7 @@ class EvaluationResult:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "case_id": self.case_id,
+            "task_id": self.task_id,
             "evaluation_level": self.evaluation_level,
             "passed": self.passed,
             "score": self.score,

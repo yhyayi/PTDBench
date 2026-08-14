@@ -1,5 +1,0 @@
-/workspace/verl/trainer/main_ppo.py:171: UserWarning: Disabled critic as algorithm.adv_estimator != gae. If it is not intended, please set critic.enable=True
-  use_critic=need_critic(config),
-[validate_config] All configuration checks passed successfully!
-[2026-07-20 12:00:15,084][megatron.core.distributed.fsdp.src.megatron_fsdp.param_and_grad_buffer][INFO] - Detected Megatron Core, using Megatron-FSDP with Megatron.
-[2026-07-20 12:00:15,087][megatron.core.distributed.fsdp.src.megatron_fsdp.megatron_fsdp][INFO] - Detected Megatron Core, using Megatron-FSDP with Megatron.

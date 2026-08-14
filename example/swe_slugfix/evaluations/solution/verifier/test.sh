@@ -3,7 +3,7 @@ set -euo pipefail
 
 workspace="${PTDBENCH_WORKSPACE:-/workspace}"
 results="${PTDBENCH_RESULTS:-/results}"
-verifier="${PTDBENCH_VERIFIER:-/case/verifier}"
+verifier="${PTDBENCH_VERIFIER:-/task/verifier}"
 tests_dir="$verifier/tests"
 result_file="$results/result.json"
 

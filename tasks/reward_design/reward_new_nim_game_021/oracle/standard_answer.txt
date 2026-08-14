@@ -1,0 +1,19 @@
+STANDARD_ANSWER_V1
+CASE_ID: reward_new_nim_game_021
+BENCHMARK_GROUP: D-core-rlve-reward-design
+EXPECTED_VERDICT: unhealthy
+EXPECTED_ATTRIBUTION: The reward design or reward function for the new_nim_game_021 environment.
+
+REQUIRED_ALL:
+- Name the new_nim_game_021 environment and identify its reward design or reward function.
+
+GLOBAL_JUDGE_POLICY:
+- The score must be exactly 0 or 1.
+- Agent A must explicitly classify the run as healthy or unhealthy.
+- An unhealthy answer may provide only one primary attribution.
+- A gold parameter bundle or computation chain counts as one attribution.
+- Broad labels without the required concrete attribution are insufficient.
+- Every REQUIRED_ALL item must be satisfied.
+- A verdict mismatch forces score 0.
+- Equivalent technical wording in any language is acceptable.
+- task.yaml may clarify targets and aliases but may not relax REQUIRED_ALL.

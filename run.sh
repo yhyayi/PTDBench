@@ -5,7 +5,7 @@ set -euo pipefail
 # agent/verifier stages. Keep credentials out of this script and out of git.
 : "${OPENAI_API_KEY:?Set OPENAI_API_KEY before running}"
 
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate "${PTDBENCH_CASE:-example/swe_slugfix}" \
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate "${PTDBENCH_TASK:-example/swe_slugfix}" \
   --evaluation-level "${PTDBENCH_EVALUATION_LEVEL:-solution}" \
   --log-level "${PTDBENCH_LOG_LEVEL:-quiet}" \
   --backend "${PTDBENCH_BACKEND:-docker}" \

@@ -1,6 +1,0 @@
-wandb: Detected [openai] in use.
-wandb: Use W&B Weave for improved LLM call tracing. Install Weave with `pip install weave` then add `import weave` to the top of your script.
-wandb: For more information, check out the docs at: https://weave-docs.wandb.ai/
-[bench] validate: pasted 5 sealed baseline file(s) from /hidden/baseline
-test_gen_batch meta info: {'eos_token_id': 128009, 'pad_token_id': 128009, 'recompute_log_prob': False, 'do_sample': False, 'validate': True, 'global_steps': 0}
-[bench] validate: restored 5 Agent file(s) after baseline paste

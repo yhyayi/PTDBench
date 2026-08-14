@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize six selected Qwen DAPO hparam tasks as PTDBench B0 cases."""
+"""Materialize six selected Qwen DAPO hparam tasks as PTDBench B0 tasks."""
 
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ from typing import Any, Dict, Iterable, List
 import yaml
 
 try:
-    from .strip_validation_artifacts import finalize_case
+    from .strip_validation_artifacts import finalize_task
 except ImportError:
-    from strip_validation_artifacts import finalize_case
+    from strip_validation_artifacts import finalize_task
 
 try:
     from .sanitize_packaging import (
@@ -64,7 +64,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dst",
         type=Path,
-        default=data_call / "cases/qwen_dapo_hparam",
+        default=data_call / "tasks/qwen_dapo_hparam",
     )
     parser.add_argument("--force", action="store_true")
     return parser.parse_args()
@@ -270,7 +270,7 @@ def attempts_summary(outputs: Path) -> Dict[str, Any]:
 def checkpoint_manifest(source_workspace: Path) -> Dict[str, Any]:
     root = source_workspace / "checkpoints"
     return {
-        "excluded_from_case": True,
+        "excluded_from_task": True,
         "reason": "Checkpoints are 13-61GB per task and are not needed for hparam diagnosis.",
         "source_present": root.exists(),
         "top_level_entries": (
@@ -346,7 +346,6 @@ def metadata_for(
 ) -> Dict[str, Any]:
     points = metrics["metrics"]["eval_points"]
     return {
-        "case_id": task_id,
         "title": f"Qwen DAPO hparam diagnosis: {task_id}",
         "submitter": {"name": "benchmark_evaluation"},
         "license": "MIT",
@@ -357,7 +356,6 @@ def metadata_for(
         "training": {
             "framework": "verl",
             "algo": "grpo",
-            "run_command": "bash outputs/run_command.sh",
         },
         "environment": {"dockerfile": "environment/Dockerfile"},
         "outcome": {
@@ -614,7 +612,7 @@ def materialize_one(
     write_json(
         verifier / "resources/verify_config.json",
         {
-            "case_id": task_id,
+            "task_id": task_id,
             "launch_script": str(LAUNCH_REL),
             "hollow_hparams": names,
             "verify": public["verify"],
@@ -625,9 +623,9 @@ def materialize_one(
         "B0 package checks are implemented by ../verify.py.\n",
         encoding="utf-8",
     )
-    finalize_case(target)
+    finalize_task(target)
     return {
-        "case_id": task_id,
+        "task_id": task_id,
         "n_eval_points": len(points),
         "eval_last": points[-1]["eval_score"],
         "attempt": metrics.get("attempt"),
@@ -642,14 +640,14 @@ def main() -> int:
     if not be_root.is_dir():
         raise FileNotFoundError(be_root)
     destination_root.mkdir(parents=True, exist_ok=True)
-    cases = []
+    tasks = []
     for task_id in TASK_IDS:
         print(f"materializing {task_id}...", flush=True)
-        cases.append(
+        tasks.append(
             materialize_one(task_id, be_root, destination_root, args.force)
         )
-    write_json(destination_root / "manifest.json", {"cases": cases})
-    print(json.dumps({"cases": cases}, indent=2))
+    write_json(destination_root / "manifest.json", {"tasks": tasks})
+    print(json.dumps({"tasks": tasks}, indent=2))
     return 0
 
 

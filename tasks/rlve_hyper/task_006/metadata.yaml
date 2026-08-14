@@ -1,0 +1,40 @@
+title: 'RLVE historical diagnosis: task_006'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-08'
+domain: post_train
+model:
+  name: Qwen2.5-0.5B-Instruct
+dataset:
+  name: RLVE held-out environments
+training:
+  framework: RLVE / slime + GRPO
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: training_collapse
+  failure_reason: rollout_max_response_len=512 truncates multi-step reasoning and degrades reward quality
+bench_category: rlve_hyper
+bench_subcategory: collapse
+source_task: Benchmark_Evaluation/tasks/task_RLVE_hyper/task_006
+source_run: run_23_rollout_maxlen_512_nsamples_8
+evidence_kind: historical_failure
+packaging_tier: B0
+packaging_ready: true
+b1_scoring_ready: false
+label_review: false
+bug_type: hyperparameter/rollout_length
+buggy_keys: rollout_max_response_len
+verify:
+  num_gpus: 4
+  timeout_minutes: 90
+  eval_interval: 20
+  eval_metric_key: eval/HELD-OUT_ENVIRONMENTS_128
+historical_baseline:
+  eval_last: -0.33872577123956776
+  eval_min: -0.8513895884323155
+  truncate_ratio_max: 0.671875
+  n_eval_points: 2
+failure_signature: rollout_truncation

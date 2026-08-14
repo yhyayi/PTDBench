@@ -1,8 +1,8 @@
 # Toy SWE Repair Task
 
-This case is a minimal software repair task for PTDBench.
+This task is a minimal software repair task for PTDBench.
 
-The workspace contains a tiny Python module with a slugification bug. The case
+The workspace contains a tiny Python module with a slugification bug. The task
 offers two evaluations: `issue` asks the agent to report the defect without
 editing code, while `solution` asks the agent to repair the implementation.
 

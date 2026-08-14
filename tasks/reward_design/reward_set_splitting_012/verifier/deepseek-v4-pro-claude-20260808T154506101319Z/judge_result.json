@@ -1,0 +1,14 @@
+{
+  "attribution_match": false,
+  "matched_requirements": [],
+  "missing_requirements": [
+    "Classify the run as unhealthy",
+    "Provide primary attribution: The reward design or reward function for the set_splitting_012 environment",
+    "Name the set_splitting_012 environment and identify its reward design or reward function as the primary cause"
+  ],
+  "passed": false,
+  "rationale": "Agent A claims healthy, but standard expects unhealthy. Verdict mismatch forces score 0. Agent A does not attribute the reward design as a fault; primary attribution is 'none', so attribution and specificity fail. No REQUIRED_ALL items are satisfied because they must be met in the context of an unhealthy diagnosis.",
+  "score": 0,
+  "specificity_match": false,
+  "verdict_match": false
+}

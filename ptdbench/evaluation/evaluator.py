@@ -13,13 +13,13 @@ from typing import Any, Dict, Optional
 from ..agents import AgentExecutionContext, AgentRunner, create_agent_runner, resolve_agent_spec
 from ..core.types import (
     AgentSpec,
-    CasePackage,
+    TaskPackage,
     CommandResult,
     EvaluationConfig,
     EvaluationPaths,
     EvaluationResult,
 )
-from ..cases import SchemaError, load_case_package
+from ..tasks import SchemaError, load_task_package
 from ..runtimes import (
     CommandSpec,
     EnvironmentArtifact,
@@ -35,7 +35,7 @@ class PreparedRun:
     """一次评测的隔离 staging 目录。"""
 
     root: Path
-    visible_case: Path
+    visible_task: Path
     workspace: Path
     results: Path
 
@@ -46,8 +46,8 @@ class AgentRunOutcome:
     execution: Optional[CommandResult]
 
 
-class CaseEvaluator:
-    """负责安排 case、agent、runtime 和 verifier 的执行顺序。"""
+class TaskEvaluator:
+    """负责安排 task、agent、runtime 和 verifier 的执行顺序。"""
 
     def __init__(self, backend: str = "docker"):
         self.backend = backend
@@ -55,15 +55,15 @@ class CaseEvaluator:
         # evaluator 只选择 runtime，不直接处理 Docker 或本机进程细节。
         self.runtime = create_runtime(backend)
 
-    def load(self, case_root: str | Path, strict: bool = True) -> CasePackage:
-        return load_case_package(Path(case_root), strict=strict)
+    def load(self, task_root: str | Path, strict: bool = True) -> TaskPackage:
+        return load_task_package(Path(task_root), strict=strict)
 
-    def validate(self, case_root: str | Path, strict: bool = True) -> Dict[str, Any]:
-        return self.load(case_root, strict=strict).report.to_dict()
+    def validate(self, task_root: str | Path, strict: bool = True) -> Dict[str, Any]:
+        return self.load(task_root, strict=strict).report.to_dict()
 
     def evaluate(
         self,
-        case_root: str | Path,
+        task_root: str | Path,
         config: EvaluationConfig | None = None,
         strict: bool = True,
     ) -> EvaluationResult:
@@ -73,11 +73,11 @@ class CaseEvaluator:
         if self.log_level not in {"quiet", "debug"}:
             raise ValueError("log_level must be 'quiet' or 'debug'")
         if config.backend != self.backend:
-            return CaseEvaluator(config.backend).evaluate(case_root, config=config, strict=strict)
+            return TaskEvaluator(config.backend).evaluate(task_root, config=config, strict=strict)
 
-        package = self.load(case_root, strict=strict)
+        package = self.load(task_root, strict=strict)
         if not package.report.ok:
-            raise SchemaError("case package failed validation")
+            raise SchemaError("task package failed validation")
         evaluation = self._select_evaluation(package, config.evaluation_level)
 
         agent_spec = resolve_agent_spec(config.agent, config.agent_cmd)
@@ -90,7 +90,7 @@ class CaseEvaluator:
         agent_runtime = create_runtime(agent_runner.backend) if agent_runner else None
         self._append_run_log(
             run.results,
-            f"PTDBench case={package.case_id} backend={self.runtime.name} "
+            f"PTDBench task={package.task_id} backend={self.runtime.name} "
             f"evaluation_level={evaluation.level} "
             f"agent={agent_runner.kind if agent_runner else 'none'} "
             f"agent_backend={agent_runtime.name if agent_runtime else 'none'}",
@@ -152,7 +152,7 @@ class CaseEvaluator:
                 and (agent_result is None or agent_result.returncode == 0)
             )
             result = EvaluationResult(
-                case_id=package.case_id,
+                task_id=package.task_id,
                 evaluation_level=evaluation.level,
                 passed=stages_ok
                 and bool(metrics.get("passed", verifier_result.returncode == 0)),
@@ -185,7 +185,7 @@ class CaseEvaluator:
 
     @staticmethod
     def _select_evaluation(
-        package: CasePackage,
+        package: TaskPackage,
         level: str,
     ) -> EvaluationPaths:
         try:
@@ -198,7 +198,7 @@ class CaseEvaluator:
 
     def _prepare_run(
         self,
-        package: CasePackage,
+        package: TaskPackage,
         evaluation: EvaluationPaths,
         config: EvaluationConfig,
     ) -> PreparedRun:
@@ -209,43 +209,43 @@ class CaseEvaluator:
             parent.mkdir(parents=True, exist_ok=True)
         root = Path(
             tempfile.mkdtemp(
-                prefix=self._run_directory_prefix(package.case_id, evaluation.level),
+                prefix=self._run_directory_prefix(package.task_id, evaluation.level),
                 dir=None if parent is None else str(parent),
             )
         ).resolve()
-        visible_case = ensure_dir(root / "visible_case")
+        visible_task = ensure_dir(root / "visible_task")
         workspace = ensure_dir(root / "workspace")
         results = ensure_dir(root / "results")
         copy_tree(package.paths.workspace, workspace)
         write_text(
-            visible_case / "instruction.md",
+            visible_task / "instruction.md",
             evaluation.instruction_md.read_text(encoding="utf-8"),
         )
-        return PreparedRun(root, visible_case, workspace, results)
+        return PreparedRun(root, visible_task, workspace, results)
 
     @staticmethod
-    def _run_directory_prefix(case_id: str, evaluation_level: str) -> str:
+    def _run_directory_prefix(task_id: str, evaluation_level: str) -> str:
         """Build a readable, sortable prefix while retaining mkdtemp uniqueness."""
-        safe_case_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", case_id).strip("-._")
-        safe_case_id = safe_case_id or "case"
+        safe_task_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", task_id).strip("-._")
+        safe_task_id = safe_task_id or "task"
         timestamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S-%f")
-        return f"ptdbench-run-{safe_case_id}-{evaluation_level}-{timestamp}-"
+        return f"ptdbench-run-{safe_task_id}-{evaluation_level}-{timestamp}-"
 
     def _build_agent_context(
         self,
-        package: CasePackage,
+        package: TaskPackage,
         evaluation: EvaluationPaths,
         run: PreparedRun,
         config: EvaluationConfig,
     ) -> AgentExecutionContext:
         return AgentExecutionContext(
-            case_id=package.case_id,
+            task_id=package.task_id,
             instruction=evaluation.instruction_md.read_text(encoding="utf-8"),
             metadata=dict(package.metadata),
             timeout_s=config.timeout_s,
-            case_root=package.paths.root,
+            task_root=package.paths.root,
             workspace=run.workspace,
-            visible_case=run.visible_case,
+            visible_task=run.visible_task,
             results=run.results,
             evaluation_level=evaluation.level,
             log_level=config.log_level,
@@ -320,20 +320,20 @@ class CaseEvaluator:
 
     def _run_verifier(
         self,
-        package: CasePackage,
+        package: TaskPackage,
         evaluation: EvaluationPaths,
         run: PreparedRun,
         config: EvaluationConfig,
         artifact: Optional[EnvironmentArtifact],
         agent_spec: Optional[AgentSpec],
     ) -> Any:
-        # 新 verifier 只依赖标准环境变量。这里暂时保留旧 Judge-B case 的
-        # 配置 handoff，以免迁移历史 case 时突然失效；新 case 不应使用它。
+        # 新 verifier 只依赖标准环境变量。这里暂时保留旧 Judge-B task 的
+        # 配置 handoff，以免迁移历史 task 时突然失效；新 task 不应使用它。
         request = SandboxRequest(
             stage="verifier",
-            case_id=package.case_id,
-            host_case_root=evaluation.root,
-            host_visible_case=run.visible_case,
+            task_id=package.task_id,
+            host_task_root=evaluation.root,
+            host_visible_task=run.visible_task,
             host_workspace=run.workspace,
             host_results=run.results,
             evaluation_level=evaluation.level,
@@ -342,7 +342,7 @@ class CaseEvaluator:
             env=self._legacy_verifier_handoff_env(agent_spec),
             network=config.verifier_network,
             timeout_s=config.timeout_s,
-            workdir="case_root",
+            workdir="task_root",
         )
         command = CommandSpec(
             shell=config.verifier_cmd or 'bash "$PTDBENCH_VERIFIER/test.sh"',
@@ -423,8 +423,8 @@ class CaseEvaluator:
         return env
 
     @staticmethod
-    def _environment_dockerfile(package: CasePackage) -> str:
-        """Resolve metadata's case-relative Dockerfile to a context-relative path."""
+    def _environment_dockerfile(package: TaskPackage) -> str:
+        """Resolve metadata's task-relative Dockerfile to a context-relative path."""
         environment = package.metadata.get("environment")
         declared = environment.get("dockerfile") if isinstance(environment, dict) else None
         value = str(declared or "environment/Dockerfile")

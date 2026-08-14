@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "historical_run",
+  "held_out_eval": {
+    "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "eval_interval": 20,
+    "eval_points": [
+      {
+        "step": 0,
+        "eval_score": -0.6376891965937646,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.078125,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.6376891965937646,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.078125
+        }
+      },
+      {
+        "step": 19,
+        "eval_score": -0.572722871540937,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.09375,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.572722871540937,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.09375
+        }
+      },
+      {
+        "step": 39,
+        "eval_score": -0.6145980568435886,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.1484375,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.6145980568435886,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.1484375
+        }
+      },
+      {
+        "step": 59,
+        "eval_score": -0.6166078525816835,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.078125,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.6166078525816835,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.078125
+        }
+      },
+      {
+        "step": 79,
+        "eval_score": -0.6807333463462732,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.1484375,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.6807333463462732,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.1484375
+        }
+      },
+      {
+        "step": 99,
+        "eval_score": -0.6377816101848753,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.109375,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.6377816101848753,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.109375
+        }
+      }
+    ],
+    "n_eval_points": 6,
+    "eval_first": -0.6376891965937646,
+    "eval_last": -0.6377816101848753,
+    "eval_min": -0.6807333463462732,
+    "eval_max": -0.572722871540937,
+    "first_rollout_ok": true,
+    "attempt": 1,
+    "run_once": {
+      "executed": true,
+      "ok": true,
+      "returncode": 0,
+      "receipt_path": "outputs/run_once_receipt.json"
+    }
+  },
+  "source_metrics": {
+    "path": "outputs/metrics.json",
+    "source_eval_points": 6
+  },
+  "source_logs": [
+    {
+      "path": "wandb/run-20260715_152451-3kj8z3yh/files/output_a4a1b669d3be-nbuy05rw.log"
+    },
+    {
+      "path": "wandb/run-20260715_152411-3kj8z3yh/files/output_a4a1b669d3be-2mu11oik.log"
+    },
+    {
+      "path": "logs/fix_run/run_20260715_152318/launcher.log"
+    },
+    {
+      "path": "logs/fix_run/run_20260715_152318/ray_job.log"
+    }
+  ],
+  "checkpoint_exclusion": {
+    "excluded_from_case": true,
+    "reason": "Runtime checkpoints are not needed for diagnosis or B0 validation.",
+    "source_locations": [
+      {
+        "path": "experiement",
+        "top_level_entries": [
+          "fix_run"
+        ]
+      }
+    ]
+  },
+  "metrics_alignment": {
+    "path": "outputs/metrics.json",
+    "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "metric_status": "available",
+    "n_eval_points": 6
+  }
+}

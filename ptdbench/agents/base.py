@@ -14,13 +14,13 @@ from ..utils.filesystem import write_text
 @dataclass(frozen=True)
 class AgentExecutionContext:
     # agent 运行时只看这个上下文，不直接依赖 evaluator 或具体 runtime。
-    case_id: str
+    task_id: str
     instruction: str
     metadata: Dict[str, Any]
     timeout_s: Optional[int]
-    case_root: Path
+    task_root: Path
     workspace: Path
-    visible_case: Path
+    visible_task: Path
     results: Path
     evaluation_level: str = "solution"
     log_level: str = "quiet"
@@ -36,9 +36,9 @@ class AgentExecutionContext:
         """为 agent 创建统一的运行请求，路径细节交给 runtime 解析。"""
         return SandboxRequest(
             stage="agent",
-            case_id=self.case_id,
-            host_case_root=self.case_root,
-            host_visible_case=self.visible_case,
+            task_id=self.task_id,
+            host_task_root=self.task_root,
+            host_visible_task=self.visible_task,
             host_workspace=self.workspace,
             host_results=self.results,
             evaluation_level=self.evaluation_level,

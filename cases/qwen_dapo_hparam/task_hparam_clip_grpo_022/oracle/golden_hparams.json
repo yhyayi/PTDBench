@@ -1,7 +1,0 @@
-{
-  "CLIP_RATIO": "0.2",
-  "CLIP_RATIO_C": "3.0",
-  "NORM_ADV_BY_STD_IN_GRPO": "True",
-  "ROLLOUT_N": "8",
-  "LOSS_AGG_MODE": "token-mean"
-}

@@ -1,0 +1,120 @@
+{
+  "task_id": "task_reward_design/reward_topological_sort_minimal_lexicographical_order_001",
+  "category": "reward_design",
+  "kind": "baseline",
+  "environment": "TopologicalSort_MinimalLexicographicalOrder",
+  "baseline_source": "hidden/baseline/environment.py",
+  "created_at": "2026-07-24T15:54:05.522952+00:00",
+  "run": {
+    "ok": true,
+    "returncode": 0,
+    "cuda_visible_devices": "4,5,6,7",
+    "run_node": "g49",
+    "num_rollout": 100,
+    "eval_interval": 20,
+    "first_rollout_ok": true,
+    "startup_failed": false,
+    "failure_reason": null,
+    "use_docker": true,
+    "workspace": "workspace_baseline",
+    "run_name": "baseline_run_20260724T152023Z",
+    "archive_rel": "baseline_runs/20260724T155405Z",
+    "archived": [
+      "logs",
+      "wandb",
+      "outputs"
+    ]
+  },
+  "metrics": {
+    "eval_interval": 20,
+    "eval_scores": [
+      {
+        "step": 0,
+        "score": -0.5972878934157115
+      },
+      {
+        "step": 19,
+        "score": -0.32815495309834963
+      },
+      {
+        "step": 39,
+        "score": -0.24572486265636
+      },
+      {
+        "step": 59,
+        "score": -0.195372331267461
+      },
+      {
+        "step": 79,
+        "score": -0.20517680504890912
+      },
+      {
+        "step": 99,
+        "score": -0.20850432989636508
+      }
+    ],
+    "eval_points": [
+      {
+        "step": 0,
+        "eval_score": -0.5972878934157115,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": null,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.5972878934157115,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.1328125
+        }
+      },
+      {
+        "step": 19,
+        "eval_score": -0.32815495309834963,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": null,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.32815495309834963,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.1015625
+        }
+      },
+      {
+        "step": 39,
+        "eval_score": -0.24572486265636,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": null,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.24572486265636,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.09375
+        }
+      },
+      {
+        "step": 59,
+        "eval_score": -0.195372331267461,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": null,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.195372331267461,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.09375
+        }
+      },
+      {
+        "step": 79,
+        "eval_score": -0.20517680504890912,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": null,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.20517680504890912,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.1171875
+        }
+      },
+      {
+        "step": 99,
+        "eval_score": -0.20850432989636508,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": null,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.20850432989636508,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.1015625
+        }
+      }
+    ]
+  },
+  "notes": "Official Gym implementation; agent-invisible; isolated from agent workspace; fresh run_name each launch."
+}

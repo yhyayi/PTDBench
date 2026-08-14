@@ -3,14 +3,14 @@
 from .agents import AgentExecutionContext, AgentRunner, create_agent_runner, register_agent_runner
 from .core.types import (
     AgentSpec,
-    CasePackage,
+    TaskPackage,
     EvaluationConfig,
     EvaluationResult,
     ValidationIssue,
     ValidationReport,
 )
-from .cases import load_case_package
-from .evaluation.evaluator import CaseEvaluator
+from .tasks import load_task_package
+from .evaluation.evaluator import TaskEvaluator
 from .runtimes import (
     CommandSpec,
     DockerRuntime,
@@ -25,7 +25,7 @@ from .runtimes import (
 __all__ = [
     "AgentRunner",
     "AgentExecutionContext",
-    "CaseEvaluator",
+    "TaskEvaluator",
     "EvaluationConfig",
     "EvaluationResult",
     "CommandSpec",
@@ -37,10 +37,10 @@ __all__ = [
     "DockerRuntime",
     "create_runtime",
     "AgentSpec",
-    "CasePackage",
+    "TaskPackage",
     "ValidationIssue",
     "ValidationReport",
     "create_agent_runner",
-    "load_case_package",
+    "load_task_package",
     "register_agent_runner",
 ]

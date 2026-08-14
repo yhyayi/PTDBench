@@ -1,0 +1,12 @@
+{
+  "attribution_match": false,
+  "matched_requirements": [],
+  "missing_requirements": [
+    "Name the sat_031 environment and identify its reward design or reward function."
+  ],
+  "passed": false,
+  "rationale": "Verdict matches (unhealthy), but primary attribution is about missing GRPO regularization, not the reward design/function of sat_031. Agent also does not explicitly name sat_031.",
+  "score": 0,
+  "specificity_match": false,
+  "verdict_match": true
+}

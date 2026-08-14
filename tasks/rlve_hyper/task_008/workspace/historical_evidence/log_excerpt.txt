@@ -1,0 +1,17 @@
+step=0 score=-0.562691319 truncated_ratio=0.09375
+step=19 score=-0.577447861 truncated_ratio=0.09375
+step=39 score=-0.630092460 truncated_ratio=0.140625
+step=59 score=-0.610252842 truncated_ratio=0.0625
+step=79 score=-0.597927198 truncated_ratio=0.1015625
+step=99 score=-0.663022237 truncated_ratio=0.1015625
+step=119 score=-0.636150846 truncated_ratio=0.0625
+step=139 score=-0.656743008 truncated_ratio=0.078125
+step=159 score=-0.630671638 truncated_ratio=0.09375
+step=179 score=-0.609959032 truncated_ratio=0.1015625
+step=199 score=-0.630900655 truncated_ratio=0.09375
+step=219 score=-0.568731670 truncated_ratio=0.0859375
+step=239 score=-0.618361743 truncated_ratio=0.1484375
+step=259 score=-0.568575553 truncated_ratio=0.078125
+step=279 score=-0.556114587 truncated_ratio=0.0546875
+step=299 score=-0.598344141 truncated_ratio=0.09375
+step=319 score=-0.612645646 truncated_ratio=0.125

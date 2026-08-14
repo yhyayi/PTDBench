@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize selected data-format variants as PTDBench B0 cases."""
+"""Materialize selected data-format variants as PTDBench B0 tasks."""
 
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ from typing import Any, Dict, Iterable, List, Tuple
 import yaml
 
 try:
-    from .strip_validation_artifacts import finalize_case
+    from .strip_validation_artifacts import finalize_task
 except ImportError:
-    from strip_validation_artifacts import finalize_case
+    from strip_validation_artifacts import finalize_task
 
 try:
     from .sanitize_packaging import (
@@ -33,7 +33,7 @@ except ImportError:
     )
 
 
-CASES: Dict[str, Dict[str, Any]] = {
+TASKS: Dict[str, Dict[str, Any]] = {
     "task_agent_loop_022-qwen-math-dapo-math": {
         "canonical": "task_qwen_dapo_math_17k/task_agent_loop_022",
         "mother": "qwen_dapo_math_17k",
@@ -105,7 +105,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dst",
         type=Path,
-        default=data_call / "cases" / "data_format",
+        default=data_call / "tasks" / "data_format",
     )
     parser.add_argument("--force", action="store_true")
     return parser.parse_args()
@@ -377,7 +377,7 @@ def checkpoint_manifest(source_workspace: Path) -> Dict[str, Any]:
         if (source_workspace / name).exists()
     ]
     return {
-        "excluded_from_case": True,
+        "excluded_from_task": True,
         "source_locations": present,
         "reason": "Runtime checkpoints are not required for B0 diagnosis.",
     }
@@ -425,14 +425,13 @@ Do not run the full GPU job yourself; the verifier owns execution.
 
 
 def metadata_for(
-    case_id: str,
+    task_id: str,
     config: Dict[str, Any],
     public: Dict[str, Any],
     historical: Dict[str, Any],
 ) -> Dict[str, Any]:
     return {
-        "case_id": case_id,
-        "title": f"Data-format run assessment: {case_id}",
+        "title": f"Data-format run assessment: {task_id}",
         "submitter": {"name": "benchmark_evaluation"},
         "license": "MIT",
         "created_date": "2026-08-08",
@@ -442,7 +441,6 @@ def metadata_for(
         "training": {
             "framework": "verl",
             "algo": "grpo",
-            "run_command": "bash outputs/run_command.sh",
         },
         "environment": {"dockerfile": "environment/Dockerfile"},
         "outcome": {
@@ -451,7 +449,7 @@ def metadata_for(
         },
         "bench_category": "data_format",
         "source_task": (
-            f"Benchmark_Evaluation/tasks/task_data_format/{case_id}"
+            f"Benchmark_Evaluation/tasks/task_data_format/{task_id}"
         ),
         "canonical_task": config["canonical"],
         "data_format_variant": True,
@@ -491,14 +489,14 @@ def verifier_python() -> str:
 
 
 def materialize_one(
-    case_id: str,
+    task_id: str,
     config: Dict[str, Any],
     be_root: Path,
     destination_root: Path,
     force: bool,
 ) -> Dict[str, Any]:
-    source = be_root / "tasks/task_data_format" / case_id
-    target = destination_root / case_id
+    source = be_root / "tasks/task_data_format" / task_id
+    target = destination_root / task_id
     if target.exists():
         if not force:
             raise FileExistsError(f"{target} exists; pass --force")
@@ -510,7 +508,7 @@ def materialize_one(
     targets = target_files(public)
     baselines = baseline_map(hidden)
     if set(targets) != set(baselines):
-        raise ValueError(f"{case_id}: target/baseline mismatch")
+        raise ValueError(f"{task_id}: target/baseline mismatch")
 
     source_workspace = source / "workspace"
     source_records = []
@@ -520,7 +518,7 @@ def materialize_one(
         if not dirty.is_file() or not golden.is_file():
             raise FileNotFoundError(relative)
         if sha256_file(golden) != baselines[relative]:
-            raise ValueError(f"{case_id}: source golden hash mismatch")
+            raise ValueError(f"{task_id}: source golden hash mismatch")
         source_records.append(
             {
                 "path": relative,
@@ -586,7 +584,7 @@ def materialize_one(
     historical["metrics_alignment"] = align_outputs_metrics(
         target / "workspace",
         historical,
-        task_id=case_id,
+        task_id=task_id,
     )
     public_historical = {
         key: value
@@ -738,7 +736,7 @@ def materialize_one(
         encoding="utf-8",
     )
     (target / "readme.md").write_text(
-        f"# {case_id}\n\n"
+        f"# {task_id}\n\n"
         "PTDBench B0 data-format dirty-workspace package.\n\n"
         f"- Historical metric: `{config['metric']}`\n"
         f"- Historical eval points: `{historical['n_eval_points']}`\n"
@@ -748,7 +746,7 @@ def materialize_one(
     )
     write_yaml(
         target / "metadata.yaml",
-        metadata_for(case_id, config, public, historical),
+        metadata_for(task_id, config, public, historical),
     )
     environment = target / "environment"
     environment.mkdir()
@@ -769,7 +767,7 @@ def materialize_one(
     write_json(
         verifier / "resources/verify_config.json",
         {
-            "case_id": case_id,
+            "task_id": task_id,
             "canonical_task": config["canonical"],
             "model": config["model"],
             "launch_script": launch,
@@ -783,9 +781,9 @@ def materialize_one(
         "B0 package checks are implemented by ../verify.py.\n",
         encoding="utf-8",
     )
-    finalize_case(target)
+    finalize_task(target)
     return {
-        "case_id": case_id,
+        "task_id": task_id,
         "canonical_task": config["canonical"],
         "model": config["model"],
         "metric": config["metric"],
@@ -812,11 +810,11 @@ def main() -> int:
         raise FileNotFoundError(be_root)
     destination_root.mkdir(parents=True, exist_ok=True)
     results = []
-    for case_id, config in CASES.items():
-        print(f"materializing data_format/{case_id}...", flush=True)
+    for task_id, config in TASKS.items():
+        print(f"materializing data_format/{task_id}...", flush=True)
         results.append(
             materialize_one(
-                case_id,
+                task_id,
                 config,
                 be_root,
                 destination_root,
@@ -827,11 +825,11 @@ def main() -> int:
         destination_root / "manifest.json",
         {
             "family": "data_format",
-            "selected_count": len(CASES),
-            "cases": results,
+            "selected_count": len(TASKS),
+            "tasks": results,
         },
     )
-    print(json.dumps({"cases": results}, indent=2))
+    print(json.dumps({"tasks": results}, indent=2))
     return 0
 
 

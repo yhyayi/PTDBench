@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "historical_run",
+  "held_out_eval": {
+    "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "eval_interval": 20,
+    "eval_points": [
+      {
+        "step": 0,
+        "eval_score": -0.6164372056401972,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.09375,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.6164372056401972,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.09375
+        }
+      },
+      {
+        "step": 19,
+        "eval_score": -0.97265625,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.03125,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.97265625,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.03125
+        }
+      },
+      {
+        "step": 39,
+        "eval_score": -0.9843749999999827,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.0078125,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.9843749999999827,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.0078125
+        }
+      },
+      {
+        "step": 59,
+        "eval_score": -1.0,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.0078125,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -1.0,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.0078125
+        }
+      },
+      {
+        "step": 79,
+        "eval_score": -1.0,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.0390625,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -1.0,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.0390625
+        }
+      },
+      {
+        "step": 99,
+        "eval_score": -0.98828125,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.0625,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.98828125,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.0625
+        }
+      }
+    ],
+    "n_eval_points": 6,
+    "eval_first": -0.6164372056401972,
+    "eval_last": -0.98828125,
+    "eval_min": -1.0,
+    "eval_max": -0.6164372056401972,
+    "first_rollout_ok": true,
+    "attempt": 1,
+    "run_once": {
+      "executed": true,
+      "ok": true,
+      "returncode": 0,
+      "receipt_path": "outputs/run_once_receipt.json"
+    }
+  },
+  "source_metrics": {
+    "path": "outputs/metrics.json",
+    "source_eval_points": 6
+  },
+  "source_logs": [
+    {
+      "path": "wandb/run-20260715_164444-xzrfbiyv/files/output_9512f3dd3105-k8pz8n30.log"
+    },
+    {
+      "path": "wandb/run-20260715_164407-xzrfbiyv/files/output_9512f3dd3105-zl9uci6y.log"
+    },
+    {
+      "path": "logs/fix_run/run_20260715_164314/launcher.log"
+    },
+    {
+      "path": "logs/fix_run/run_20260715_164314/ray_job.log"
+    }
+  ],
+  "checkpoint_exclusion": {
+    "excluded_from_case": true,
+    "reason": "Runtime checkpoints are not needed for diagnosis or B0 validation.",
+    "source_locations": [
+      {
+        "path": "experiement",
+        "top_level_entries": [
+          "fix_run"
+        ]
+      }
+    ]
+  },
+  "metrics_alignment": {
+    "path": "outputs/metrics.json",
+    "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "metric_status": "available",
+    "n_eval_points": 6
+  }
+}

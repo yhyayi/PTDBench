@@ -1,0 +1,109 @@
+{
+  "tasks": [
+    {
+      "task_id": "task_001",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_001",
+      "n_eval_points": 4,
+      "eval_last": -0.6393607996231563,
+      "failure_signature": "metric_failure"
+    },
+    {
+      "task_id": "task_002",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_002",
+      "n_eval_points": 1,
+      "eval_last": -0.687386920211788,
+      "failure_signature": "early_run"
+    },
+    {
+      "task_id": "task_003",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_003",
+      "n_eval_points": 1,
+      "eval_last": -0.639550920947597,
+      "failure_signature": "early_run"
+    },
+    {
+      "task_id": "task_005",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_005",
+      "n_eval_points": 9,
+      "eval_last": -0.7907582940922553,
+      "failure_signature": "eval_truncation"
+    },
+    {
+      "task_id": "task_006",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_006",
+      "n_eval_points": 2,
+      "eval_last": -0.33872577123956776,
+      "failure_signature": "rollout_truncation"
+    },
+    {
+      "task_id": "task_007",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_007",
+      "n_eval_points": 6,
+      "eval_last": -0.2552701534954937,
+      "failure_signature": "boundary_metric_failure"
+    },
+    {
+      "task_id": "task_008",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_008",
+      "n_eval_points": 17,
+      "eval_last": -0.6126456460639882,
+      "failure_signature": "metric_failure"
+    },
+    {
+      "task_id": "task_009",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_009",
+      "n_eval_points": 13,
+      "eval_last": -0.5731876952630935,
+      "failure_signature": "metric_failure"
+    },
+    {
+      "task_id": "task_010",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_010",
+      "n_eval_points": 15,
+      "eval_last": -1.0,
+      "failure_signature": "eval_truncation"
+    },
+    {
+      "task_id": "task_012",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_012",
+      "n_eval_points": 6,
+      "eval_last": -0.613648950688992,
+      "failure_signature": "metric_failure"
+    },
+    {
+      "task_id": "task_015",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_015",
+      "n_eval_points": 6,
+      "eval_last": -0.42111604364774624,
+      "failure_signature": "boundary_metric_failure"
+    },
+    {
+      "task_id": "task_016",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_016",
+      "n_eval_points": 3,
+      "eval_last": -0.6099539726536959,
+      "failure_signature": "metric_failure"
+    },
+    {
+      "task_id": "task_018",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_018",
+      "n_eval_points": 1,
+      "eval_last": -0.6096609025871415,
+      "failure_signature": "early_run"
+    },
+    {
+      "task_id": "task_019",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_019",
+      "n_eval_points": 6,
+      "eval_last": -0.5221301909316525,
+      "failure_signature": "metric_failure"
+    },
+    {
+      "task_id": "task_021",
+      "target": "/home/test/test06/lyh/data_call/tasks/rlve_hyper/task_021",
+      "n_eval_points": 2,
+      "eval_last": -0.9177316621245876,
+      "failure_signature": "eval_truncation"
+    }
+  ]
+}

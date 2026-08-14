@@ -15,9 +15,9 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import yaml
 
 try:
-    from .strip_validation_artifacts import finalize_case
+    from .strip_validation_artifacts import finalize_task
 except ImportError:
-    from strip_validation_artifacts import finalize_case
+    from strip_validation_artifacts import finalize_task
 
 try:
     from .sanitize_packaging import (
@@ -72,7 +72,7 @@ FAMILIES: Dict[str, Dict[str, Any]] = {
         "max_train_steps": 100,
     },
 }
-REMOVED_CASES = {
+REMOVED_TASKS = {
     "llama_dapo_implementation": ("task_agent_loop_022",),
 }
 VAL_RE = re.compile(
@@ -96,7 +96,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dst",
         type=Path,
-        default=data_call / "cases",
+        default=data_call / "tasks",
     )
     parser.add_argument(
         "--family",
@@ -390,7 +390,7 @@ def protected_hashes(
 def checkpoint_manifest(source_workspace: Path) -> Dict[str, Any]:
     root = source_workspace / "checkpoints"
     return {
-        "excluded_from_case": True,
+        "excluded_from_task": True,
         "reason": "Implementation diagnosis does not require 12-148GB checkpoints.",
         "source_present": root.exists(),
         "top_level_entries": (
@@ -458,7 +458,6 @@ def metadata_for(
     already_at_baseline: bool,
 ) -> Dict[str, Any]:
     return {
-        "case_id": task_id,
         "title": f"{family} implementation diagnosis: {task_id}",
         "submitter": {"name": "benchmark_evaluation"},
         "license": "MIT",
@@ -475,7 +474,6 @@ def metadata_for(
         "training": {
             "framework": "verl",
             "algo": "grpo",
-            "run_command": "bash outputs/run_command.sh",
         },
         "environment": {"dockerfile": "environment/Dockerfile"},
         "outcome": {
@@ -776,7 +774,7 @@ def materialize_one(
     write_json(
         verifier / "resources/verify_config.json",
         {
-            "case_id": task_id,
+            "task_id": task_id,
             "family": family,
             "launch_script": config["launch"],
             "targets": targets,
@@ -789,9 +787,9 @@ def materialize_one(
         "B0 package checks are implemented by ../verify.py.\n",
         encoding="utf-8",
     )
-    finalize_case(target)
+    finalize_task(target)
     return {
-        "case_id": task_id,
+        "task_id": task_id,
         "family": family,
         "targets": len(targets),
         "metric_status": metrics["metric_status"],
@@ -814,7 +812,7 @@ def main() -> int:
     results = []
     for family, config in selected.items():
         if args.force:
-            for task_id in REMOVED_CASES.get(family, ()):
+            for task_id in REMOVED_TASKS.get(family, ()):
                 stale = destination_root / family / task_id
                 if stale.exists():
                     shutil.rmtree(stale)
@@ -832,13 +830,13 @@ def main() -> int:
             )
         write_json(
             destination_root / family / "manifest.json",
-            {"family": family, "cases": [r for r in results if r["family"] == family]},
+            {"family": family, "tasks": [r for r in results if r["family"] == family]},
         )
     write_json(
         destination_root / "verl_implementation_manifest.json",
-        {"cases": results},
+        {"tasks": results},
     )
-    print(json.dumps({"cases": results}, indent=2))
+    print(json.dumps({"tasks": results}, indent=2))
     return 0
 
 

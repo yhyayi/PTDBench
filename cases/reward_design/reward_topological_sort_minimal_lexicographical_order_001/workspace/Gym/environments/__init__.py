@@ -1,5 +1,0 @@
-from Gym.environments.topological_sort_minimal_lexicographical_order import TopologicalSort_MinimalLexicographicalOrder_Environment
-
-identifier2environment = {
-    "TopologicalSort_MinimalLexicographicalOrder": TopologicalSort_MinimalLexicographicalOrder_Environment,
-}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize the selected reward-design dirty workspaces as PTDBench B0 cases."""
+"""Materialize the selected reward-design dirty workspaces as PTDBench B0 tasks."""
 
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ from typing import Any, Dict, Iterable, List
 import yaml
 
 try:
-    from .strip_validation_artifacts import finalize_case
+    from .strip_validation_artifacts import finalize_task
 except ImportError:
-    from strip_validation_artifacts import finalize_case
+    from strip_validation_artifacts import finalize_task
 
 try:
     from .sanitize_packaging import (
@@ -89,7 +89,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dst",
         type=Path,
-        default=data_call / "cases" / "reward_design",
+        default=data_call / "tasks" / "reward_design",
     )
     parser.add_argument("--force", action="store_true")
     return parser.parse_args()
@@ -309,7 +309,7 @@ def checkpoint_manifest(source_workspace: Path) -> Dict[str, Any]:
                 }
             )
     return {
-        "excluded_from_case": True,
+        "excluded_from_task": True,
         "reason": "Runtime checkpoints are not needed for diagnosis or B0 validation.",
         "source_locations": found,
     }
@@ -432,7 +432,6 @@ def metadata_for(
 ) -> Dict[str, Any]:
     held = historical["held_out_eval"]
     return {
-        "case_id": task_id,
         "title": f"Reward-design run assessment: {task_id}",
         "submitter": {"name": "benchmark_evaluation"},
         "license": "MIT",
@@ -443,7 +442,6 @@ def metadata_for(
         "training": {
             "framework": "RLVE / slime",
             "algo": "grpo",
-            "run_command": "bash outputs/run_command.sh",
         },
         "environment": {"dockerfile": "environment/Dockerfile"},
         "outcome": {
@@ -720,7 +718,7 @@ def materialize_one(
     write_json(
         verifier / "resources/verify_config.json",
         {
-            "case_id": task_id,
+            "task_id": task_id,
             "target": target_rel,
             "locked_heldout_environment_list": public.get(
                 "locked_heldout_environment_list", []
@@ -733,9 +731,9 @@ def materialize_one(
         "B0 package checks are implemented by ../verify.py.\n",
         encoding="utf-8",
     )
-    finalize_case(target)
+    finalize_task(target)
     return {
-        "case_id": task_id,
+        "task_id": task_id,
         "target": target_rel,
         "historical_eval_points": historical["held_out_eval"]["n_eval_points"],
         "historical_eval_max": historical["held_out_eval"]["eval_max"],
@@ -773,10 +771,10 @@ def main() -> int:
         {
             "family": "reward_design",
             "selected_count": len(TASK_IDS),
-            "cases": results,
+            "tasks": results,
         },
     )
-    print(json.dumps({"cases": results}, indent=2))
+    print(json.dumps({"tasks": results}, indent=2))
     return 0
 
 

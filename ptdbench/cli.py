@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from .core.types import AgentSpec, EvaluationConfig
-from .evaluation.evaluator import CaseEvaluator
+from .evaluation.evaluator import TaskEvaluator
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -15,17 +15,17 @@ def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="ptdbench")
     sub = ap.add_subparsers(dest="command", required=True)
 
-    v = sub.add_parser("validate", help="validate a case package")
-    v.add_argument("case_root")
+    v = sub.add_parser("validate", help="validate a task package")
+    v.add_argument("task_root")
     v.add_argument("--lenient", action="store_true", help="skip non-critical directory warnings")
 
-    e = sub.add_parser("evaluate", help="run an agent + verifier for a case package")
-    e.add_argument("case_root")
+    e = sub.add_parser("evaluate", help="run an agent + verifier for a task package")
+    e.add_argument("task_root")
     e.add_argument(
         "--evaluation-level",
         choices=["issue", "solution"],
         default="solution",
-        help="case evaluation to run",
+        help="task evaluation to run",
     )
     e.add_argument(
         "--log-level",
@@ -71,12 +71,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
-    # CLI 只是 CaseEvaluator 的薄封装。
+    # CLI 只是 TaskEvaluator 的薄封装。
     args = build_parser().parse_args(argv)
-    evaluator = CaseEvaluator(backend=getattr(args, "backend", "docker"))
+    evaluator = TaskEvaluator(backend=getattr(args, "backend", "docker"))
 
     if args.command == "validate":
-        report = evaluator.validate(args.case_root, strict=not args.lenient)
+        report = evaluator.validate(args.task_root, strict=not args.lenient)
         print(json.dumps(report, indent=2, ensure_ascii=False))
         return 0 if report.get("ok", False) else 1
 
@@ -119,7 +119,7 @@ def main(argv=None) -> int:
                 network=args.agent_network,
             )
         result = evaluator.evaluate(
-            args.case_root,
+            args.task_root,
             EvaluationConfig(
                 agent=agent_spec,
                 agent_cmd=agent_command,

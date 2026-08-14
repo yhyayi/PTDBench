@@ -1,0 +1,41 @@
+task_id: task_ray_trainer_015
+category: qwen_dapo_math_17k
+hollow_file: verl/trainer/ppo/ray_trainer.py
+hollow_files:
+- verl/trainer/ppo/ray_trainer.py
+hollow_symbols:
+- compute_advantage
+- apply_kl_penalty
+- compute_response_mask
+- RayPPOTrainer.fit
+- RayPPOTrainer._validate
+- RayPPOTrainer._compute_reward_colocate
+- RayPPOTrainer.init_workers
+- RayPPOTrainer._create_dataloader
+hollow_symbol_map:
+  verl/trainer/ppo/ray_trainer.py:
+  - compute_advantage
+  - apply_kl_penalty
+  - compute_response_mask
+  - RayPPOTrainer.fit
+  - RayPPOTrainer._validate
+  - RayPPOTrainer._compute_reward_colocate
+  - RayPPOTrainer.init_workers
+  - RayPPOTrainer._create_dataloader
+hollowed_symbols:
+- apply_kl_penalty
+- compute_response_mask
+- compute_advantage
+- RayPPOTrainer._create_dataloader
+- RayPPOTrainer._compute_reward_colocate
+- RayPPOTrainer._validate
+- RayPPOTrainer.init_workers
+- RayPPOTrainer.fit
+baseline_path: hidden/baseline/verl/trainer/ppo/ray_trainer.py
+baselines:
+  verl/trainer/ppo/ray_trainer.py: 2053cf3c4f5685c110fa740f8304cabdce1b935f0db0edd589bb28117218a2cc
+experiment_name: task_ray_trainer_015
+created_at: '2026-07-20T03:13:08.010845+00:00'
+note: verl GRPO/DAPO-Math-17k/Qwen2.5-0.5B mother; no RLVE gym_eval. During _validate, ALL hidden/baseline/*.py are pasted onto workspace then restored; /hidden mounted only for GPU verify (Agent cannot read).
+val_baseline_paste:
+- hidden/baseline/** (all sealed .py; includes hollow + val stack)

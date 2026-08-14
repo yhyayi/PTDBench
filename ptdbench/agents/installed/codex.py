@@ -203,7 +203,7 @@ class CodexAgentRunner(AgentRunner):
                 context.instruction.strip(),
                 "",
                 "Workspace path: use $PTDBENCH_WORKSPACE.",
-                "Public task text path: use $PTDBENCH_VISIBLE_CASE/instruction.md.",
+                "Public task text path: use $PTDBENCH_VISIBLE_TASK/instruction.md.",
             ]
         )
 

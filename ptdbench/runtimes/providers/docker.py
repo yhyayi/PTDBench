@@ -80,8 +80,8 @@ class DockerRuntime(SandboxRuntime):
 
     def path(self, request: SandboxRequest, name: str) -> str:
         paths = {
-            "case_root": "/case",
-            "visible_case": "/case",
+            "task_root": "/task",
+            "visible_task": "/task",
             "workspace": "/workspace",
             "results": "/results",
         }
@@ -92,11 +92,11 @@ class DockerRuntime(SandboxRuntime):
         if name in selected_paths and selected_paths[name] is not None:
             selected = selected_paths[name]
             try:
-                relative = selected.resolve().relative_to(request.host_case_root.resolve())
+                relative = selected.resolve().relative_to(request.host_task_root.resolve())
             except ValueError as exc:
-                raise ValueError(f"{name} must stay under the selected case root") from exc
-            return f"/case/{relative.as_posix()}"
-        paths.update({"oracle": "/case/oracle", "verifier": "/case/verifier"})
+                raise ValueError(f"{name} must stay under the selected task root") from exc
+            return f"/task/{relative.as_posix()}"
+        paths.update({"oracle": "/task/oracle", "verifier": "/task/verifier"})
         try:
             return paths[name]
         except KeyError as exc:
@@ -363,12 +363,12 @@ class DockerRuntime(SandboxRuntime):
         if request.stage == "agent":
             return [
                 DockerMount(request.host_workspace, "/workspace"),
-                DockerMount(request.host_visible_case, "/case", read_only=True),
+                DockerMount(request.host_visible_task, "/task", read_only=True),
                 DockerMount(request.host_results, "/results"),
             ]
         return [
             DockerMount(request.host_workspace, "/workspace", read_only=True),
-            DockerMount(request.host_case_root, "/case", read_only=True),
+            DockerMount(request.host_task_root, "/task", read_only=True),
             DockerMount(request.host_results, "/results"),
         ]
 

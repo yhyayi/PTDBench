@@ -1,6 +1,0 @@
-{
-  "schema_version": 1,
-  "source": "Benchmark_Evaluation/packaging/qwen_dapo_math_17k/mother_workspace",
-  "status": "healthy_format_stack",
-  "model_and_launch_inherited": false
-}

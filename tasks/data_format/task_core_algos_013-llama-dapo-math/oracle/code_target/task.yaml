@@ -1,0 +1,10 @@
+task_id: task_core_algos_013
+category: llama_dapo_math_17k
+hollow_file: verl/trainer/ppo/core_algos.py
+baseline_path: oracle/code_target/baseline/verl/trainer/ppo/core_algos.py
+experiment_name: task_core_algos_013
+created_at: '2026-07-18T14:13:46.992731+00:00'
+val_baseline_paste:
+- hidden/baseline/** (all sealed .py; includes hollow + val stack)
+baselines:
+  verl/trainer/ppo/core_algos.py: 9114f9e16c87e4c9ebf2fa016baf733c9bbc819766b53c8968aaa9e8abcd7916

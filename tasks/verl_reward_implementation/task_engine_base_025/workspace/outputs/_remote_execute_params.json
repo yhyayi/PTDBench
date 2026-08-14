@@ -1,0 +1,13 @@
+{
+  "task_id": "task_verl_reward_implementation/task_engine_base_025",
+  "host_cuda": "0,1",
+  "use_docker": true,
+  "stop_after_first_step": true,
+  "kill_on_first_step": false,
+  "max_train_steps": 100,
+  "locked_environment_list": [
+    "gsm8k"
+  ],
+  "param_path": "/home/test/test06/lyh/Benchmark_Evaluation/tasks/task_verl_reward_implementation/task_engine_base_025/workspace/outputs/_remote_execute_params.json",
+  "result_path": "/home/test/test06/lyh/Benchmark_Evaluation/tasks/task_verl_reward_implementation/task_engine_base_025/workspace/outputs/remote_execute_result.json"
+}

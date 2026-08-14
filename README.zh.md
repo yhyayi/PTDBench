@@ -5,7 +5,7 @@ PTDBench（PostTrainDiagnosisBench）是一个面向社区提交的后训练诊�
 
 ## 核心流程
 
-1. 提交一个 case package，里面包含公开说明、可写 workspace、隐藏 oracle、环境镜像和 verifier。
+1. 提交一个 task package，里面包含公开说明、可写 workspace、隐藏 oracle、环境镜像和 verifier。
 2. 评测器把 `workspace/` 复制到 staging 目录。
 3. 指定的 agent 在 staging workspace 上修改代码。
 4. verifier 运行 `verifier/test.sh`，读取修复后的 workspace 并输出结果。
@@ -45,7 +45,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
 
 在 `--backend local` 下，中央 evaluator 会把 `--model`、`--base-url`
 和 `--api-key` 通过 verifier 子进程环境转交给需要 LLM Judge 的
-self-contained verifier。Codex case 默认让 Judge 使用同一个
+self-contained verifier。Codex task 默认让 Judge 使用同一个
 OpenAI-compatible model、base URL 和 API key；task verifier 仍可用
 `PTDBENCH_JUDGE_*` 环境变量覆盖 Judge 设置。该转交不会把 key 写进
 `report.json` 或 agent trace。Docker verifier backend 不转交 key，以免
@@ -86,7 +86,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
 ```
 
 运行前需要确保 Docker daemon 已启动，并允许 Docker Desktop 访问当前仓库目录。
-评测器会自动读取 case 的 `environment/Dockerfile`，构建 task 基础镜像，并分别启动 agent/verifier
+评测器会自动读取 task 的 `environment/Dockerfile`，构建 task 基础镜像，并分别启动 agent/verifier
 容器。task 镜像不需要预装 Codex，框架会在 agent 容器启动后安装 `@openai/codex@latest`。
 安装完成后，框架会根据 `--base-url` 在容器内生成 Codex model provider 配置，并通过 stdin
 执行 `codex login --with-api-key`；API key 不会写入命令参数或运行日志。例如默认的
@@ -128,7 +128,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
 ## 目录结构
 
 ```text
-example/your_case/
+example/your_task/
 ├── instruction.md
 ├── readme.md
 ├── metadata.yaml
@@ -164,7 +164,6 @@ example/your_case/
 
 `metadata.yaml` 需要包含以下顶层字段：
 
-- `case_id`
 - `title`
 - `submitter`
 - `license`
@@ -179,7 +178,6 @@ example/your_case/
 其中建议结构如下：
 
 ```yaml
-case_id: swe_slugfix_001
 title: Toy slugify repair
 submitter:
   name: ptdbench
@@ -193,7 +191,6 @@ dataset:
 training:
   framework: none
   algo: none
-  run_command: n/a
 environment:
   dockerfile: environment/Dockerfile
 outcome:
@@ -208,7 +205,6 @@ outcome:
 - `dataset.name`：训练或数据来源名称
 - `training.framework`：训练框架
 - `training.algo`：训练算法
-- `training.run_command`：训练命令
 - `environment.dockerfile`：环境 Dockerfile 路径
 - `outcome.failure_type`：失败类型
 - `outcome.failure_reason`：失败原因说明
@@ -238,7 +234,7 @@ outcome:
 
 3. `metadata.yaml`
    - 填完整元数据
-   - 至少把 `case_id`、`title`、`submitter`、`license`、`created_date`、`domain`、`model`、`dataset`、`training`、`environment`、`outcome` 写全
+   - 至少把 `title`、`submitter`、`license`、`created_date`、`domain`、`model`、`dataset`、`training`、`environment`、`outcome` 写全
 
 4. `workspace/`
    - 放有 bug 的可写工作区
@@ -294,7 +290,7 @@ outcome:
 - `PTDBENCH_ORACLE`
 - `PTDBENCH_VERIFIER`
 - `PTDBENCH_RESULTS`
-- `PTDBENCH_CASE_ID`
+- `PTDBENCH_TASK_ID`
 
 `verifier` 需要：
 
@@ -306,7 +302,7 @@ outcome:
 
 ### `example/empty`
 
-这是一个空模板 case，适合作为社区提交的起点。
+这是一个空模板 task，适合作为社区提交的起点。
 它保留了完整目录骨架，但具体内容仍然是占位符。
 
 ### `example/swe_slugfix`

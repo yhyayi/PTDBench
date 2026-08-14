@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "status": "measured",
+  "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+  "initial": -0.5972878934157115,
+  "maximum": -0.195372331267461,
+  "final": -0.20850432989636508,
+  "n_eval_points": 6,
+  "provenance": "hidden/reward_design_metrics.json",
+  "authoritative_archive": "20260724T155405Z"
+}

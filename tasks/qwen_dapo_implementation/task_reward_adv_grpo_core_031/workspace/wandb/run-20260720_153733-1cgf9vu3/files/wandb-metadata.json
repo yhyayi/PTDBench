@@ -1,0 +1,61 @@
+{
+  "os":  "Linux-3.10.0-1160.el7.x86_64-x86_64-with-glibc2.35",
+  "python":  "CPython 3.12.13",
+  "startedAt":  "2026-07-20T15:37:33.327917Z",
+  "args":  [
+    "--node-ip-address=172.17.0.3",
+    "--node-manager-port=41592",
+    "--object-store-name=/tmp/ray/session_2026-07-20_15-34-49_415051_18/sockets/plasma_store",
+    "--raylet-name=/tmp/ray/session_2026-07-20_15-34-49_415051_18/sockets/raylet",
+    "--redis-address=None",
+    "--metrics-agent-port=0",
+    "--logging-rotate-bytes=536870912",
+    "--logging-rotate-backup-count=5",
+    "--runtime-env-agent-port=0",
+    "--gcs-address=172.17.0.3:36290",
+    "--session-name=session_2026-07-20_15-34-49_415051_18",
+    "--temp-dir=/tmp/ray",
+    "--webui=127.0.0.1:8265",
+    "--cluster-id=2a5de94b0f60d49e1561a7fd9d478cfddca09b44ac6f81bec9944741",
+    "--worker-id=7f37353227fc97d72c51961a824b021a81f114bb114b870bd9e0c759",
+    "--worker-launch-time-ms=1784561699050",
+    "--node-id=ae849822536a9d383033eedb48f332bad6505ea719b4a206c568c45b",
+    "--runtime-env-hash=1388234770"
+  ],
+  "program":  "/usr/local/lib/python3.12/dist-packages/ray/_private/workers/default_worker.py",
+  "email":  "jimmylai20001014@gmail.com",
+  "root":  "/workspace",
+  "host":  "1fbb2a8e7d30",
+  "executable":  "/usr/bin/python3",
+  "cpu_count":  104,
+  "cpu_count_logical":  104,
+  "gpu":  "NVIDIA A800-SXM4-80GB",
+  "gpu_count":  2,
+  "disk":  {
+    "/":  {
+      "total":  "11483453849600",
+      "used":  "1381079207936"
+    }
+  },
+  "memory":  {
+    "total":  "1081601728512"
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA A800-SXM4-80GB",
+      "memoryTotal":  "85899345920",
+      "cudaCores":  6912,
+      "architecture":  "Ampere",
+      "uuid":  "GPU-47e81279-102a-a9f9-01cf-1635c6e12f71"
+    },
+    {
+      "name":  "NVIDIA A800-SXM4-80GB",
+      "memoryTotal":  "85899345920",
+      "cudaCores":  6912,
+      "architecture":  "Ampere",
+      "uuid":  "GPU-91d67c89-5992-8d62-902d-d92383caca8c"
+    }
+  ],
+  "cudaVersion":  "12.9",
+  "writerId":  "pojvajxjwlg97l1vap1kd0cqfsw4aiw2"
+}

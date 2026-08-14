@@ -1,0 +1,14 @@
+{
+  "n_attempts": 2,
+  "n_failed": 1,
+  "failures": [
+    {
+      "attempt": 1,
+      "returncode": 1,
+      "failure_reason": ", 'trainer.total_epochs=15', 'trainer.total_training_steps=200', 'trainer.use_v1=False', 'trainer.resume_mode=disable'] Traceback (most recent call last):   File \"/workspace/verl/trainer/main_ppo.py\", line 168, in main     validate_config(   File \"/workspace/verl/utils/config.py\", line 151, in validate_config     actor_config.validate(n_gpus, config.da",
+      "startup_failed": true
+    }
+  ],
+  "final_ok": true,
+  "final_attempt": 2
+}

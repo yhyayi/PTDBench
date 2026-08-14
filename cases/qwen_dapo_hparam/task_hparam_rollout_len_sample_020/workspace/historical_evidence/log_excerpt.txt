@@ -1,3 +1,0 @@
-step=0 score=0.000558659
-step=20 score=0.000558659
-step=40 score=0.000558659

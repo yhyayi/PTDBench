@@ -14,7 +14,7 @@ from ..factory import register_agent_runner
 class OpenCodeAgentRunner(AgentRunner):
     """通过 OpenCode CLI 调用 OpenAI-compatible 模型。"""
 
-    # 使用一个固定的 provider 名称，避免要求每个 case 额外提供 OpenCode 配置文件。
+    # 使用一个固定的 provider 名称，避免要求每个 task 额外提供 OpenCode 配置文件。
     provider_name = "ptdbench"
 
     def run(

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize the selected RLVE hyperparameter tasks as PTDBench B0 cases."""
+"""Materialize the selected RLVE hyperparameter tasks as PTDBench B0 tasks."""
 
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import yaml
 
 try:
-    from .strip_validation_artifacts import finalize_case
+    from .strip_validation_artifacts import finalize_task
 except ImportError:
-    from strip_validation_artifacts import finalize_case
+    from strip_validation_artifacts import finalize_task
 
 try:
     from .sanitize_packaging import (
@@ -75,7 +75,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dst",
         type=Path,
-        default=default_data_call / "cases" / "rlve_hyper",
+        default=default_data_call / "tasks" / "rlve_hyper",
     )
     parser.add_argument("--force", action="store_true")
     return parser.parse_args()
@@ -355,7 +355,6 @@ def metadata_for(
     held = manifest["held_out_eval"]
     label_review = task_id in LABEL_REVIEW_TASKS
     return {
-        "case_id": task_id,
         "title": f"RLVE historical diagnosis: {task_id}",
         "submitter": {"name": "benchmark_evaluation"},
         "license": "MIT",
@@ -366,7 +365,6 @@ def metadata_for(
         "training": {
             "framework": public.get("framework", "RLVE / slime + GRPO"),
             "algo": "grpo",
-            "run_command": "bash outputs/run_command.sh",
         },
         "environment": {"dockerfile": "environment/Dockerfile"},
         "outcome": {
@@ -612,7 +610,7 @@ def materialize_one(
         },
     )
     (target / "oracle/source_snapshot/workspace_diff.txt").write_text(
-        "Historical-failure case. Critical launch script hashes are recorded in "
+        "Historical-failure task. Critical launch script hashes are recorded in "
         "hashes.json; workspace and seed use the same reconstructed start.\n",
         encoding="utf-8",
     )
@@ -648,7 +646,7 @@ def materialize_one(
     write_json(
         verifier / "resources/verify_config.json",
         {
-            "case_id": task_id,
+            "task_id": task_id,
             "launch_script": public["launch_script"],
             "locked_environment_list": public.get(
                 "locked_environment_list", []
@@ -664,9 +662,9 @@ def materialize_one(
         "B0 checks are implemented by ../verify.py in package mode.\n",
         encoding="utf-8",
     )
-    finalize_case(target)
+    finalize_task(target)
     return {
-        "case_id": task_id,
+        "task_id": task_id,
         "target": str(target),
         "n_eval_points": manifest["held_out_eval"]["n_eval_points"],
         "eval_last": manifest["held_out_eval"]["eval_last"],
@@ -694,8 +692,8 @@ def main() -> int:
                 parse_rlve_sh_hparams,
             )
         )
-    write_json(destination_root / "manifest.json", {"cases": results})
-    print(json.dumps({"cases": results}, indent=2))
+    write_json(destination_root / "manifest.json", {"tasks": results})
+    print(json.dumps({"tasks": results}, indent=2))
     return 0
 
 

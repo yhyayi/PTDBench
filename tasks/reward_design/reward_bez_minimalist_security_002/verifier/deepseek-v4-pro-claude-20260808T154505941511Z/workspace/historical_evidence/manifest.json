@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "historical_run",
+  "held_out_eval": {
+    "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "eval_interval": 20,
+    "eval_points": [],
+    "n_eval_points": 0,
+    "eval_first": null,
+    "eval_last": null,
+    "eval_min": null,
+    "eval_max": null,
+    "first_rollout_ok": false,
+    "attempt": 5,
+    "run_once": {
+      "executed": false,
+      "ok": false,
+      "returncode": 0,
+      "receipt_path": "outputs/run_once_receipt.json"
+    }
+  },
+  "checkpoint_exclusion": {
+    "excluded_from_case": true,
+    "reason": "Runtime checkpoints are not needed for diagnosis or B0 validation.",
+    "source_locations": [
+      {
+        "path": "experiement",
+        "top_level_entries": [
+          "fix_run"
+        ]
+      }
+    ]
+  }
+}

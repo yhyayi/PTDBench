@@ -5,15 +5,15 @@ submission of broken post-train tasks, environment specs, and verifier logic.
 
 ## Core idea
 
-1. A case package provides a broken `workspace/` plus one or more evaluations.
+1. A task package provides a broken `workspace/` plus one or more evaluations.
 2. A specified model+agent follows the selected evaluation's instruction.
 3. The evaluator runs the selected `verifier/test.sh` against the workspace.
 4. The verifier writes structured results to `$PTDBENCH_RESULTS/result.json`.
 
-## Case layout
+## Task layout
 
 ```text
-case/
+task/
 ├── readme.md
 ├── metadata.yaml
 ├── workspace/
@@ -34,8 +34,8 @@ case/
             └── resources/    # optional
 ```
 
-Cases using `evaluations/` declare `schema_version: 2` in `metadata.yaml`. A
-case may provide `issue`, `solution`, or both. Legacy cases with top-level
+The directory layout identifies the task format. A task may provide `issue`,
+`solution`, or both under `evaluations/`. Legacy tasks with top-level
 `instruction.md`, `oracle/`, and `verifier/` remain supported and are loaded as
 a `solution` evaluation.
 
@@ -46,7 +46,7 @@ ptdbench/
 ├── cli.py
 ├── core/                       # 稳定的数据模型
 │   └── types.py
-├── cases/                      # case 加载、校验和 schema YAML
+├── tasks/                      # task 加载、校验和 schema YAML
 │   ├── loader.py
 │   ├── validator.py
 │   └── yaml.py
@@ -76,7 +76,7 @@ ptdbench/
 
 Agent-visible for the selected evaluation:
 
-- its `instruction.md`, exposed as `/case/instruction.md`
+- its `instruction.md`, exposed as `/task/instruction.md`
 - a writable copy of `workspace/`
 - the Docker image built from `environment/Dockerfile`
 
@@ -98,7 +98,7 @@ invocations. The agent stage does not mount hidden oracle or verifier files.
 
 ## Runtime abstraction
 
-PTDBench separates the case contract from the execution platform. The current
+PTDBench separates the task contract from the execution platform. The current
 runtime implementations are:
 
 - `local`: runs commands on the host and is intended only for development;
@@ -129,11 +129,11 @@ Each evaluation's `verifier/test.sh` is the single entrypoint. It should read:
 - `PTDBENCH_ORACLE`
 - `PTDBENCH_VERIFIER`
 - `PTDBENCH_RESULTS`
-- `PTDBENCH_CASE_ID`
+- `PTDBENCH_TASK_ID`
 - `PTDBENCH_EVALUATION_LEVEL`
 
 For an issue evaluation, the instruction may require the agent to write a
-report such as `$PTDBENCH_RESULTS/agent_answer.md`. This is a case-level output
+report such as `$PTDBENCH_RESULTS/agent_answer.md`. This is a task-level output
 contract: the framework does not generate or recover that file from the agent's
 final message. The issue verifier decides how to score it. `tests/` and
 `resources/` are optional for both evaluation levels.
@@ -161,7 +161,7 @@ If no `result.json` exists, the evaluator falls back to the verifier exit code.
 
 ## CLI
 
-Validate a case:
+Validate a task:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench validate example/empty
@@ -261,8 +261,8 @@ it with the factory, and keep `evaluator.py` untouched. Its `run` method should
 only construct a `CommandSpec` and call the supplied `SandboxRuntime`.
 
 The Docker backend builds from `environment/Dockerfile`, mounts the editable
-workspace at `/workspace`, exposes public task text at `/case`, and writes
-results to `/results`. The verifier sees its selected evaluation at `/case`;
+workspace at `/workspace`, exposes public task text at `/task`, and writes
+results to `/results`. The verifier sees its selected evaluation at `/task`;
 `PTDBENCH_ORACLE` and `PTDBENCH_VERIFIER` resolve the evaluation-specific
 paths.
 
@@ -292,7 +292,7 @@ network unchanged and does not require Clash.
 
 ## Toy SWE Example
 
-A runnable code-repair case lives in `example/swe_slugfix/`.
+A runnable code-repair task lives in `example/swe_slugfix/`.
 
 Validate the package:
 

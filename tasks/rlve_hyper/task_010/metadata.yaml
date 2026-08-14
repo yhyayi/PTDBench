@@ -1,0 +1,40 @@
+title: 'RLVE historical diagnosis: task_010'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-08'
+domain: post_train
+model:
+  name: Qwen2.5-0.5B-Instruct
+dataset:
+  name: RLVE held-out environments
+training:
+  framework: RLVE / slime + GRPO
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: training_collapse
+  failure_reason: 'Suspected unhealthy hyperparameters: eval_max_response_len. Auto-draft only; human must verify.'
+bench_category: rlve_hyper
+bench_subcategory: collapse
+source_task: Benchmark_Evaluation/tasks/task_RLVE_hyper/task_010
+source_run: run_31_eval_max_response_len_20
+evidence_kind: historical_failure
+packaging_tier: B0
+packaging_ready: true
+b1_scoring_ready: false
+label_review: true
+bug_type: hyperparameter/eval_max_response_len
+buggy_keys: eval_max_response_len
+verify:
+  num_gpus: 4
+  timeout_minutes: 90
+  eval_interval: 20
+  eval_metric_key: eval/HELD-OUT_ENVIRONMENTS_128
+historical_baseline:
+  eval_last: -1.0
+  eval_min: -1.0
+  truncate_ratio_max: 1.0
+  n_eval_points: 15
+failure_signature: eval_truncation

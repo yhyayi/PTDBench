@@ -51,9 +51,9 @@ class SandboxRequest:
     """一次 agent 或 verifier 运行需要的宿主机资源。"""
 
     stage: str
-    case_id: str
-    host_case_root: Path
-    host_visible_case: Path
+    task_id: str
+    host_task_root: Path
+    host_visible_task: Path
     host_workspace: Path
     host_results: Path
     evaluation_level: str = "solution"
@@ -67,8 +67,8 @@ class SandboxRequest:
     def __post_init__(self) -> None:
         if self.stage not in {"agent", "verifier"}:
             raise ValueError("sandbox stage must be 'agent' or 'verifier'")
-        if self.workdir not in {"workspace", "case_root"}:
-            raise ValueError("sandbox workdir must be 'workspace' or 'case_root'")
+        if self.workdir not in {"workspace", "task_root"}:
+            raise ValueError("sandbox workdir must be 'workspace' or 'task_root'")
 
 
 class SandboxRuntime(ABC):
@@ -132,24 +132,24 @@ class SandboxRuntime(ABC):
 
     def standard_env(self, request: SandboxRequest) -> Dict[str, str]:
         """生成 agent/verifier 都可以依赖的 PTDBench 环境变量。"""
-        visible_case = self.path(request, "visible_case")
+        visible_task = self.path(request, "visible_task")
         workspace = self.path(request, "workspace")
         results = self.path(request, "results")
         if request.stage == "agent":
-            case_root = visible_case
-            visible = visible_case
+            task_root = visible_task
+            visible = visible_task
             oracle = ""
             verifier = ""
         else:
-            case_root = self.path(request, "case_root")
+            task_root = self.path(request, "task_root")
             visible = ""
             oracle = self.path(request, "oracle")
             verifier = self.path(request, "verifier")
         return {
-            "PTDBENCH_CASE_ID": request.case_id,
+            "PTDBENCH_TASK_ID": request.task_id,
             "PTDBENCH_EVALUATION_LEVEL": request.evaluation_level,
-            "PTDBENCH_CASE_ROOT": case_root,
-            "PTDBENCH_VISIBLE_CASE": visible,
+            "PTDBENCH_TASK_ROOT": task_root,
+            "PTDBENCH_VISIBLE_TASK": visible,
             "PTDBENCH_WORKSPACE": workspace,
             "PTDBENCH_ORACLE": oracle,
             "PTDBENCH_VERIFIER": verifier,

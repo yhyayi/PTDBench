@@ -29,15 +29,15 @@ class LocalRuntime(SandboxRuntime):
         dockerfile: str = "Dockerfile",
         tag_prefix: str = "ptdbench",
     ) -> EnvironmentArtifact:
-        # local 模式不构建镜像，environment 仍由 case validator 检查。
+        # local 模式不构建镜像，environment 仍由 task validator 检查。
         return EnvironmentArtifact(backend=self.name)
 
     def path(self, request: SandboxRequest, name: str) -> str:
-        oracle = request.host_oracle or request.host_case_root / "oracle"
-        verifier = request.host_verifier or request.host_case_root / "verifier"
+        oracle = request.host_oracle or request.host_task_root / "oracle"
+        verifier = request.host_verifier or request.host_task_root / "verifier"
         paths = {
-            "case_root": request.host_case_root,
-            "visible_case": request.host_visible_case,
+            "task_root": request.host_task_root,
+            "visible_task": request.host_visible_task,
             "workspace": request.host_workspace,
             "results": request.host_results,
             "oracle": oracle,

@@ -1,0 +1,38 @@
+title: 'Reward-design run assessment: reward_prefix_sum_mod_distinct_permutation_010'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-08'
+domain: post_train
+model:
+  name: Qwen2.5-0.5B-Instruct
+dataset:
+  name: RLVE held-out environments
+training:
+  framework: RLVE / slime
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: run_health_unknown
+  failure_reason: Historical run requires independent evidence-based assessment
+bench_category: reward_design
+source_task: Benchmark_Evaluation/tasks/task_reward_design/reward_prefix_sum_mod_distinct_permutation_010
+evidence_kind: dirty_agent_workspace
+packaging_tier: B0
+packaging_ready: true
+b1_scoring_ready: false
+verify:
+  num_gpus: 4
+  timeout_minutes: 90
+  eval_interval: 20
+  eval_metric_key: eval/HELD-OUT_ENVIRONMENTS_128
+historical_run:
+  eval_first: -0.6164372056401972
+  eval_last: -0.98828125
+  eval_max: -0.6164372056401972
+  n_eval_points: 6
+baseline_reference:
+  status: measured
+  initial: -0.6310042429508607
+  maximum: -0.10429029203111072

@@ -9,7 +9,7 @@ from pathlib import Path
 from ptdbench.agents.base import AgentExecutionContext, AgentRunner
 from ptdbench.agents.installed.codex import CodexAgentRunner
 from ptdbench.core.types import AgentSpec, CommandResult
-from ptdbench.evaluation.evaluator import CaseEvaluator
+from ptdbench.evaluation.evaluator import TaskEvaluator
 from ptdbench.runtimes import (
     CommandSpec,
     EnvironmentArtifact,
@@ -39,12 +39,12 @@ class RecordingRuntime(SandboxRuntime):
 
     def path(self, request, name):
         return {
-            "case_root": "/case",
-            "visible_case": "/case",
+            "task_root": "/task",
+            "visible_task": "/task",
             "workspace": "/workspace",
             "results": "/results",
-            "oracle": "/case/oracle",
-            "verifier": "/case/verifier",
+            "oracle": "/task/oracle",
+            "verifier": "/task/verifier",
         }[name]
 
     def run(self, request, spec, *, artifact=None):
@@ -81,20 +81,20 @@ class SandboxLifecycleTests(unittest.TestCase):
         for name in ("workspace", "visible", "results"):
             (root / name).mkdir()
         return AgentExecutionContext(
-            case_id="case",
+            task_id="task",
             instruction="do work",
             metadata={},
             timeout_s=10,
-            case_root=root,
+            task_root=root,
             workspace=root / "workspace",
-            visible_case=root / "visible",
+            visible_task=root / "visible",
             results=root / "results",
         )
 
     def test_setup_and_run_share_one_sandbox(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             runtime = RecordingRuntime()
-            outcome = CaseEvaluator()._run_agent(
+            outcome = TaskEvaluator()._run_agent(
                 RecordingAgent(),
                 self.context(Path(temp_dir)),
                 runtime,
@@ -110,7 +110,7 @@ class SandboxLifecycleTests(unittest.TestCase):
     def test_setup_failure_skips_run_and_closes_sandbox(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             runtime = RecordingRuntime()
-            outcome = CaseEvaluator()._run_agent(
+            outcome = TaskEvaluator()._run_agent(
                 RecordingAgent(setup_returncode=1),
                 self.context(Path(temp_dir)),
                 runtime,
@@ -136,7 +136,7 @@ class SandboxLifecycleTests(unittest.TestCase):
     def test_failed_stage_summary_points_to_debug_logs(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             results = Path(temp_dir)
-            CaseEvaluator("local")._append_command_summary(
+            TaskEvaluator("local")._append_command_summary(
                 results,
                 "agent_setup",
                 CommandResult(
@@ -161,9 +161,9 @@ class SandboxLifecycleTests(unittest.TestCase):
     def test_docker_proxy_is_opt_in_for_agent_only(self):
         request = SandboxRequest(
             stage="agent",
-            case_id="case",
-            host_case_root=Path("/case"),
-            host_visible_case=Path("/visible"),
+            task_id="task",
+            host_task_root=Path("/task"),
+            host_visible_task=Path("/visible"),
             host_workspace=Path("/workspace"),
             host_results=Path("/results"),
         )
@@ -268,7 +268,7 @@ class SandboxLifecycleTests(unittest.TestCase):
         self.assertTrue(runtime.setup_spec.live_log_to_stderr)
 
     def test_run_directory_prefix_is_readable_and_safe(self):
-        prefix = CaseEvaluator._run_directory_prefix(
+        prefix = TaskEvaluator._run_directory_prefix(
             "swe_slugfix/001: trial",
             "issue",
         )

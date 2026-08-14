@@ -2,8 +2,8 @@
 
 from .types import (
     AgentSpec,
-    CasePackage,
-    CasePaths,
+    TaskPackage,
+    TaskPaths,
     CommandResult,
     EvaluationConfig,
     EvaluationPaths,
@@ -15,8 +15,8 @@ from .types import (
 
 __all__ = [
     "AgentSpec",
-    "CasePackage",
-    "CasePaths",
+    "TaskPackage",
+    "TaskPaths",
     "CommandResult",
     "EvaluationConfig",
     "EvaluationPaths",

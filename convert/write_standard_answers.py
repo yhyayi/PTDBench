@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write English verifier-only attribution answers for 58 selected cases."""
+"""Write English verifier-only attribution answers for 58 selected tasks."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Tuple
 
 
-CaseKey = Tuple[str, str]
+TaskKey = Tuple[str, str]
 
 
 @dataclass(frozen=True)
@@ -36,7 +36,7 @@ def healthy(group: str, reason: str) -> Answer:
     )
 
 
-ANSWERS: Dict[CaseKey, Answer] = {
+ANSWERS: Dict[TaskKey, Answer] = {
     ("qwen_dapo_hparam", "task_hparam_overlong_023"): unhealthy(
         "A-core-verl-hparam",
         "MAX_RESPONSE_LENGTH=256; overlong fields behind the disabled enable gate are distractors.",
@@ -148,8 +148,8 @@ RLVE_UNHEALTHY = {
     "task_018": "rollout-temperature=0.",
     "task_021": "entropy-coef=0.1.",
 }
-for case_id, attribution in RLVE_UNHEALTHY.items():
-    ANSWERS[("rlve_hyper", case_id)] = unhealthy(
+for task_id, attribution in RLVE_UNHEALTHY.items():
+    ANSWERS[("rlve_hyper", task_id)] = unhealthy(
         "C-rlve-hparam",
         attribution,
         f"Name the exact attribution: {attribution}",
@@ -189,25 +189,25 @@ REWARD_UNHEALTHY = {
     "reward_protecting_flowers_006": "challenge",
     "reward_two_sat_030": "challenge",
 }
-for case_id, level in REWARD_UNHEALTHY.items():
-    slug = case_id.removeprefix("reward_")
-    ANSWERS[("reward_design", case_id)] = unhealthy(
+for task_id, level in REWARD_UNHEALTHY.items():
+    slug = task_id.removeprefix("reward_")
+    ANSWERS[("reward_design", task_id)] = unhealthy(
         f"D-{level}-rlve-reward-design",
         f"The reward design or reward function for the {slug} environment.",
         f"Name the {slug} environment and identify its reward design or reward function.",
     )
-for case_id in ("reward_tetris_attack_025", "reward_hungry_rabbit_036"):
-    slug = case_id.removeprefix("reward_")
-    ANSWERS[("reward_design", case_id)] = healthy(
+for task_id in ("reward_tetris_attack_025", "reward_hungry_rabbit_036"):
+    slug = task_id.removeprefix("reward_")
+    ANSWERS[("reward_design", task_id)] = healthy(
         "D-healthy-negative",
         f"The current reward implementation for {slug} must be treated as healthy.",
     )
 
 
-def render(case_id: str, answer: Answer) -> str:
+def render(task_id: str, answer: Answer) -> str:
     lines = [
         "STANDARD_ANSWER_V1",
-        f"CASE_ID: {case_id}",
+        f"TASK_ID: {task_id}",
         f"BENCHMARK_GROUP: {answer.group}",
         f"EXPECTED_VERDICT: {answer.verdict}",
         f"EXPECTED_ATTRIBUTION: {answer.attribution}",
@@ -233,30 +233,30 @@ def render(case_id: str, answer: Answer) -> str:
 def parse_args() -> argparse.Namespace:
     here = Path(__file__).resolve()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cases-root", type=Path, default=here.parents[1] / "cases")
+    parser.add_argument("--tasks-root", type=Path, default=here.parents[1] / "tasks")
     return parser.parse_args()
 
 
-def write_one(case_root: Path) -> Path:
-    answer = ANSWERS[(case_root.parent.name, case_root.name)]
-    path = case_root / "oracle/standard_answer.txt"
-    path.write_text(render(case_root.name, answer), encoding="utf-8")
+def write_one(task_root: Path) -> Path:
+    answer = ANSWERS[(task_root.parent.name, task_root.name)]
+    path = task_root / "oracle/standard_answer.txt"
+    path.write_text(render(task_root.name, answer), encoding="utf-8")
     return path
 
 
 def main() -> int:
-    cases_root = parse_args().cases_root.resolve()
+    tasks_root = parse_args().tasks_root.resolve()
     actual = {
         (path.parent.parent.name, path.parent.name)
-        for path in cases_root.glob("*/*/metadata.yaml")
+        for path in tasks_root.glob("*/*/metadata.yaml")
     }
     if actual != set(ANSWERS):
         raise ValueError(
             f"answer map mismatch: missing={sorted(actual - set(ANSWERS))}, "
             f"extra={sorted(set(ANSWERS) - actual)}"
         )
-    for family, case_id in sorted(actual):
-        write_one(cases_root / family / case_id)
+    for family, task_id in sorted(actual):
+        write_one(tasks_root / family / task_id)
     healthy_count = sum(item.verdict == "healthy" for item in ANSWERS.values())
     print(
         f"wrote {len(ANSWERS)} English standard answers "

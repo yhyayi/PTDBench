@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Remove legacy package/hash validation artifacts from materialized cases."""
+"""Remove legacy package/hash validation artifacts from materialized tasks."""
 
 from __future__ import annotations
 
@@ -84,10 +84,10 @@ def remove_empty_directories(root: Path) -> None:
                 pass
 
 
-def finalize_case(case_root: Path) -> None:
-    oracle = case_root / "oracle"
-    verifier = case_root / "verifier"
-    visible_evidence = case_root / "workspace/historical_evidence"
+def finalize_task(task_root: Path) -> None:
+    oracle = task_root / "oracle"
+    verifier = task_root / "verifier"
+    visible_evidence = task_root / "workspace/historical_evidence"
 
     for name in VALIDATION_DIRECTORIES:
         path = oracle / name
@@ -117,17 +117,17 @@ def finalize_case(case_root: Path) -> None:
     test_sh.write_text(MINIMAL_TEST_SH, encoding="utf-8")
     os.chmod(test_sh, 0o755)
 
-    write_one(case_root)
+    write_one(task_root)
 
 
-def finalize_all(cases_root: Path) -> int:
-    cases = sorted(path.parent for path in cases_root.glob("*/*/metadata.yaml"))
-    for case_root in cases:
-        finalize_case(case_root)
-    return len(cases)
+def finalize_all(tasks_root: Path) -> int:
+    tasks = sorted(path.parent for path in tasks_root.glob("*/*/metadata.yaml"))
+    for task_root in tasks:
+        finalize_task(task_root)
+    return len(tasks)
 
 
 if __name__ == "__main__":
     here = Path(__file__).resolve()
-    count = finalize_all(here.parents[1] / "cases")
-    print(f"finalized {count} cases")
+    count = finalize_all(here.parents[1] / "tasks")
+    print(f"finalized {count} tasks")

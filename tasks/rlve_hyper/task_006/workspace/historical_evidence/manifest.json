@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "historical_failure",
+  "task_id": "task_006",
+  "source_run": "run_23_rollout_maxlen_512_nsamples_8",
+  "failure_signature": "rollout_truncation",
+  "held_out_eval": {
+    "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "eval_interval": 20,
+    "n_eval_points": 2,
+    "eval_points": [
+      {
+        "step": 0,
+        "eval_score": -0.8513895884323155,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": 0.671875
+      },
+      {
+        "step": 19,
+        "eval_score": -0.33872577123956776,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncate_ratio": 0.2734375
+      }
+    ],
+    "eval_first": -0.8513895884323155,
+    "eval_last": -0.33872577123956776,
+    "eval_min": -0.8513895884323155,
+    "eval_max": -0.33872577123956776,
+    "truncate_ratio_max": 0.671875,
+    "source_logs": [
+      {
+        "path": "logs/run.log"
+      },
+      {
+        "path": "logs/run_log/run_20260701_075540/launcher.log"
+      },
+      {
+        "path": "logs/run_log/run_20260701_075540/ray_job.log"
+      },
+      {
+        "path": "wandb/run-20260701_085552-h7lx0ple/files/output_df1c905987ed-hsh03k53.log"
+      },
+      {
+        "path": "wandb/run-20260701_085626-h7lx0ple/files/output_df1c905987ed-94q9gwi2.log"
+      }
+    ],
+    "conflicts": []
+  },
+  "raw_reward": {
+    "n_raw_reward_points": 74,
+    "raw_reward_first3": [
+      -0.6943489109747959,
+      -0.6066843849162983,
+      -0.6121042160252806
+    ],
+    "raw_reward_last3": [
+      0.25978326001145413,
+      0.28899724469459565,
+      0.1891423834664608
+    ],
+    "raw_reward_mean": -0.1021649542966208,
+    "raw_reward_last5_mean": 0.27577513263287645
+  },
+  "effective_hparams_visible": {
+    "lr": 2e-06,
+    "kl_coef": 0.0,
+    "kl_loss_coef": 0.0,
+    "entropy_coef": 0.0,
+    "eps_clip": 0.2,
+    "eps_clip_high": 0.28,
+    "rollout_temperature": 1.0,
+    "eval_temperature": null,
+    "optimizer": "adam",
+    "attention_dropout": 0.0,
+    "hidden_dropout": 0.0,
+    "gamma": 1.0,
+    "advantage_estimator": "grpo",
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.98,
+    "adam_eps": 1e-08,
+    "clip_grad": 1.0,
+    "weight_decay": 0.01,
+    "tis_clip": 2.0,
+    "n_samples_per_prompt": 8,
+    "rollout_max_response_len": 512,
+    "eval_max_response_len": null,
+    "rollout_top_p": 1.0,
+    "rollout_top_k": -1,
+    "lr_decay_style": "constant",
+    "lr_warmup_iters": 0,
+    "lr_decay_iters": null
+  },
+  "materialized_hparams": {
+    "lr": 2e-06,
+    "kl_coef": 0,
+    "kl_loss_coef": 0,
+    "entropy_coef": 0,
+    "eps_clip": 0.2,
+    "eps_clip_high": 0.28,
+    "rollout_temperature": 1,
+    "optimizer": "adam",
+    "attention_dropout": 0,
+    "hidden_dropout": 0,
+    "gamma": 1,
+    "advantage_estimator": "grpo",
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.98,
+    "adam_eps": 1e-08,
+    "clip_grad": 1,
+    "weight_decay": 0.01,
+    "tis_clip": 2,
+    "n_samples_per_prompt": 8,
+    "rollout_max_response_len": 512,
+    "num_rollout": 100,
+    "rollout_top_p": 1,
+    "rollout_top_k": -1,
+    "lr_decay_style": "constant",
+    "lr_warmup_iters": 0
+  },
+  "metrics_alignment": {
+    "path": "outputs/metrics.json",
+    "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "metric_status": "available",
+    "n_eval_points": 2
+  }
+}

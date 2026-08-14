@@ -1,0 +1,38 @@
+[
+  {
+    "step": 0,
+    "eval_score": -0.5596950973260124,
+    "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "truncate_ratio": 0.0703125
+  },
+  {
+    "step": 19,
+    "eval_score": -0.49395747215601254,
+    "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "truncate_ratio": 0.140625
+  },
+  {
+    "step": 39,
+    "eval_score": -0.36691918751654073,
+    "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "truncate_ratio": 0.125
+  },
+  {
+    "step": 59,
+    "eval_score": -0.25334999304971845,
+    "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "truncate_ratio": 0.1640625
+  },
+  {
+    "step": 79,
+    "eval_score": -0.30578245020602945,
+    "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "truncate_ratio": 0.1875
+  },
+  {
+    "step": 99,
+    "eval_score": -0.2552701534954937,
+    "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "truncate_ratio": 0.1640625
+  }
+]

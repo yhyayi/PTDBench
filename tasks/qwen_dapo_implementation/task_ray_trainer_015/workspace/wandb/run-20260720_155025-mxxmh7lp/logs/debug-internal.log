@@ -1,0 +1,12 @@
+{"time":"2026-07-20T15:50:25.673557249Z","level":"INFO","msg":"stream: starting","core version":"0.25.0"}
+{"time":"2026-07-20T15:50:26.181129139Z","level":"INFO","msg":"stream: created new stream","id":"mxxmh7lp"}
+{"time":"2026-07-20T15:50:26.181365058Z","level":"INFO","msg":"handler: started","stream_id":"mxxmh7lp"}
+{"time":"2026-07-20T15:50:26.183366801Z","level":"INFO","msg":"stream: started","id":"mxxmh7lp"}
+{"time":"2026-07-20T15:50:26.183628034Z","level":"INFO","msg":"writer: started","stream_id":"mxxmh7lp"}
+{"time":"2026-07-20T15:50:26.183636144Z","level":"INFO","msg":"sender: started","stream_id":"mxxmh7lp"}
+{"time":"2026-07-20T15:50:33.528754293Z","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2026-07-20T15:50:34.077337537Z","level":"INFO","msg":"handler: operation stats","stats":{}}
+{"time":"2026-07-20T15:50:34.085199474Z","level":"INFO","msg":"stream: closing","id":"mxxmh7lp"}
+{"time":"2026-07-20T15:50:34.085310075Z","level":"INFO","msg":"handler: closed","stream_id":"mxxmh7lp"}
+{"time":"2026-07-20T15:50:34.087190192Z","level":"INFO","msg":"sender: closed","stream_id":"mxxmh7lp"}
+{"time":"2026-07-20T15:50:34.087302323Z","level":"INFO","msg":"stream: closed","id":"mxxmh7lp"}

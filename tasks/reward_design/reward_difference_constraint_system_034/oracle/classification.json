@@ -1,0 +1,7 @@
+{
+  "failure_class": "semantic_implementation_error",
+  "historical_eval_points": 6,
+  "baseline_status": "measured",
+  "heldout_environment_count": 39,
+  "authoritative_baseline_archive": "20260724T104948Z"
+}

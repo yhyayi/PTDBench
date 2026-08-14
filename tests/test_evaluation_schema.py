@@ -4,33 +4,32 @@ import unittest
 import tempfile
 from pathlib import Path
 
-from ptdbench.cases import SchemaError, load_case_package
+from ptdbench.tasks import SchemaError, load_task_package
 from ptdbench.core.types import AgentSpec, EvaluationConfig
-from ptdbench.evaluation.evaluator import CaseEvaluator
+from ptdbench.evaluation.evaluator import TaskEvaluator
 from ptdbench.runtimes import SandboxRequest
 from ptdbench.runtimes.providers.docker import DockerRuntime
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SWE_CASE = ROOT / "example" / "swe_slugfix"
+SWE_TASK = ROOT / "example" / "swe_slugfix"
 
 
-def create_legacy_case(root: Path) -> Path:
-    case = root / "legacy"
+def create_legacy_task(root: Path) -> Path:
+    task = root / "legacy"
     for directory in ("workspace", "oracle", "environment", "verifier"):
-        (case / directory).mkdir(parents=True, exist_ok=True)
-    (case / "instruction.md").write_text("Fix the workspace.\n", encoding="utf-8")
-    (case / "environment" / "Dockerfile").write_text(
+        (task / directory).mkdir(parents=True, exist_ok=True)
+    (task / "instruction.md").write_text("Fix the workspace.\n", encoding="utf-8")
+    (task / "environment" / "Dockerfile").write_text(
         "FROM python:3.11-slim\n",
         encoding="utf-8",
     )
-    (case / "verifier" / "test.sh").write_text(
+    (task / "verifier" / "test.sh").write_text(
         "#!/usr/bin/env bash\nexit 0\n",
         encoding="utf-8",
     )
-    (case / "metadata.yaml").write_text(
-        """case_id: legacy_case
-title: Legacy case
+    (task / "metadata.yaml").write_text(
+        """title: Legacy task
 submitter:
   name: test
 license: MIT
@@ -43,7 +42,6 @@ dataset:
 training:
   framework: none
   algo: none
-  run_command: n/a
 environment:
   dockerfile: environment/Dockerfile
 outcome:
@@ -52,40 +50,41 @@ outcome:
 """,
         encoding="utf-8",
     )
-    return case
+    return task
 
 
 class EvaluationSchemaTests(unittest.TestCase):
-    def test_v2_case_loads_both_evaluations(self):
-        package = load_case_package(SWE_CASE)
+    def test_evaluations_layout_loads_both_levels(self):
+        package = load_task_package(SWE_TASK)
 
         self.assertTrue(package.report.ok, package.report.to_dict())
+        self.assertEqual(package.task_id, SWE_TASK.name)
         self.assertEqual(package.evaluation_levels, ("issue", "solution"))
         self.assertTrue(package.paths.evaluations["issue"].oracle.is_file())
         self.assertTrue(package.paths.evaluations["solution"].oracle.is_dir())
         self.assertFalse(package.paths.evaluations["issue"].verifier_resources.exists())
 
-    def test_legacy_case_is_mapped_to_solution(self):
+    def test_legacy_task_is_mapped_to_solution(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            legacy_case = create_legacy_case(Path(temp_dir))
-            package = load_case_package(legacy_case)
+            legacy_task = create_legacy_task(Path(temp_dir))
+            package = load_task_package(legacy_task)
 
             self.assertTrue(package.report.ok, package.report.to_dict())
             self.assertEqual(package.evaluation_levels, ("solution",))
             self.assertEqual(
                 package.paths.evaluations["solution"].instruction_md,
-                (legacy_case / "instruction.md").resolve(),
+                (legacy_task / "instruction.md").resolve(),
             )
 
     def test_unavailable_evaluation_fails_before_running(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            legacy_case = create_legacy_case(Path(temp_dir))
+            legacy_task = create_legacy_task(Path(temp_dir))
             with self.assertRaisesRegex(
                 SchemaError,
                 "available levels: solution",
             ):
-                CaseEvaluator("local").evaluate(
-                    legacy_case,
+                TaskEvaluator("local").evaluate(
+                    legacy_task,
                     EvaluationConfig(backend="local", evaluation_level="issue"),
                 )
 
@@ -96,8 +95,8 @@ class EvaluationSchemaTests(unittest.TestCase):
             "are not handled, and repeated separators are not collapsed.' "
             '> "$PTDBENCH_RESULTS/agent_answer.md"'
         )
-        result = CaseEvaluator("local").evaluate(
-            SWE_CASE,
+        result = TaskEvaluator("local").evaluate(
+            SWE_TASK,
             EvaluationConfig(
                 backend="local",
                 evaluation_level="issue",
@@ -114,8 +113,8 @@ class EvaluationSchemaTests(unittest.TestCase):
         self.assertTrue(result.metrics["answer_present"])
 
     def test_solution_evaluation_uses_hidden_tests(self):
-        result = CaseEvaluator("local").evaluate(
-            SWE_CASE,
+        result = TaskEvaluator("local").evaluate(
+            SWE_TASK,
             EvaluationConfig(backend="local", evaluation_level="solution"),
         )
 
@@ -133,8 +132,8 @@ class EvaluationSchemaTests(unittest.TestCase):
             "text.strip().lower()).strip(\\\"-\\\")\" "
             '> "$PTDBENCH_WORKSPACE/toy_swe/slugify.py"'
         )
-        result = CaseEvaluator("local").evaluate(
-            SWE_CASE,
+        result = TaskEvaluator("local").evaluate(
+            SWE_TASK,
             EvaluationConfig(
                 backend="local",
                 evaluation_level="solution",
@@ -151,12 +150,12 @@ class EvaluationSchemaTests(unittest.TestCase):
         self.assertNotEqual(result.workspace_before_hash, result.workspace_after_hash)
 
     def test_docker_verifier_mounts_selected_hidden_paths(self):
-        evaluation = load_case_package(SWE_CASE).paths.evaluations["issue"]
+        evaluation = load_task_package(SWE_TASK).paths.evaluations["issue"]
         request = SandboxRequest(
             stage="verifier",
-            case_id="case",
-            host_case_root=evaluation.root,
-            host_visible_case=Path("/visible"),
+            task_id="task",
+            host_task_root=evaluation.root,
+            host_visible_task=Path("/visible"),
             host_workspace=Path("/workspace"),
             host_results=Path("/results"),
             evaluation_level="issue",
@@ -166,11 +165,11 @@ class EvaluationSchemaTests(unittest.TestCase):
 
         mounts = DockerRuntime()._mounts(request)
         by_container_path = {mount.container_path: mount for mount in mounts}
-        self.assertEqual(by_container_path["/case"].host_path, evaluation.root)
-        self.assertTrue(by_container_path["/case"].read_only)
+        self.assertEqual(by_container_path["/task"].host_path, evaluation.root)
+        self.assertTrue(by_container_path["/task"].read_only)
         runtime = DockerRuntime()
-        self.assertEqual(runtime.path(request, "oracle"), "/case/oracle.md")
-        self.assertEqual(runtime.path(request, "verifier"), "/case/verifier")
+        self.assertEqual(runtime.path(request, "oracle"), "/task/oracle.md")
+        self.assertEqual(runtime.path(request, "verifier"), "/task/verifier")
 
 
 if __name__ == "__main__":

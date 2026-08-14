@@ -1,0 +1,10 @@
+task_id: task_exp_dapo_rm_007
+category: llama_dapo_math_17k
+hollow_file: verl/experimental/reward_loop/reward_manager/dapo.py
+baseline_path: oracle/code_target/baseline/verl/experimental/reward_loop/reward_manager/dapo.py
+experiment_name: task_exp_dapo_rm_007
+created_at: '2026-07-18T14:11:20.714446+00:00'
+val_baseline_paste:
+- hidden/baseline/** (all sealed .py; includes hollow + val stack)
+baselines:
+  verl/experimental/reward_loop/reward_manager/dapo.py: 6fdc9ce3bc2ac956fe111ef5600f175c4c4c161dce1ea836c1c0385b6080feed
