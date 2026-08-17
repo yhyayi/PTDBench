@@ -328,15 +328,13 @@ class DockerRuntime(SandboxRuntime):
 
     @staticmethod
     def _proxy_env(request: SandboxRequest, env: Mapping[str, str]) -> dict[str, str]:
-        """Optionally expose a host-reachable proxy to agent containers.
+        """Optionally expose a host-reachable proxy to task containers.
 
         Docker does not inherit the host's GUI/system proxy settings. The
         explicit PTDBENCH_DOCKER_PROXY opt-in keeps direct networking as the
         default and avoids forwarding a host localhost address by accident.
         """
         result = dict(env)
-        if request.stage != "agent":
-            return result
         proxy = os.environ.get("PTDBENCH_DOCKER_PROXY", "").strip()
         if proxy:
             for key in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"):

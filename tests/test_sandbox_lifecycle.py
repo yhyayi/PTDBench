@@ -8,7 +8,8 @@ from pathlib import Path
 
 from ptdbench.agents.base import AgentExecutionContext, AgentRunner
 from ptdbench.agents.installed.codex import CodexAgentRunner
-from ptdbench.core.types import AgentSpec, CommandResult
+from ptdbench.cli import build_parser
+from ptdbench.core.types import AgentSpec, CommandResult, EvaluationConfig
 from ptdbench.evaluation.evaluator import TaskEvaluator
 from ptdbench.runtimes import (
     CommandSpec,
@@ -64,7 +65,7 @@ class RecordingRuntime(SandboxRuntime):
 
 class RecordingAgent(AgentRunner):
     def __init__(self, setup_returncode: int = 0) -> None:
-        super().__init__(AgentSpec(kind="recording", backend="recording"))
+        super().__init__(AgentSpec(kind="recording"))
         self.setup_returncode = setup_returncode
 
     def setup(self, context, *, runtime, sandbox):
@@ -133,6 +134,46 @@ class SandboxLifecycleTests(unittest.TestCase):
         self.assertEqual(process_env["OPENAI_API_KEY"], "secret")
         self.assertNotIn("secret", " ".join(argv))
 
+    def test_network_defaults_allow_agent_and_verifier_access(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            request = SandboxRequest(
+                stage="verifier",
+                task_id="task",
+                host_task_root=root,
+                host_visible_task=root,
+                host_workspace=root,
+                host_results=root,
+            )
+        args = build_parser().parse_args(["evaluate", "task"])
+        self.assertEqual(request.network, "bridge")
+        self.assertEqual(EvaluationConfig().verifier_network, "bridge")
+        self.assertFalse(hasattr(args, "agent_backend"))
+        self.assertEqual(args.agent_network, "bridge")
+        self.assertEqual(args.verifier_network, "bridge")
+        judge_args = build_parser().parse_args(
+            ["evaluate", "task", "--model", "agent-model", "--judge-model", "judge-model"]
+        )
+        self.assertEqual(judge_args.model, "agent-model")
+        self.assertEqual(judge_args.judge_model, "judge-model")
+
+    def test_docker_verifier_receives_judge_configuration(self):
+        env = TaskEvaluator("docker")._verifier_judge_env(
+            AgentSpec(
+                kind="codex",
+                model="agent-model",
+                judge_model="judge-model",
+                base_url="https://api.example.test/v1",
+                api_key="secret-key",
+            )
+        )
+        argv, process_env = DockerRuntime._docker_env(env)
+        self.assertEqual(env["PTDBENCH_JUDGE_MODEL"], "judge-model")
+        self.assertEqual(env["OPENAI_BASE_URL"], "https://api.example.test/v1")
+        self.assertIn("-e", argv)
+        self.assertNotIn("secret-key", " ".join(argv))
+        self.assertEqual(process_env["OPENAI_API_KEY"], "secret-key")
+
     def test_failed_stage_summary_points_to_debug_logs(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             results = Path(temp_dir)
@@ -158,7 +199,7 @@ class SandboxLifecycleTests(unittest.TestCase):
             run_log,
         )
 
-    def test_docker_proxy_is_opt_in_for_agent_only(self):
+    def test_docker_proxy_is_opt_in_for_all_stages(self):
         request = SandboxRequest(
             stage="agent",
             task_id="task",
@@ -177,6 +218,26 @@ class SandboxLifecycleTests(unittest.TestCase):
         self.assertEqual(env["HTTPS_PROXY"], "http://host.docker.internal:7890")
         self.assertEqual(env["ALL_PROXY"], "http://host.docker.internal:7890")
 
+        verifier_request = SandboxRequest(
+            stage="verifier",
+            task_id="task",
+            host_task_root=Path("/task"),
+            host_visible_task=Path("/visible"),
+            host_workspace=Path("/workspace"),
+            host_results=Path("/results"),
+        )
+        with patch.dict(
+            "os.environ",
+            {"PTDBENCH_DOCKER_PROXY": "http://host.docker.internal:7890"},
+            clear=False,
+        ):
+            verifier_env = DockerRuntime._proxy_env(
+                verifier_request, {"PTDBENCH_STAGE": "verifier"}
+            )
+        self.assertEqual(
+            verifier_env["HTTPS_PROXY"], "http://host.docker.internal:7890"
+        )
+
     def test_codex_setup_configures_provider_and_logs_in_via_stdin(self):
         class SetupRuntime(RecordingRuntime):
             name = "docker"
@@ -191,7 +252,6 @@ class SandboxLifecycleTests(unittest.TestCase):
             runner = CodexAgentRunner(
                 AgentSpec(
                     kind="codex",
-                    backend="recording",
                     model="gpt-5.5",
                     reasoning_effort="medium",
                     base_url="https://yeysai.com/v1",
@@ -289,6 +349,13 @@ class SandboxLifecycleTests(unittest.TestCase):
         self.assertIn("--dangerously-bypass-approvals-and-sandbox", argv)
         self.assertNotIn("--sandbox", argv)
         self.assertIn('model_reasoning_effort="high"', argv)
+
+    def test_codex_prompt_allows_instruction_defined_result_deliverables(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            context = self.context(Path(temp_dir))
+            prompt = CodexAgentRunner(AgentSpec(kind="codex"))._build_prompt(context)
+        self.assertIn("deliverables", prompt)
+        self.assertIn("$PTDBENCH_RESULTS", prompt)
 
     def test_codex_keeps_workspace_sandbox_for_local_runtime(self):
         runner = CodexAgentRunner(AgentSpec(kind="codex"))

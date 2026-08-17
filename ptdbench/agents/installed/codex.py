@@ -147,7 +147,14 @@ class CodexAgentRunner(AgentRunner):
             if sandbox is not None
             else runtime.run(request, command, artifact=artifact)
         )
-        self._write_trajectory(context.results, prompt, env, result, last_message_host_path)
+        self._write_trajectory(
+            context.results,
+            prompt,
+            env,
+            result,
+            last_message_host_path,
+            backend=runtime.name,
+        )
         return result
 
     @staticmethod
@@ -197,12 +204,16 @@ class CodexAgentRunner(AgentRunner):
         return "\n".join(
             [
                 "You are solving a PTDBench task.",
-                "Only modify files under the workspace.",
+                (
+                    "Only modify files under the workspace, except for deliverables "
+                    "that the task explicitly requires under $PTDBENCH_RESULTS."
+                ),
                 "Do not touch oracle/ or verifier/.",
                 "Task instruction:",
                 context.instruction.strip(),
                 "",
                 "Workspace path: use $PTDBENCH_WORKSPACE.",
+                "Results path: use $PTDBENCH_RESULTS only for required deliverables.",
                 "Public task text path: use $PTDBENCH_VISIBLE_TASK/instruction.md.",
             ]
         )
@@ -217,6 +228,8 @@ class CodexAgentRunner(AgentRunner):
         env: Dict[str, str],
         result: CommandResult,
         last_message_path: Path,
+        *,
+        backend: str,
     ) -> None:
         # 轨迹尽量压成一份，保留重放需要的关键字段就够了。
         last_message = ""
@@ -230,7 +243,7 @@ class CodexAgentRunner(AgentRunner):
             results_dir,
             {
                 "kind": self.kind,
-                "backend": self.backend,
+                "backend": backend,
                 "prompt": prompt,
                 "env": self._redact_env(env),
                 "last_message": last_message,

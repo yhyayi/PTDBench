@@ -201,7 +201,6 @@ Run Codex as the agent:
 PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/empty \
   --evaluation-level solution \
   --backend docker \
-  --agent-backend docker \
   --agent codex \
   --model gpt-5 \
   --reasoning-effort high \
@@ -209,9 +208,9 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/empty \
 ```
 
 The Codex adapter turns `instruction.md` into the initial prompt and runs
-`codex exec` in the staged workspace. With `--agent-backend docker`, PTDBench
-starts a fresh task container, installs `@openai/codex@latest`, and runs Codex
-in that same container. The verifier runs in a separate clean container built
+`codex exec` in the staged workspace. With `--backend docker`, PTDBench starts
+a fresh task container, installs `@openai/codex@latest`, and runs Codex in that
+same container. The verifier runs in a separate clean container built
 from the original task environment. Agent installation is not cached yet.
 After installation, PTDBench creates a Codex model-provider entry from
 `--base-url` and runs `codex login --with-api-key` via stdin. The credential is
@@ -226,8 +225,8 @@ Agent options:
 
 - `--evaluation-level issue|solution`
 - `--agent codex|shell`
-- `--agent-backend local|docker`
 - `--model <name>`
+- `--judge-model <name>`
 - `--reasoning-effort minimal|low|medium|high|xhigh`
 - `--base-url <url>`
 - `--api-key <key>`
@@ -264,7 +263,9 @@ The Docker backend builds from `environment/Dockerfile`, mounts the editable
 workspace at `/workspace`, exposes public task text at `/task`, and writes
 results to `/results`. The verifier sees its selected evaluation at `/task`;
 `PTDBENCH_ORACLE` and `PTDBENCH_VERIFIER` resolve the evaluation-specific
-paths.
+paths. `--backend` selects the single runtime backend used by both agent and
+verifier; their network policies remain independently configurable through
+`--agent-network` and `--verifier-network`.
 
 Run artifacts are grouped under `results/`. The main files are:
 
@@ -275,7 +276,8 @@ Run artifacts are grouped under `results/`. The main files are:
 Docker container network defaults:
 
 - Docker agent stage: `bridge`, so API-backed agents can reach their model endpoint
-- Docker verifier stage: `none`, so hidden grading logic stays offline by default
+- Docker verifier stage: `bridge`, so API-backed judges and external validation
+  services are available; pass `--verifier-network none` for an offline verifier
 
 Docker Desktop does not automatically pass a host GUI/system proxy into a
 container. If the host network requires Clash, opt in explicitly with a
@@ -287,8 +289,9 @@ export PTDBENCH_DOCKER_NO_PROXY=localhost,127.0.0.1,host.docker.internal
 ./run.sh
 ```
 
-Without `PTDBENCH_DOCKER_PROXY`, PTDBench leaves the default Docker bridge
-network unchanged and does not require Clash.
+The proxy settings apply to both agent and verifier containers. Without
+`PTDBENCH_DOCKER_PROXY`, PTDBench leaves the default Docker bridge network
+unchanged and does not require Clash.
 
 ## Toy SWE Example
 

@@ -41,7 +41,13 @@ class OpenCodeAgentRunner(AgentRunner):
             CommandSpec(argv=self._build_argv(prompt, workspace_path)),
             artifact=artifact,
         )
-        self._write_opencode_trace(context.results, prompt, config, result)
+        self._write_opencode_trace(
+            context.results,
+            prompt,
+            config,
+            result,
+            backend=runtime.name,
+        )
         return result
 
     def _build_config(self) -> Dict[str, Any]:
@@ -87,12 +93,16 @@ class OpenCodeAgentRunner(AgentRunner):
         return "\n".join(
             [
                 "You are solving a PTDBench task.",
-                "Only modify files under the workspace.",
+                (
+                    "Only modify files under the workspace, except for deliverables "
+                    "that the task explicitly requires under $PTDBENCH_RESULTS."
+                ),
                 "Do not touch oracle/ or verifier/.",
                 "Task instruction:",
                 context.instruction.strip(),
                 "",
                 f"Workspace absolute path: {workspace_path}",
+                "Use $PTDBENCH_RESULTS only for deliverables required by the task.",
                 "Use that exact absolute path when calling file tools.",
                 "Do not guess or construct a different workspace path.",
                 "The task instruction above is the complete public task description.",
@@ -105,12 +115,14 @@ class OpenCodeAgentRunner(AgentRunner):
         prompt: str,
         config: Dict[str, Any],
         result: CommandResult,
+        *,
+        backend: str,
     ) -> None:
         """把 OpenCode JSON 事件流转换成逐行的 role/content 消息。"""
         metadata = {
             "type": "run_metadata",
             "agent": self.kind,
-            "backend": self.backend,
+            "backend": backend,
             "provider": self.provider_name,
             "model": self._model_name(),
             "config": self._redact_config(config),

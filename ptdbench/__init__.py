@@ -9,8 +9,10 @@ from .core.types import (
     ValidationIssue,
     ValidationReport,
 )
+from .core.harbor_types import HarborEvaluationConfig, HarborEvaluationReport
 from .tasks import load_task_package
 from .evaluation.evaluator import TaskEvaluator
+from .evaluation.harbor_evaluator import HarborEvaluator
 from .runtimes import (
     CommandSpec,
     DockerRuntime,
@@ -26,6 +28,9 @@ __all__ = [
     "AgentRunner",
     "AgentExecutionContext",
     "TaskEvaluator",
+    "HarborEvaluator",
+    "HarborEvaluationConfig",
+    "HarborEvaluationReport",
     "EvaluationConfig",
     "EvaluationResult",
     "CommandSpec",

@@ -7,11 +7,11 @@ set -euo pipefail
 
 PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate "${PTDBENCH_TASK:-example/swe_slugfix}" \
   --evaluation-level "${PTDBENCH_EVALUATION_LEVEL:-solution}" \
-  --log-level "${PTDBENCH_LOG_LEVEL:-quiet}" \
+  --log-level "${PTDBENCH_LOG_LEVEL:-debug}" \
   --backend "${PTDBENCH_BACKEND:-docker}" \
-  --agent-backend "${PTDBENCH_AGENT_BACKEND:-docker}" \
   --agent codex \
   --model "${PTDBENCH_MODEL:-gpt-5.5}" \
+  --judge-model "${PTDBENCH_JUDGE_MODEL:-${PTDBENCH_MODEL:-gpt-5.5}}" \
   --reasoning-effort "${PTDBENCH_REASONING_EFFORT:-high}" \
   --base-url "${OPENAI_BASE_URL:-https://yeysai.com/v1}" \
   --api-key-env OPENAI_API_KEY \

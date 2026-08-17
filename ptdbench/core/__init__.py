@@ -12,6 +12,12 @@ from .types import (
     ValidationIssue,
     ValidationReport,
 )
+from .harbor_types import (
+    HarborEvaluationConfig,
+    HarborEvaluationReport,
+    HarborRun,
+    PreparedHarborTask,
+)
 
 __all__ = [
     "AgentSpec",
@@ -21,6 +27,10 @@ __all__ = [
     "EvaluationConfig",
     "EvaluationPaths",
     "EvaluationResult",
+    "HarborEvaluationConfig",
+    "HarborEvaluationReport",
+    "HarborRun",
+    "PreparedHarborTask",
     "StageArtifact",
     "ValidationIssue",
     "ValidationReport",

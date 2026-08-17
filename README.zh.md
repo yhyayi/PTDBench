@@ -28,12 +28,10 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench validate example/swe_slugfix
 
 - `--backend local`：评测和 verifier 都在本机跑，仅建议用于开发和调试
 - `--agent codex`：用 Codex 作为 agent
-- `--agent-backend local`：Codex 在本机直接启动
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
   --backend local \
-  --agent-backend local \
   --agent codex \
   --model gpt-5.5 \
   --base-url "https://yeysai.com/v1" \
@@ -74,9 +72,9 @@ export OPENAI_API_KEY='你的 API key'
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
   --backend docker \
-  --agent-backend docker \
   --agent codex \
   --model gpt-5.5 \
+  --judge-model gpt-5.5 \
   --reasoning-effort high \
   --base-url "${OPENAI_BASE_URL:-https://yeysai.com/v1}" \
   --api-key-env OPENAI_API_KEY \
@@ -87,11 +85,19 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
 
 运行前需要确保 Docker daemon 已启动，并允许 Docker Desktop 访问当前仓库目录。
 评测器会自动读取 task 的 `environment/Dockerfile`，构建 task 基础镜像，并分别启动 agent/verifier
-容器。task 镜像不需要预装 Codex，框架会在 agent 容器启动后安装 `@openai/codex@latest`。
+容器。`--backend` 是整次评测唯一的 runtime backend，agent 和 verifier 始终使用同一个 backend；
+两者的网络策略仍可分别通过 `--agent-network` 和 `--verifier-network` 配置。
+task 镜像不需要预装 Codex，框架会在 agent 容器启动后安装 `@openai/codex@latest`。
 安装完成后，框架会根据 `--base-url` 在容器内生成 Codex model provider 配置，并通过 stdin
 执行 `codex login --with-api-key`；API key 不会写入命令参数或运行日志。例如默认的
 `https://yeysai.com/v1` 会配置为使用 Responses API 的通用 `ptdbench` provider。
 `run.sh` 默认使用 `high` 推理强度，可以通过环境变量覆盖而不必修改脚本：
+
+完成任务的 agent 模型和 verifier judge 模型可以分别设置：
+
+```bash
+PTDBENCH_MODEL=gpt-5.5 PTDBENCH_JUDGE_MODEL=gpt-4.1 ./run.sh
+```
 
 ```bash
 PTDBENCH_REASONING_EFFORT=medium ./run.sh
@@ -102,6 +108,103 @@ Docker 已经作为 agent 的外层安全边界，因此 Docker backend 会使�
 `--dangerously-bypass-approvals-and-sandbox`，避免 bubblewrap 在容器内创建嵌套 user namespace
 失败。本地 backend 仍使用 Codex 的 `workspace-write` 沙盒。
 
+### 通过 Harbor 运行
+
+`evaluate` 和 `harbor-evaluate` 是两个并行入口：前者使用 PTDBench 原有的
+`TaskEvaluator`，后者在线生成临时 Harbor task 并交给 Harbor CLI 执行，最后再映射回同一个
+PTDBench 结果结构。因此不需要修改原有评测命令。
+
+如果 Harbor 是当前仓库旁边的 clone，可以这样运行：
+
+```bash
+export OPENAI_API_KEY='你的 API key'
+export OPENAI_BASE_URL='https://yeysai.com/v1'
+./run_harbor.sh
+```
+
+脚本默认使用 `example/swe_slugfix`、`solution`、`separate`、Codex、`gpt-5.5` 和
+`uv run --project harbor harbor`。也可以直接展开它对应的 CLI 命令：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench harbor-evaluate example/swe_slugfix \
+  --evaluation-level solution \
+  --judge-model gpt-5.5 \
+  --debian-mirror https://mirrors.tuna.tsinghua.edu.cn \
+  --verifier-mode separate \
+  --agent-network public \
+  --verifier-network public \
+  --harbor-command "uv run --project harbor harbor" \
+  --harbor-temp-dir outputs/harbor-tmp \
+  --agent codex \
+  --model gpt-5.5 \
+  --agent-kwarg reasoning_effort=high \
+  --env docker \
+  --jobs-dir outputs/harbor \
+  --yes \
+  --debug
+```
+
+`--verifier-mode separate` 是默认值，表示 agent 结束后由 Harbor 使用独立 verifier 环境；
+需要复用同一个环境时改成 `--verifier-mode shared`。`--evaluation-level issue` 和
+`solution` 分别选择 task package 中对应的两套 instruction/oracle/verifier，仍然只会运行
+选中的一套，不会离线复制成两个数据集。`--agent-network` 和 `--verifier-network` 用于生成
+Harbor task 中对应阶段的 `network_mode`。
+
+`--harbor-command` 是可拆分的命令字符串，也可以直接写成 `"harbor"`。运行前需确保该命令
+在当前 shell 中可用，并按 Harbor 的要求准备 agent、Docker 和模型凭据。
+
+`--debian-mirror` 是任务物化参数。设置后，adapter 会在生成的 Dockerfile 中替换 Debian
+软件源，确保 Harbor 启动容器后安装 agent 依赖时也使用该镜像；不设置则保持任务原始软件源。
+`run_harbor.sh` 默认使用 `https://mirrors.tuna.tsinghua.edu.cn`，可通过
+`PTDBENCH_DEBIAN_MIRROR` 覆盖。
+
+除了上述 PTDBench 转换参数，其余参数会原样传给 `harbor run`。参数名、别名和行为均保持
+Harbor 原义，因此 Harbor 增加普通 CLI 参数时不需要同步修改 adapter：
+
+```bash
+python3 -m ptdbench harbor-evaluate example/swe_slugfix \
+  --evaluation-level solution \
+  --judge-model gpt-4.1 \
+  --agent codex \
+  --model gpt-5.5 \
+  --env daytona \
+  --n-concurrent 8 \
+  --max-retries 2
+```
+
+`--path/-p` 是唯一由 adapter 管理的 Harbor 参数，它始终指向在线生成的临时 Harbor task。
+`--harbor-temp-dir` 设置这些临时 task 的父目录；每次运行仍会创建并只清理一个随机唯一的
+子目录。未设置时使用操作系统临时目录。
+`--jobs-dir/-o` 和 `--job-name` 可以按 Harbor 原生方式使用；没有提供时 adapter 使用 `jobs`
+和一个唯一 job name，以便可靠读取结果。临时 task 在运行后自动清理，Harbor job 正常保留。
+使用 `--config/-c` 时，配置文件中的 `jobs_dir` 和 `job_name` 也会保持 Harbor 原义，不会被
+adapter 覆盖。
+`HarborEvaluator.evaluate()` 一次对应一个 Harbor job，并统一返回
+`HarborEvaluationReport`。默认只有一个 trial；`--n-attempts` 或多 model 产生多个 trial 时，
+它们仍然包含在同一个 report 中。
+
+Python API 同样只区分 PTDBench 转换配置和 Harbor 原生 argv：
+
+```python
+HarborEvaluationConfig(
+    evaluation_level="solution",
+    judge_model="gpt-4.1",
+    harbor_args=(
+        "--agent", "codex",
+        "--model", "gpt-5.5",
+        "--env", "docker",
+        "--agent-kwarg", "reasoning_effort=high",
+    ),
+)
+```
+
+`run_harbor.sh` 可通过 `PTDBENCH_TASK`、`PTDBENCH_MODEL`、`PTDBENCH_EVALUATION_LEVEL`、
+`PTDBENCH_JUDGE_MODEL`、`PTDBENCH_REASONING_EFFORT`、`PTDBENCH_BACKEND`、
+`PTDBENCH_AGENT_NETWORK`、`PTDBENCH_VERIFIER_NETWORK`、`PTDBENCH_VERIFIER_MODE`、
+`PTDBENCH_DEBIAN_MIRROR`、`PTDBENCH_HARBOR_COMMAND`、`PTDBENCH_HARBOR_TEMP_DIR`、
+`PTDBENCH_TIMEOUT_MULTIPLIER` 和 `PTDBENCH_JOBS_DIR` 覆盖默认值；
+额外 CLI 参数可以直接追加在脚本命令后。
+
 Docker 默认使用 bridge 网络直连外网；宿主机开启 Clash 不会自动让容器使用 Clash。
 如果当前网络必须通过 Clash，先确认 Clash 对 Docker Desktop 可访问（通常开启局域网访问），
 然后显式设置宿主机可访问的代理地址。常见配置如下，端口以 Clash 实际配置为准：
@@ -110,6 +213,14 @@ Docker 默认使用 bridge 网络直连外网；宿主机开启 Clash 不会自�
 export PTDBENCH_DOCKER_PROXY=http://host.docker.internal:7890
 export PTDBENCH_DOCKER_NO_PROXY=localhost,127.0.0.1,host.docker.internal
 ./run.sh
+```
+
+Harbor 的容器环境变量直接使用其原生参数。例如 Colima 中只有 HTTPS 需要经过宿主机代理时：
+
+```bash
+bash run_harbor.sh \
+  --agent-env HTTPS_PROXY=http://192.168.5.2:7890 \
+  --verifier-env HTTPS_PROXY=http://192.168.5.2:7890
 ```
 
 不设置 `PTDBENCH_DOCKER_PROXY` 时，框架不会修改容器网络或代理环境，适用于本身可以直连外网的环境。
@@ -318,5 +429,5 @@ outcome:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench validate example/swe_slugfix
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix --backend local --agent-backend local --agent codex --model gpt-5.5 --json
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix --backend local --agent codex --model gpt-5.5 --json
 ```

@@ -7,7 +7,6 @@ set -euo pipefail
 # OpenCode 把 PTDBench 源码仓库误识别为当前任务的项目根。
 PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
   --backend local \
-  --agent-backend local \
   --agent opencode \
   --agent-command "/home/test/test1706/.nvm/versions/node/v24.15.0/bin/opencode" \
   --model /model \

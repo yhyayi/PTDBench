@@ -103,7 +103,6 @@ class EvaluationSchemaTests(unittest.TestCase):
                 agent=AgentSpec(
                     kind="shell",
                     command=command,
-                    backend="local",
                 ),
             ),
         )
@@ -140,7 +139,6 @@ class EvaluationSchemaTests(unittest.TestCase):
                 agent=AgentSpec(
                     kind="shell",
                     command=command,
-                    backend="local",
                 ),
             ),
         )

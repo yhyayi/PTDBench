@@ -87,11 +87,11 @@ class AgentSpec:
     kind: str = "codex"
     command: Optional[str] = None
     model: Optional[str] = None
+    judge_model: Optional[str] = None
     reasoning_effort: Optional[str] = None
     base_url: Optional[str] = None
     api_key: Optional[str] = None
     extra_args: Sequence[str] = field(default_factory=tuple)
-    backend: Optional[str] = None
     network: str = "bridge"
 
     def to_dict(self) -> Dict[str, Any]:
@@ -99,11 +99,11 @@ class AgentSpec:
             "kind": self.kind,
             "command": self.command,
             "model": self.model,
+            "judge_model": self.judge_model,
             "reasoning_effort": self.reasoning_effort,
             "base_url": self.base_url,
             "api_key": None if self.api_key is None else "<redacted>",
             "extra_args": list(self.extra_args),
-            "backend": self.backend,
             "network": self.network,
         }
 
@@ -150,7 +150,7 @@ class EvaluationConfig:
     agent_cmd: Optional[str] = None
     verifier_cmd: Optional[str] = None
     backend: str = "docker"
-    verifier_network: str = "none"
+    verifier_network: str = "bridge"
     timeout_s: Optional[int] = None
     keep_artifacts: bool = False
     image_tag_prefix: str = "ptdbench"

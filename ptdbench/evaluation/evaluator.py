@@ -81,40 +81,30 @@ class TaskEvaluator:
         evaluation = self._select_evaluation(package, config.evaluation_level)
 
         agent_spec = resolve_agent_spec(config.agent, config.agent_cmd)
-        agent_runner = (
-            create_agent_runner(agent_spec, default_backend=self.backend)
-            if agent_spec
-            else None
-        )
+        agent_runner = create_agent_runner(agent_spec) if agent_spec else None
         run = self._prepare_run(package, evaluation, config)
-        agent_runtime = create_runtime(agent_runner.backend) if agent_runner else None
         self._append_run_log(
             run.results,
             f"PTDBench task={package.task_id} backend={self.runtime.name} "
             f"evaluation_level={evaluation.level} "
-            f"agent={agent_runner.kind if agent_runner else 'none'} "
-            f"agent_backend={agent_runtime.name if agent_runtime else 'none'}",
+            f"agent={agent_runner.kind if agent_runner else 'none'}",
         )
         try:
-            artifacts: Dict[str, EnvironmentArtifact] = {}
-            for runtime in (agent_runtime, self.runtime):
-                if runtime is None or not runtime.needs_environment_image:
-                    continue
-                if runtime.name in artifacts:
-                    continue
+            artifact = None
+            if self.runtime.needs_environment_image:
                 self._append_run_log(
                     run.results,
-                    f"[START] environment_prepare backend={runtime.name}",
+                    f"[START] environment_prepare backend={self.runtime.name}",
                 )
-                artifacts[runtime.name] = runtime.build_environment(
+                artifact = self.runtime.build_environment(
                     package.paths.environment,
                     dockerfile=self._environment_dockerfile(package),
                     tag_prefix=config.image_tag_prefix,
                 )
                 self._append_run_log(
                     run.results,
-                    f"[OK] environment_prepare backend={runtime.name} "
-                    f"artifact={artifacts[runtime.name].reference or '-'}",
+                    f"[OK] environment_prepare backend={self.runtime.name} "
+                    f"artifact={artifact.reference or '-'}",
                 )
 
             workspace_before_hash = tree_digest(package.paths.workspace)
@@ -125,8 +115,8 @@ class TaskEvaluator:
                 outcome = self._run_agent(
                     agent_runner,
                     context,
-                    runtime=agent_runtime,
-                    artifact=artifacts.get(agent_runtime.name) if agent_runtime else None,
+                    runtime=self.runtime,
+                    artifact=artifact,
                 )
                 agent_setup_result = outcome.setup
                 agent_result = outcome.execution
@@ -135,6 +125,7 @@ class TaskEvaluator:
                     agent_runner,
                     agent_result or agent_setup_result,
                     stage="agent" if agent_result is not None else "agent_setup",
+                    backend=self.runtime.name,
                 )
 
             verifier_result = self._run_verifier(
@@ -142,7 +133,7 @@ class TaskEvaluator:
                 evaluation,
                 run,
                 config,
-                artifact=artifacts.get(self.runtime.name),
+                artifact=artifact,
                 agent_spec=agent_spec,
             )
             workspace_after_hash = tree_digest(run.workspace)
@@ -305,14 +296,14 @@ class TaskEvaluator:
         result: Any,
         *,
         stage: str,
+        backend: str,
     ) -> None:
         trace_path = results_dir / "agent_trace.json"
         if trace_path.exists():
             return
-        trace_path = trace_paths[0]
         payload = {
             "kind": runner.kind,
-            "backend": runner.backend,
+            "backend": backend,
             "stage": stage,
             "result": result.to_dict() if hasattr(result, "to_dict") else result,
         }
@@ -327,8 +318,6 @@ class TaskEvaluator:
         artifact: Optional[EnvironmentArtifact],
         agent_spec: Optional[AgentSpec],
     ) -> Any:
-        # 新 verifier 只依赖标准环境变量。这里暂时保留旧 Judge-B task 的
-        # 配置 handoff，以免迁移历史 task 时突然失效；新 task 不应使用它。
         request = SandboxRequest(
             stage="verifier",
             task_id=package.task_id,
@@ -339,7 +328,7 @@ class TaskEvaluator:
             evaluation_level=evaluation.level,
             host_oracle=evaluation.oracle,
             host_verifier=evaluation.verifier,
-            env=self._legacy_verifier_handoff_env(agent_spec),
+            env=self._verifier_judge_env(agent_spec),
             network=config.verifier_network,
             timeout_s=config.timeout_s,
             workdir="task_root",
@@ -403,23 +392,20 @@ class TaskEvaluator:
                 f"  logs: {stage}.stdout.log, {stage}.stderr.log",
             )
 
-    def _legacy_verifier_handoff_env(self, agent_spec: Optional[AgentSpec]) -> Dict[str, str]:
-        """兼容旧 verifier 的 Judge-B 配置；它不是新的 agent workflow 接口。"""
+    def _verifier_judge_env(self, agent_spec: Optional[AgentSpec]) -> Dict[str, str]:
+        """Expose the configured model endpoint to API-backed verifiers."""
         if agent_spec is None:
             return {}
-        env = {"PTDBENCH_CENTRAL_AGENT_KIND": agent_spec.kind}
-        if agent_spec.kind == "codex":
-            env["PTDBENCH_JUDGE_PROVIDER"] = "openai-compatible"
-        if agent_spec.model:
-            env["PTDBENCH_JUDGE_MODEL"] = agent_spec.model
-        if agent_spec.base_url:
-            env["PTDBENCH_JUDGE_BASE_URL"] = agent_spec.base_url
-        # A Docker verifier must not receive secrets through ``docker run -e``;
-        # its argv can be observed by other host processes. Local verifier
-        # runs retain the legacy handoff for backwards compatibility.
-        if agent_spec.api_key and self.runtime.name == "local":
-            env["PTDBENCH_JUDGE_API_KEY_ENV"] = "PTDBENCH_JUDGE_API_KEY"
-            env["PTDBENCH_JUDGE_API_KEY"] = agent_spec.api_key
+        env = {
+            "PTDBENCH_CENTRAL_AGENT_KIND": agent_spec.kind,
+            "PTDBENCH_JUDGE_PROVIDER": "openai-compatible",
+        }
+        judge_model = agent_spec.judge_model or agent_spec.model
+        if judge_model:
+            env["PTDBENCH_JUDGE_MODEL"] = judge_model
+        env["OPENAI_BASE_URL"] = agent_spec.base_url or "https://api.openai.com/v1"
+        if agent_spec.api_key:
+            env["OPENAI_API_KEY"] = agent_spec.api_key
         return env
 
     @staticmethod

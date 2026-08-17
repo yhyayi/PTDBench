@@ -1,0 +1,20 @@
+category: hyperparameter
+framework: verl
+task: task_hparam_overlong_023
+verdict: unhealthy
+root_cause:
+- kind: hparam
+  name: MAX_RESPONSE_LENGTH
+  observed: '256'
+  expected: '1024'
+evidence_metrics:
+- response_length/clip_ratio ≈ 0.983 (control ≈ 0.15)
+- response_length/mean ≈ 255; pinned at the max length
+- val-core 0.0017 → 0.0011; about 1/21 of the same-cluster control
+- healthy protocol baseline (Qwen2.5-0.5B-Instruct + DAPO-Math-17k): about 6.0% at 200 steps, 7.7% at 1000 steps
+- fraction of steps with reward ≈ 5%
+fix:
+  must:
+  - target: MAX_RESPONSE_LENGTH
+    direction: increase
+    to: '1024'

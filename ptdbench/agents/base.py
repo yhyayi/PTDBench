@@ -30,7 +30,7 @@ class AgentExecutionContext:
         runtime: SandboxRuntime,
         *,
         env: Optional[Dict[str, str]] = None,
-        network: str = "none",
+        network: str = "bridge",
         workdir: str = "workspace",
     ) -> SandboxRequest:
         """为 agent 创建统一的运行请求，路径细节交给 runtime 解析。"""
@@ -51,19 +51,12 @@ class AgentExecutionContext:
 
 class AgentRunner(ABC):
     # 每个具体 agent 都实现这个接口；evaluator 只依赖这里。
-    def __init__(self, spec: AgentSpec, default_backend: str = "local"):
-        backend = spec.backend or default_backend
+    def __init__(self, spec: AgentSpec):
         self.spec = spec
-        self.backend = backend
 
     @property
     def kind(self) -> str:
         return self.spec.kind
-
-    @property
-    def needs_environment_image(self) -> bool:
-        # 兼容旧调用方；正式流程由 SandboxRuntime 决定是否需要镜像。
-        return self.backend != "local"
 
     def _write_agent_trace(self, results_dir: Path, payload: Dict[str, Any]) -> Path:
         # 统一把 agent 的最终轨迹收敛成一个 JSON 文件，减少 results 里的碎片。

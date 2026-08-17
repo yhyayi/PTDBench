@@ -1,0 +1,26 @@
+category: hyperparameter
+framework: verl
+task: task_hparam_seqlen_micro_014
+verdict: unhealthy
+root_cause:
+- kind: hparam
+  name: MAX_RESPONSE_LENGTH
+  observed: '512'
+  expected: '1024'
+- kind: hparam
+  name: MAX_PROMPT_LENGTH
+  observed: '512'
+  expected: '1024'
+evidence_metrics:
+- response_length/clip_ratio ≈ 0.766
+- prompt_length/max drops from control 745 to 469 while prompt_length/clip_ratio stays 0 (filtering, not truncation)
+- val-core 0.017 → 0.015; about 1/2.3 of the same-cluster control
+- healthy protocol baseline (Qwen2.5-0.5B-Instruct + DAPO-Math-17k): about 6.0% at 200 steps, 7.7% at 1000 steps
+fix:
+  must:
+  - target: MAX_RESPONSE_LENGTH
+    direction: increase
+    to: '1024'
+  - target: MAX_PROMPT_LENGTH
+    direction: increase
+    to: '1024'

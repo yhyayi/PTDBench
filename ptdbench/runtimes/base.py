@@ -61,7 +61,7 @@ class SandboxRequest:
     host_verifier: Optional[Path] = None
     workdir: str = "workspace"
     env: Mapping[str, str] = field(default_factory=dict)
-    network: str = "none"
+    network: str = "bridge"
     timeout_s: Optional[int] = None
 
     def __post_init__(self) -> None:

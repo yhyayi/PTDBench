@@ -26,11 +26,11 @@ def resolve_agent_spec(agent: Optional[AgentSpec], legacy_cmd: Optional[str]) ->
     return None
 
 
-def create_agent_runner(spec: AgentSpec, default_backend: str) -> AgentRunner:
+def create_agent_runner(spec: AgentSpec) -> AgentRunner:
     runner_cls = _REGISTRY.get(spec.kind)
     if runner_cls is None:
         raise ValueError(f"unsupported agent kind: {spec.kind}")
-    return runner_cls(spec, default_backend=default_backend)
+    return runner_cls(spec)
 
 
 # 导入 installed agents 以完成注册。
