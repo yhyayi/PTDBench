@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence
+from urllib.parse import urlsplit
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,11 @@ class AgentSpec:
     api_key: Optional[str] = None
     extra_args: Sequence[str] = field(default_factory=tuple)
     network: str = "bridge"
+    env: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "extra_args", tuple(self.extra_args))
+        object.__setattr__(self, "env", _normalize_env(self.env))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -105,6 +111,7 @@ class AgentSpec:
             "api_key": None if self.api_key is None else "<redacted>",
             "extra_args": list(self.extra_args),
             "network": self.network,
+            "env": _redact_env(dict(self.env)),
         }
 
 
@@ -157,6 +164,13 @@ class EvaluationConfig:
     work_dir: Optional[Path] = None
     evaluation_level: str = "solution"
     log_level: str = "quiet"
+    debian_mirror: Optional[str] = None
+    verifier_env: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.debian_mirror is not None:
+            object.__setattr__(self, "debian_mirror", _normalize_plain_url(self.debian_mirror))
+        object.__setattr__(self, "verifier_env", _normalize_env(self.verifier_env))
 
 
 @dataclass(frozen=True)
@@ -193,3 +207,34 @@ class EvaluationResult:
             "workspace_after_hash": self.workspace_after_hash,
             "metadata": self.metadata,
         }
+
+
+def _normalize_plain_url(value: str) -> str:
+    url = str(value).rstrip("/")
+    parsed = urlsplit(url)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or "|" in url
+        or any(char.isspace() for char in url)
+    ):
+        raise ValueError("URL must be a plain HTTP(S) base URL")
+    return url
+
+
+def _normalize_env(env: Mapping[str, str]) -> Dict[str, str]:
+    return {str(key): str(value) for key, value in env.items()}
+
+
+def _redact_env(env: Dict[str, str]) -> Dict[str, str]:
+    redacted: Dict[str, str] = {}
+    for key, value in env.items():
+        if any(token in key.upper() for token in ("KEY", "TOKEN", "SECRET", "PASSWORD")):
+            redacted[key] = "<redacted>"
+        else:
+            redacted[key] = value
+    return redacted

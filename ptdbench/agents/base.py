@@ -24,6 +24,7 @@ class AgentExecutionContext:
     results: Path
     evaluation_level: str = "solution"
     log_level: str = "quiet"
+    debian_mirror: Optional[str] = None
 
     def sandbox_request(
         self,

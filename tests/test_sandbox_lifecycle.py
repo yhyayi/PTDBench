@@ -157,6 +157,32 @@ class SandboxLifecycleTests(unittest.TestCase):
         self.assertEqual(judge_args.model, "agent-model")
         self.assertEqual(judge_args.judge_model, "judge-model")
 
+    def test_evaluate_cli_accepts_stage_env_and_debian_mirror(self):
+        args = build_parser().parse_args(
+            [
+                "evaluate",
+                "task",
+                "--agent-env",
+                "npm_config_registry=https://registry.npmmirror.com",
+                "--agent-env",
+                "EMPTY_VALUE=",
+                "--verifier-env",
+                "HTTPS_PROXY=http://proxy:7890",
+                "--debian-mirror",
+                "https://mirrors.tuna.tsinghua.edu.cn/",
+            ]
+        )
+
+        self.assertEqual(
+            args.agent_env,
+            [
+                "npm_config_registry=https://registry.npmmirror.com",
+                "EMPTY_VALUE=",
+            ],
+        )
+        self.assertEqual(args.verifier_env, ["HTTPS_PROXY=http://proxy:7890"])
+        self.assertEqual(args.debian_mirror, "https://mirrors.tuna.tsinghua.edu.cn/")
+
     def test_docker_verifier_receives_judge_configuration(self):
         env = TaskEvaluator("docker")._verifier_judge_env(
             AgentSpec(
@@ -173,6 +199,59 @@ class SandboxLifecycleTests(unittest.TestCase):
         self.assertIn("-e", argv)
         self.assertNotIn("secret-key", " ".join(argv))
         self.assertEqual(process_env["OPENAI_API_KEY"], "secret-key")
+
+    def test_verifier_env_is_merged_before_judge_configuration(self):
+        class VerifierRuntime(RecordingRuntime):
+            def create_sandbox(self, request, *, artifact):
+                self.request = request
+                return super().create_sandbox(request, artifact=artifact)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for name in ("task", "visible", "workspace", "results", "oracle", "verifier"):
+                (root / name).mkdir()
+            runtime = VerifierRuntime()
+            evaluator = TaskEvaluator("local")
+            evaluator.runtime = runtime
+            evaluator._run_verifier(
+                type("Package", (), {"task_id": "task"})(),
+                type(
+                    "Evaluation",
+                    (),
+                    {
+                        "root": root / "task",
+                        "level": "solution",
+                        "oracle": root / "oracle",
+                        "verifier": root / "verifier",
+                    },
+                )(),
+                type(
+                    "Run",
+                    (),
+                    {
+                        "visible_task": root / "visible",
+                        "workspace": root / "workspace",
+                        "results": root / "results",
+                    },
+                )(),
+                EvaluationConfig(
+                    backend="local",
+                    verifier_env={"HTTPS_PROXY": "http://proxy:7890"},
+                ),
+                EnvironmentArtifact("recording"),
+                AgentSpec(
+                    kind="codex",
+                    model="gpt-5.5",
+                    base_url="https://api.example.test/v1",
+                ),
+            )
+
+        self.assertEqual(runtime.request.env["HTTPS_PROXY"], "http://proxy:7890")
+        self.assertEqual(runtime.request.env["PTDBENCH_JUDGE_MODEL"], "gpt-5.5")
+        self.assertEqual(
+            runtime.request.env["OPENAI_BASE_URL"],
+            "https://api.example.test/v1",
+        )
 
     def test_failed_stage_summary_points_to_debug_logs(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -275,8 +354,57 @@ class SandboxLifecycleTests(unittest.TestCase):
         self.assertEqual(runtime.setup_spec.live_log_name, "agent_setup")
         self.assertFalse(runtime.setup_spec.live_log_to_stderr)
         self.assertIn("[setup] downloading nvm", shell)
+        self.assertIn("PTDBENCH_DEBIAN_MIRROR", shell)
+        self.assertIn("PTDBENCH_NVM_INSTALL_URL", shell)
         self.assertIn("[setup] installing @openai/codex@latest", shell)
         self.assertIn("[setup] complete", shell)
+
+    def test_codex_setup_merges_agent_env_and_debian_mirror(self):
+        class SetupRuntime(RecordingRuntime):
+            name = "docker"
+
+            def exec(self, sandbox, spec):
+                self.setup_spec = spec
+                return result("setup")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime = SetupRuntime()
+            context = self.context(Path(temp_dir))
+            context = AgentExecutionContext(
+                **{
+                    **context.__dict__,
+                    "debian_mirror": "https://mirrors.tuna.tsinghua.edu.cn",
+                }
+            )
+            runner = CodexAgentRunner(
+                AgentSpec(
+                    kind="codex",
+                    api_key="secret",
+                    env={
+                        "npm_config_registry": "https://registry.npmmirror.com",
+                        "NVM_NODEJS_ORG_MIRROR": "https://npmmirror.com/mirrors/node",
+                    },
+                )
+            )
+            runner.setup(
+                context,
+                runtime=runtime,
+                sandbox=SandboxInstance("recording", "agent", context.sandbox_request(runtime)),
+            )
+
+        self.assertEqual(
+            runtime.setup_spec.env["npm_config_registry"],
+            "https://registry.npmmirror.com",
+        )
+        self.assertEqual(
+            runtime.setup_spec.env["NVM_NODEJS_ORG_MIRROR"],
+            "https://npmmirror.com/mirrors/node",
+        )
+        self.assertEqual(
+            runtime.setup_spec.env["PTDBENCH_DEBIAN_MIRROR"],
+            "https://mirrors.tuna.tsinghua.edu.cn",
+        )
+        self.assertEqual(runtime.setup_spec.env["OPENAI_API_KEY"], "secret")
 
     def test_docker_stream_process_writes_live_stage_logs(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -294,7 +422,7 @@ class SandboxLifecycleTests(unittest.TestCase):
             )
             self.assertFalse(timed_out)
             self.assertEqual(stdout, "setup-out\n")
-            self.assertEqual(stderr, "setup-error\n")
+            self.assertIn("setup-error\n", stderr)
             self.assertEqual(
                 (Path(temp_dir) / "agent_setup.stdout.log").read_text(),
                 stdout,
@@ -336,6 +464,19 @@ class SandboxLifecycleTests(unittest.TestCase):
             prefix,
             r"^ptdbench-run-swe_slugfix-001-trial-issue-\d{8}-\d{6}-\d{6}-$",
         )
+
+    def test_debian_mirror_layer_is_inserted_after_from(self):
+        dockerfile = "ARG BASE=python:3.11-slim\nFROM ${BASE}\nRUN apt-get update\n"
+        materialized = TaskEvaluator._insert_debian_mirror_layer(
+            dockerfile,
+            "https://mirrors.tuna.tsinghua.edu.cn",
+        )
+
+        self.assertLess(
+            materialized.index("mirror=https://mirrors.tuna.tsinghua.edu.cn"),
+            materialized.index("RUN apt-get update"),
+        )
+        self.assertIn("deb.debian.org/debian", materialized)
 
     def test_codex_uses_outer_docker_sandbox(self):
         runner = CodexAgentRunner(

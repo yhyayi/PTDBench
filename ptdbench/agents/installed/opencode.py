@@ -28,7 +28,8 @@ class OpenCodeAgentRunner(AgentRunner):
             raise ValueError("opencode agent needs --base-url")
 
         config = self._build_config()
-        env = {"OPENCODE_CONFIG_CONTENT": json.dumps(config, ensure_ascii=False)}
+        env = dict(self.spec.env)
+        env["OPENCODE_CONFIG_CONTENT"] = json.dumps(config, ensure_ascii=False)
         request = context.sandbox_request(
             runtime,
             env=env,

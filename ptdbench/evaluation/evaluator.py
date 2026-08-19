@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import shutil
 import sys
 import tempfile
@@ -96,9 +97,18 @@ class TaskEvaluator:
                     run.results,
                     f"[START] environment_prepare backend={self.runtime.name}",
                 )
+                environment_dir = package.paths.environment
+                dockerfile = self._environment_dockerfile(package)
+                if config.debian_mirror:
+                    environment_dir = self._prepare_environment(
+                        package,
+                        run,
+                        dockerfile=dockerfile,
+                        debian_mirror=config.debian_mirror,
+                    )
                 artifact = self.runtime.build_environment(
-                    package.paths.environment,
-                    dockerfile=self._environment_dockerfile(package),
+                    environment_dir,
+                    dockerfile=dockerfile,
                     tag_prefix=config.image_tag_prefix,
                 )
                 self._append_run_log(
@@ -240,6 +250,7 @@ class TaskEvaluator:
             results=run.results,
             evaluation_level=evaluation.level,
             log_level=config.log_level,
+            debian_mirror=config.debian_mirror,
         )
 
     def _run_agent(
@@ -318,6 +329,8 @@ class TaskEvaluator:
         artifact: Optional[EnvironmentArtifact],
         agent_spec: Optional[AgentSpec],
     ) -> Any:
+        verifier_env = dict(config.verifier_env)
+        verifier_env.update(self._verifier_judge_env(agent_spec))
         request = SandboxRequest(
             stage="verifier",
             task_id=package.task_id,
@@ -328,7 +341,7 @@ class TaskEvaluator:
             evaluation_level=evaluation.level,
             host_oracle=evaluation.oracle,
             host_verifier=evaluation.verifier,
-            env=self._verifier_judge_env(agent_spec),
+            env=verifier_env,
             network=config.verifier_network,
             timeout_s=config.timeout_s,
             workdir="task_root",
@@ -425,6 +438,60 @@ class TaskEvaluator:
         if not (package.paths.environment / path).is_file():
             raise SchemaError(f"Dockerfile not found: {package.paths.environment / path}")
         return value
+
+    def _prepare_environment(
+        self,
+        package: TaskPackage,
+        run: PreparedRun,
+        *,
+        dockerfile: str,
+        debian_mirror: str,
+    ) -> Path:
+        environment_dir = run.root / "environment"
+        copy_tree(package.paths.environment, environment_dir)
+        dockerfile_path = environment_dir / dockerfile
+        content = dockerfile_path.read_text(encoding="utf-8").rstrip()
+        write_text(
+            dockerfile_path,
+            self._insert_debian_mirror_layer(content, debian_mirror),
+        )
+        return environment_dir
+
+    @staticmethod
+    def _insert_debian_mirror_layer(dockerfile: str, mirror: str) -> str:
+        layer = TaskEvaluator._debian_mirror_layer(mirror).strip("\n")
+        lines = dockerfile.splitlines()
+        output: list[str] = []
+        inserted = False
+        for line in lines:
+            output.append(line)
+            if line.lstrip().lower().startswith("from "):
+                output.append(layer)
+                inserted = True
+        if not inserted:
+            output.append(layer)
+        return "\n".join(output).rstrip() + "\n"
+
+    @staticmethod
+    def _debian_mirror_layer(mirror: str) -> str:
+        mirror_value = shlex.quote(mirror)
+        return f"""
+
+# PTDBench evaluate adapter: switch Debian sources before runtime package installs.
+RUN set -eu; \\
+    mirror={mirror_value}; \\
+    for sources in /etc/apt/sources.list /etc/apt/sources.list.d/debian.sources; do \\
+        [ -f "$sources" ] || continue; \\
+        sed -i \\
+            -e "s|http://deb.debian.org/debian-security|$mirror/debian-security|g" \\
+            -e "s|https://deb.debian.org/debian-security|$mirror/debian-security|g" \\
+            -e "s|http://security.debian.org/debian-security|$mirror/debian-security|g" \\
+            -e "s|https://security.debian.org/debian-security|$mirror/debian-security|g" \\
+            -e "s|http://deb.debian.org/debian|$mirror/debian|g" \\
+            -e "s|https://deb.debian.org/debian|$mirror/debian|g" \\
+            "$sources"; \\
+    done
+"""
 
     def _write_report(self, path: Path, result: EvaluationResult) -> None:
         write_text(path, json.dumps(result.to_dict(), indent=2, ensure_ascii=False))

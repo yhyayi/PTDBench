@@ -35,9 +35,10 @@ class ShellAgentRunner(AgentRunner):
 
         request = context.sandbox_request(
             runtime,
+            env=dict(self.spec.env),
             network=self.spec.network,
         )
-        spec = CommandSpec(shell=command)
+        spec = CommandSpec(shell=command, env=dict(self.spec.env))
         result = (
             runtime.exec(sandbox, spec)
             if sandbox is not None

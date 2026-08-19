@@ -63,13 +63,30 @@ class CodexAgentRunner(AgentRunner):
             "printf '%s' \"$OPENAI_API_KEY\" | /usr/local/bin/codex login --with-api-key; "
             "/usr/local/bin/codex login status;"
         )
+        debian_mirror_command = (
+            'if [ -n "${PTDBENCH_DEBIAN_MIRROR:-}" ]; then '
+            'mirror="${PTDBENCH_DEBIAN_MIRROR%/}"; '
+            "for sources in /etc/apt/sources.list /etc/apt/sources.list.d/debian.sources; do "
+            '[ -f "$sources" ] || continue; '
+            'sed -i '
+            '-e "s|http://deb.debian.org/debian-security|$mirror/debian-security|g" '
+            '-e "s|https://deb.debian.org/debian-security|$mirror/debian-security|g" '
+            '-e "s|http://security.debian.org/debian-security|$mirror/debian-security|g" '
+            '-e "s|https://security.debian.org/debian-security|$mirror/debian-security|g" '
+            '-e "s|http://deb.debian.org/debian|$mirror/debian|g" '
+            '-e "s|https://deb.debian.org/debian|$mirror/debian|g" '
+            '"$sources"; '
+            "done; "
+            "fi; "
+        )
         bash_install = " ".join(
             [
                 "set -euo pipefail;",
                 "echo '[setup] downloading nvm' >&2;",
                 "export NVM_DIR=/root/.nvm;",
+                'nvm_install_url="${PTDBENCH_NVM_INSTALL_URL:-https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh}";',
                 "curl --fail --location --show-error --silent --retry 5 --retry-all-errors --connect-timeout 15 --max-time 120 ",
-                "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh -o /tmp/install-nvm.sh;",
+                '"$nvm_install_url" -o /tmp/install-nvm.sh;',
                 "test -s /tmp/install-nvm.sh;",
                 "echo '[setup] installing nvm' >&2;",
                 "bash /tmp/install-nvm.sh;",
@@ -96,6 +113,7 @@ class CodexAgentRunner(AgentRunner):
         install = CommandSpec(
             shell=(
                 "set -e; "
+                f"{debian_mirror_command}"
                 "if command -v apk >/dev/null 2>&1; then "
                 "apk add --no-cache ca-certificates curl bash nodejs npm ripgrep; "
                 "else "
@@ -110,7 +128,11 @@ class CodexAgentRunner(AgentRunner):
                 "fi; "
                 f"exec bash -lc {shlex.quote(bash_install)}"
             ),
-            env=self._build_env(),
+            env=self._build_env(
+                {"PTDBENCH_DEBIAN_MIRROR": context.debian_mirror}
+                if context.debian_mirror
+                else None
+            ),
             timeout_s=context.timeout_s,
             user="0",
             live_log_name="agent_setup",
@@ -162,8 +184,10 @@ class CodexAgentRunner(AgentRunner):
         """Encode a value as a TOML basic string without shell interpolation."""
         return json.dumps(value, ensure_ascii=False)
 
-    def _build_env(self) -> Dict[str, str]:
-        env: Dict[str, str] = {}
+    def _build_env(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        env: Dict[str, str] = dict(self.spec.env)
+        if extra:
+            env.update(extra)
         if self.spec.base_url:
             env["OPENAI_BASE_URL"] = self.spec.base_url
         if self.spec.api_key:

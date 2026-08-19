@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 from pathlib import Path
 
@@ -10,6 +11,21 @@ from .core.harbor_types import HarborEvaluationConfig
 from .core.types import AgentSpec, EvaluationConfig
 from .evaluation.evaluator import TaskEvaluator
 from .evaluation.harbor_evaluator import HarborEvaluator
+
+
+_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _parse_env_assignments(assignments: list[str]) -> dict[str, str]:
+    env: dict[str, str] = {}
+    for assignment in assignments:
+        key, separator, value = assignment.partition("=")
+        if not separator:
+            raise SystemExit(f"environment assignment must be KEY=VALUE: {assignment}")
+        if not _ENV_KEY_RE.fullmatch(key):
+            raise SystemExit(f"invalid environment variable name: {key}")
+        env[key] = value
+    return env
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -62,11 +78,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="read the API key from this environment variable (keeps it out of argv)",
     )
     e.add_argument("--agent-arg", action="append", default=[], help="extra agent argument, repeatable")
+    e.add_argument(
+        "--agent-env",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="environment variable for the agent stage; repeatable",
+    )
+    e.add_argument(
+        "--verifier-env",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="environment variable for the verifier stage; repeatable",
+    )
     e.add_argument("--agent-cmd", default=None, help=argparse.SUPPRESS)
     e.add_argument("--verifier-cmd", default=None, help="override verifier entrypoint")
     e.add_argument("--backend", choices=["docker", "local"], default="docker")
     e.add_argument("--agent-network", choices=["none", "bridge", "host"], default="bridge")
     e.add_argument("--verifier-network", choices=["none", "bridge", "host"], default="bridge")
+    e.add_argument(
+        "--debian-mirror",
+        default=None,
+        help="Debian mirror base URL applied before agent setup package installs",
+    )
     e.add_argument("--image-tag-prefix", default="ptdbench")
     e.add_argument("--timeout-s", type=int, default=None)
     e.add_argument("--keep-artifacts", action="store_true")
@@ -148,6 +183,8 @@ def main(argv=None) -> int:
                 raise SystemExit(
                     f"API key environment variable is unset or empty: {args.api_key_env}"
                 )
+        agent_env = _parse_env_assignments(args.agent_env)
+        verifier_env = _parse_env_assignments(args.verifier_env)
         agent_kind = args.agent
         if agent_kind is None:
             if (
@@ -157,6 +194,7 @@ def main(argv=None) -> int:
                 or args.base_url
                 or api_key
                 or args.agent_arg
+                or agent_env
             ):
                 agent_kind = "codex"
             elif agent_command:
@@ -171,6 +209,7 @@ def main(argv=None) -> int:
             or args.base_url
             or api_key
             or args.agent_arg
+            or agent_env
         ):
             agent_spec = AgentSpec(
                 kind=agent_kind or "codex",
@@ -182,6 +221,7 @@ def main(argv=None) -> int:
                 api_key=api_key,
                 extra_args=tuple(args.agent_arg),
                 network=args.agent_network,
+                env=agent_env,
             )
         result = evaluator.evaluate(
             args.task_root,
@@ -197,6 +237,8 @@ def main(argv=None) -> int:
                 work_dir=None if args.work_dir is None else Path(args.work_dir),
                 evaluation_level=args.evaluation_level,
                 log_level=args.log_level,
+                debian_mirror=args.debian_mirror,
+                verifier_env=verifier_env,
             ),
         )
         payload = result.to_dict()
