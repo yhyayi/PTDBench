@@ -1,0 +1,18 @@
+title: Qwen DAPO response-length cap diagnosis
+submitter:
+  name: LIF1014
+license: Apache-2.0
+created_date: '2026-08-14'
+domain: math
+model:
+  name: Qwen2.5-0.5B-Instruct
+dataset:
+  name: DAPO-Math-17k
+training:
+  framework: verl
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: training_failure
+  failure_reason: An effective response-length cap of 256 clips nearly all rollouts and coincides with sparse rewards and declining held-out accuracy

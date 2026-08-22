@@ -1,0 +1,23 @@
+STANDARD_ANSWER_V2
+CASE_ID: task_agent_loop_022-llama-dapo-math
+MODE: metric-only reproduction
+
+REQUIRED_REPAIR:
+- Restore the selected agent-loop rollout, reward, mask, and batch-field methods
+  to the sealed baseline semantics.
+- Preserve Answer: extraction and add final boxed-answer fallback in
+  math_dapo.is_correct_minerva.
+
+REQUIRED_RUN:
+- Use the designated launch script with Llama-3.2-1B-instruct.
+- Use workspace DAPO-Math-17k train/test parquet files.
+- Use CUDA_VISIBLE_DEVICES=0,1 and WANDB_MODE=offline.
+- Run 100 steps with test frequency 20 in the foreground.
+
+SCORING:
+- Metric: val-core/math_dapo/reward/mean@1
+- Required final step: 100
+- Historical final baseline: 0.012297372833985467
+- Required final score: 0.06 (6.0%)
+- Pass score: 1
+- Fail score: 0

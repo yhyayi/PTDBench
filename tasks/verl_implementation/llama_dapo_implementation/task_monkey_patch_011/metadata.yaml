@@ -1,0 +1,18 @@
+title: 'llama_dapo_implementation implementation diagnosis: task_monkey_patch_011'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-08'
+domain: post_train
+model:
+  name: Llama-3.2-1B-Instruct
+dataset:
+  name: DAPO-Math-17k
+training:
+  framework: verl
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: implementation_bug
+  failure_reason: A rewritten apply_monkey_patch no longer installs the baseline flash-attention hook, cutting val-core 43% below control with 70.5% zero-advantage steps

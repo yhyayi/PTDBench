@@ -1,0 +1,38 @@
+[
+  {
+    "step": 0,
+    "eval_score": 0.000758150113722517,
+    "eval_key": "val-core/openai/gsm8k/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 20,
+    "eval_score": 0.000758150113722517,
+    "eval_key": "val-core/openai/gsm8k/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 40,
+    "eval_score": 0.001516300227445034,
+    "eval_key": "val-core/openai/gsm8k/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 60,
+    "eval_score": 0.000758150113722517,
+    "eval_key": "val-core/openai/gsm8k/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 80,
+    "eval_score": 0.000758150113722517,
+    "eval_key": "val-core/openai/gsm8k/acc/mean@1",
+    "truncate_ratio": null
+  },
+  {
+    "step": 100,
+    "eval_score": 0.0,
+    "eval_key": "val-core/openai/gsm8k/acc/mean@1",
+    "truncate_ratio": null
+  }
+]

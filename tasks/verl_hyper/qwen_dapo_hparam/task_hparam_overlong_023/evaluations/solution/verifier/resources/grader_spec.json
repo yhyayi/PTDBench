@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "task_id": "task_hparam_overlong_023",
+  "metric_key": "val-core/math_dapo/acc/mean@1",
+  "final_step": 200,
+  "historical_final_baseline": "0.0011173184357541898",
+  "required_final_score": "0.045",
+  "log_roots": [
+    "experiment_logs"
+  ]
+}
