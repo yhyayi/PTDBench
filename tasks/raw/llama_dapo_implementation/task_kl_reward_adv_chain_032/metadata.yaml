@@ -1,0 +1,39 @@
+title: 'llama_dapo_implementation implementation diagnosis: task_kl_reward_adv_chain_032'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-08'
+domain: post_train
+model:
+  name: Llama-3.2-1B-Instruct
+dataset:
+  name: DAPO-Math-17k
+training:
+  framework: verl
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: implementation_bug
+  failure_reason: Previous Agent implementation requires oracle and metric verification
+bench_category: llama_dapo_implementation
+source_task: Benchmark_Evaluation/tasks/task_llama_dapo_math_17k/task_kl_reward_adv_chain_032
+evidence_kind: dirty_agent_failure
+packaging_tier: B0
+packaging_ready: true
+b1_scoring_ready: false
+target_files: verl/trainer/ppo/ray_trainer.py,verl/trainer/ppo/core_algos.py
+validation_stack: DAPO_V4_LLAMA
+already_at_baseline: false
+metric_status: log_reconstructed
+verify:
+  num_gpus: 2
+  timeout_minutes: 90
+  max_train_steps: 200
+  eval_metric_key: val-core/math_dapo/acc/mean@1
+historical_baseline:
+  actual_metric_key: val-core/math_dapo/acc/mean@1
+  eval_last: 0.05977653631284916
+  eval_max: 0.05977653631284916
+  n_eval_points: 11
+  attempt: 1

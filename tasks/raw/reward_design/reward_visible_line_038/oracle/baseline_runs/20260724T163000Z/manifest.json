@@ -1,0 +1,11 @@
+{
+  "created_at": "2026-07-24T16:30:00.917744+00:00",
+  "archive_rel": "baseline_runs/20260724T163000Z",
+  "copied": [
+    "logs",
+    "wandb",
+    "outputs"
+  ],
+  "workspace": "/home/test/test06/lyh/Benchmark_Evaluation/tasks/task_reward_design/reward_visible_line_038/workspace_baseline",
+  "note": "Survives workspace_seed restore; agent cannot read hidden/."
+}

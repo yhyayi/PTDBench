@@ -17,8 +17,11 @@ args=(
   --base-url "${OPENAI_BASE_URL:-https://yeysai.com/v1}"
   --api-key-env OPENAI_API_KEY
   --debian-mirror "${PTDBENCH_DEBIAN_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn}"
+  --huggingface-mirror "${PTDBENCH_HUGGINGFACE_MIRROR:-https://hf-mirror.com}"
   --agent-env "NVM_NODEJS_ORG_MIRROR=${PTDBENCH_NODE_MIRROR:-https://npmmirror.com/mirrors/node}"
   --agent-env "npm_config_registry=${PTDBENCH_NPM_REGISTRY:-https://registry.npmmirror.com}"
+  --agent-env "HF_ENDPOINT=${PTDBENCH_HUGGINGFACE_MIRROR:-https://hf-mirror.com}"
+  --verifier-env "HF_ENDPOINT=${PTDBENCH_HUGGINGFACE_MIRROR:-https://hf-mirror.com}"
   --timeout-s "${PTDBENCH_TIMEOUT_S:-3600}"
   --work-dir "${PTDBENCH_WORK_DIR:-outputs/ptdbench-swe-debug}"
   --keep-artifacts

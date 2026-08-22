@@ -1,43 +1,18 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "RL-Diagnosis submission",
+  "title": "RL repair run submission",
   "type": "object",
-  "required": ["verdict", "root_cause", "evidence", "fix"],
+  "required": ["run_dir", "metrics_path", "receipt_path", "log_path", "command_path", "changed_files"],
   "additionalProperties": false,
   "properties": {
-    "verdict": {
-      "type": "string",
-      "enum": ["healthy", "unhealthy"]
-    },
-    "root_cause": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["name"],
-        "additionalProperties": false,
-        "properties": {
-          "name": {"type": "string"},
-          "where": {"type": "string"},
-          "observed": {"type": "string"},
-          "expected": {"type": "string"}
-        }
-      }
-    },
-    "evidence": {
+    "run_dir": {"type": "string"},
+    "metrics_path": {"type": "string"},
+    "receipt_path": {"type": "string"},
+    "log_path": {"type": "string"},
+    "command_path": {"type": "string"},
+    "changed_files": {
       "type": "array",
       "items": {"type": "string"}
-    },
-    "fix": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["target", "change"],
-        "additionalProperties": false,
-        "properties": {
-          "target": {"type": "string"},
-          "change": {"type": "string"}
-        }
-      }
     }
   }
 }

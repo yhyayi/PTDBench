@@ -1,7 +1,0 @@
-Logging to /workspace/logs/qwen2_5_0_5b_instruct_dapo_math_fsdp_20260720_160316.log (no console training output)
-MODEL_PATH=/models/Qwen2.5-0.5B-Instruct
-TRAIN_FILE=/workspace/DAPO-Math-17k_verl/train.parquet TEST_FILE=/workspace/DAPO-Math-17k_verl/test.parquet
-adv=grpo reward_manager=dapo score=0/1(/workspace/examples/grpo_trainer/reward_math_dapo_01.py) resume_mode=disable max_model_len=2048
-use_kl_in_reward=False kl_ctrl.kl_coef=0 (actor use_kl_loss=False kl_loss_coef=0.0)
-
-=== STDERR ===

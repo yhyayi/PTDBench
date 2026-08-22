@@ -1,0 +1,88 @@
+{
+  "task_id": "task_llama_dapo_math_17k/task_agent_loop_022",
+  "created_at": "2026-07-18T17:43:35.462000+00:00",
+  "scoring_note": "Historical validation metrics frozen from the original run.",
+  "run_once": {
+    "executed": true,
+    "ok": true,
+    "returncode": 0,
+    "receipt_path": "outputs/run_once_receipt.json"
+  },
+  "logs": {
+    "run_log_dirs": [],
+    "source_logs": [
+      "logs/llama3_2_1b_instruct_dapo_math_fsdp_20260718_164537.log"
+    ]
+  },
+  "metrics": {
+    "eval_interval": 20,
+    "metric_key": "val-core/math_dapo/reward/mean@1",
+    "metric_status": "log_reconstructed",
+    "eval_points": [
+      {
+        "step": 0,
+        "eval_score": 0.006148686416992733,
+        "eval_key": "val-core/math_dapo/reward/mean@1",
+        "truncate_ratio": null
+      },
+      {
+        "step": 20,
+        "eval_score": 0.003912800447177194,
+        "eval_key": "val-core/math_dapo/reward/mean@1",
+        "truncate_ratio": null
+      },
+      {
+        "step": 40,
+        "eval_score": 0.005589714924538848,
+        "eval_key": "val-core/math_dapo/reward/mean@1",
+        "truncate_ratio": null
+      },
+      {
+        "step": 60,
+        "eval_score": 0.007825600894354388,
+        "eval_key": "val-core/math_dapo/reward/mean@1",
+        "truncate_ratio": null
+      },
+      {
+        "step": 80,
+        "eval_score": 0.011179429849077696,
+        "eval_key": "val-core/math_dapo/reward/mean@1",
+        "truncate_ratio": null
+      },
+      {
+        "step": 100,
+        "eval_score": 0.012297372833985467,
+        "eval_key": "val-core/math_dapo/reward/mean@1",
+        "truncate_ratio": null
+      }
+    ],
+    "eval_scores": [
+      {
+        "step": 0,
+        "score": 0.006148686416992733
+      },
+      {
+        "step": 20,
+        "score": 0.003912800447177194
+      },
+      {
+        "step": 40,
+        "score": 0.005589714924538848
+      },
+      {
+        "step": 60,
+        "score": 0.007825600894354388
+      },
+      {
+        "step": 80,
+        "score": 0.011179429849077696
+      },
+      {
+        "step": 100,
+        "score": 0.012297372833985467
+      }
+    ]
+  },
+  "first_rollout_ok": true,
+  "attempt": 6
+}

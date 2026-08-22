@@ -1,0 +1,56 @@
+{
+  "n_attempts": 9,
+  "n_failed": 8,
+  "failures": [
+    {
+      "attempt": 1,
+      "returncode": 137,
+      "failure_reason": "nonzero returncode=137",
+      "startup_failed": true
+    },
+    {
+      "attempt": 2,
+      "returncode": 137,
+      "failure_reason": "nonzero returncode=137",
+      "startup_failed": true
+    },
+    {
+      "attempt": 3,
+      "returncode": 137,
+      "failure_reason": "nonzero returncode=137",
+      "startup_failed": true
+    },
+    {
+      "attempt": 4,
+      "returncode": 137,
+      "failure_reason": "nonzero returncode=137",
+      "startup_failed": true
+    },
+    {
+      "attempt": 5,
+      "returncode": 137,
+      "failure_reason": "nonzero returncode=137",
+      "startup_failed": true
+    },
+    {
+      "attempt": 6,
+      "returncode": 137,
+      "failure_reason": "nonzero returncode=137",
+      "startup_failed": true
+    },
+    {
+      "attempt": 7,
+      "returncode": 137,
+      "failure_reason": "nonzero returncode=137",
+      "startup_failed": true
+    },
+    {
+      "attempt": 8,
+      "returncode": 137,
+      "failure_reason": "nonzero returncode=137",
+      "startup_failed": true
+    }
+  ],
+  "final_ok": true,
+  "final_attempt": 9
+}

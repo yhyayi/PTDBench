@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "historical_run",
+  "held_out_eval": {
+    "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "eval_interval": 20,
+    "eval_points": [
+      {
+        "step": 0,
+        "eval_score": -0.613639591448119,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.1015625,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.613639591448119,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.1015625
+        }
+      },
+      {
+        "step": 19,
+        "eval_score": -0.35541502963327837,
+        "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+        "truncated_ratio": 0.1328125,
+        "raw": {
+          "eval/HELD-OUT_ENVIRONMENTS_128": -0.35541502963327837,
+          "eval/HELD-OUT_ENVIRONMENTS_128-truncated_ratio": 0.1328125
+        }
+      }
+    ],
+    "n_eval_points": 2,
+    "eval_first": -0.613639591448119,
+    "eval_last": -0.35541502963327837,
+    "eval_min": -0.613639591448119,
+    "eval_max": -0.35541502963327837,
+    "first_rollout_ok": true,
+    "attempt": 1,
+    "run_once": {
+      "executed": true,
+      "ok": true,
+      "returncode": 137,
+      "receipt_path": "outputs/run_once_receipt.json"
+    }
+  },
+  "checkpoint_exclusion": {
+    "excluded_from_case": true,
+    "reason": "Runtime checkpoints are not needed for diagnosis or B0 validation.",
+    "source_locations": [
+      {
+        "path": "experiement",
+        "top_level_entries": [
+          "fix_run"
+        ]
+      }
+    ]
+  }
+}

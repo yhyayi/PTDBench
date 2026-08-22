@@ -165,11 +165,18 @@ class EvaluationConfig:
     evaluation_level: str = "solution"
     log_level: str = "quiet"
     debian_mirror: Optional[str] = None
+    huggingface_mirror: Optional[str] = None
     verifier_env: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.debian_mirror is not None:
             object.__setattr__(self, "debian_mirror", _normalize_plain_url(self.debian_mirror))
+        if self.huggingface_mirror is not None:
+            object.__setattr__(
+                self,
+                "huggingface_mirror",
+                _normalize_plain_url(self.huggingface_mirror),
+            )
         object.__setattr__(self, "verifier_env", _normalize_env(self.verifier_env))
 
 

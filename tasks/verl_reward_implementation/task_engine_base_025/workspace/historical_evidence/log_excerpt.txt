@@ -1,6 +1,0 @@
-step=0 key=val-core/openai/gsm8k/acc/mean@1 score=0.000758150
-step=20 key=val-core/openai/gsm8k/acc/mean@1 score=0.000758150
-step=40 key=val-core/openai/gsm8k/acc/mean@1 score=0.001516300
-step=60 key=val-core/openai/gsm8k/acc/mean@1 score=0.000758150
-step=80 key=val-core/openai/gsm8k/acc/mean@1 score=0.000758150
-step=100 key=val-core/openai/gsm8k/acc/mean@1 score=0.000000000

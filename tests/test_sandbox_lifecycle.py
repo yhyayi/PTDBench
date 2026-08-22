@@ -157,7 +157,7 @@ class SandboxLifecycleTests(unittest.TestCase):
         self.assertEqual(judge_args.model, "agent-model")
         self.assertEqual(judge_args.judge_model, "judge-model")
 
-    def test_evaluate_cli_accepts_stage_env_and_debian_mirror(self):
+    def test_evaluate_cli_accepts_stage_env_and_mirrors(self):
         args = build_parser().parse_args(
             [
                 "evaluate",
@@ -170,6 +170,8 @@ class SandboxLifecycleTests(unittest.TestCase):
                 "HTTPS_PROXY=http://proxy:7890",
                 "--debian-mirror",
                 "https://mirrors.tuna.tsinghua.edu.cn/",
+                "--huggingface-mirror",
+                "https://hf-mirror.com/",
             ]
         )
 
@@ -182,6 +184,7 @@ class SandboxLifecycleTests(unittest.TestCase):
         )
         self.assertEqual(args.verifier_env, ["HTTPS_PROXY=http://proxy:7890"])
         self.assertEqual(args.debian_mirror, "https://mirrors.tuna.tsinghua.edu.cn/")
+        self.assertEqual(args.huggingface_mirror, "https://hf-mirror.com/")
 
     def test_docker_verifier_receives_judge_configuration(self):
         env = TaskEvaluator("docker")._verifier_judge_env(
@@ -477,6 +480,20 @@ class SandboxLifecycleTests(unittest.TestCase):
             materialized.index("RUN apt-get update"),
         )
         self.assertIn("deb.debian.org/debian", materialized)
+
+    def test_huggingface_mirror_rewrites_environment_dockerfile_urls(self):
+        dockerfile = (
+            "FROM python:3.11-slim\n"
+            "ARG DATASET_URL=https://huggingface.co/datasets/org/name/resolve/main/file.tar.gz\n"
+            "RUN curl \"$DATASET_URL\"\n"
+        )
+        materialized = TaskEvaluator._rewrite_huggingface_endpoint(
+            dockerfile,
+            "https://hf-mirror.com",
+        )
+
+        self.assertIn("https://hf-mirror.com/datasets/org/name/resolve/main/file.tar.gz", materialized)
+        self.assertNotIn("https://huggingface.co", materialized)
 
     def test_codex_uses_outer_docker_sandbox(self):
         runner = CodexAgentRunner(

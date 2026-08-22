@@ -1,0 +1,29 @@
+task_id: task_core_algos_013
+category: llama_dapo_math_17k
+hollow_file: verl/trainer/ppo/core_algos.py
+hollow_symbols:
+- compute_grpo_outcome_advantage
+- compute_grpo_vectorized_outcome_advantage
+- agg_loss
+- kl_penalty
+- compute_policy_loss
+- get_policy_loss_fn
+- compute_entropy_loss
+- get_adv_estimator_fn
+hollowed_symbols:
+- get_policy_loss_fn
+- get_adv_estimator_fn
+- compute_grpo_outcome_advantage
+- compute_grpo_vectorized_outcome_advantage
+- agg_loss
+- compute_policy_loss
+- compute_entropy_loss
+- kl_penalty
+baseline_path: hidden/baseline/verl/trainer/ppo/core_algos.py
+experiment_name: task_core_algos_013
+created_at: '2026-07-19T13:08:45.947170+00:00'
+note: verl GRPO/DAPO-Math-17k/Llama mother; no RLVE gym_eval. During _validate, ALL hidden/baseline/*.py are pasted onto workspace then restored; /hidden mounted only for GPU verify (Agent cannot read).
+val_baseline_paste:
+- hidden/baseline/** (all sealed .py; includes hollow + val stack)
+baselines:
+  verl/trainer/ppo/core_algos.py: 9114f9e16c87e4c9ebf2fa016baf733c9bbc819766b53c8968aaa9e8abcd7916

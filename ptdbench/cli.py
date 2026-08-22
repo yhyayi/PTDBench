@@ -102,6 +102,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Debian mirror base URL applied before agent setup package installs",
     )
+    e.add_argument(
+        "--huggingface-mirror",
+        default=None,
+        help="Hugging Face mirror base URL applied to environment Dockerfiles",
+    )
     e.add_argument("--image-tag-prefix", default="ptdbench")
     e.add_argument("--timeout-s", type=int, default=None)
     e.add_argument("--keep-artifacts", action="store_true")
@@ -238,6 +243,7 @@ def main(argv=None) -> int:
                 evaluation_level=args.evaluation_level,
                 log_level=args.log_level,
                 debian_mirror=args.debian_mirror,
+                huggingface_mirror=args.huggingface_mirror,
                 verifier_env=verifier_env,
             ),
         )

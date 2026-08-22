@@ -99,12 +99,13 @@ class TaskEvaluator:
                 )
                 environment_dir = package.paths.environment
                 dockerfile = self._environment_dockerfile(package)
-                if config.debian_mirror:
+                if config.debian_mirror or config.huggingface_mirror:
                     environment_dir = self._prepare_environment(
                         package,
                         run,
                         dockerfile=dockerfile,
                         debian_mirror=config.debian_mirror,
+                        huggingface_mirror=config.huggingface_mirror,
                     )
                 artifact = self.runtime.build_environment(
                     environment_dir,
@@ -445,16 +446,18 @@ class TaskEvaluator:
         run: PreparedRun,
         *,
         dockerfile: str,
-        debian_mirror: str,
+        debian_mirror: Optional[str],
+        huggingface_mirror: Optional[str],
     ) -> Path:
         environment_dir = run.root / "environment"
         copy_tree(package.paths.environment, environment_dir)
         dockerfile_path = environment_dir / dockerfile
         content = dockerfile_path.read_text(encoding="utf-8").rstrip()
-        write_text(
-            dockerfile_path,
-            self._insert_debian_mirror_layer(content, debian_mirror),
-        )
+        if debian_mirror:
+            content = self._insert_debian_mirror_layer(content, debian_mirror).rstrip()
+        if huggingface_mirror:
+            content = self._rewrite_huggingface_endpoint(content, huggingface_mirror).rstrip()
+        write_text(dockerfile_path, content.rstrip() + "\n")
         return environment_dir
 
     @staticmethod
@@ -492,6 +495,10 @@ RUN set -eu; \\
             "$sources"; \\
     done
 """
+
+    @staticmethod
+    def _rewrite_huggingface_endpoint(dockerfile: str, mirror: str) -> str:
+        return dockerfile.replace("https://huggingface.co", mirror)
 
     def _write_report(self, path: Path, result: EvaluationResult) -> None:
         write_text(path, json.dumps(result.to_dict(), indent=2, ensure_ascii=False))

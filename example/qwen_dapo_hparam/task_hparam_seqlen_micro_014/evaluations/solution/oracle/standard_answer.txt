@@ -1,19 +1,34 @@
 STANDARD_ANSWER_V1
 CASE_ID: task_hparam_seqlen_micro_014
 BENCHMARK_GROUP: A-core-verl-hparam
-EXPECTED_VERDICT: unhealthy
-EXPECTED_ATTRIBUTION: The MAX_PROMPT_LENGTH / MAX_RESPONSE_LENGTH length family.
+EXPECTED_MODE: execution-based repair
 
-REQUIRED_ALL:
-- Name MAX_PROMPT_LENGTH and MAX_RESPONSE_LENGTH.
+REQUIRED_RUN_ARTIFACTS:
+- Submit a run manifest at $PTDBENCH_RESULTS/submission.json.
+- The manifest must point to a repaired run directory, metrics JSON, run receipt,
+  training log, launch command, and changed file list.
+
+REQUIRED_REPAIR:
+- The effective launch configuration must set MAX_PROMPT_LENGTH=1024.
+- The effective launch configuration must set MAX_RESPONSE_LENGTH=1024.
+- PPO_MICRO_BATCH_SIZE_PER_GPU, LOG_PROB_MICRO_BATCH_SIZE_PER_GPU, and
+  TRAIN_BATCH_SIZE must remain at the golden values.
+- The repaired job must use the fixed dataset, held-out set, model, evaluation
+  interval, and 200-step training budget.
+
+REQUIRED_HEALTH_SIGNALS:
+- The repaired run must finish the 200-step protocol successfully.
+- The final val-core/math_dapo/acc/mean@1 must be at least 0.045.
+- The best val-core/math_dapo/acc/mean@1 must be at least 0.05.
+- The log must contain training/validation signals from the repaired run.
+- Response length metrics must not show the old 512-token cap with high clipping:
+  response_length/clip_ratio should be <= 0.45, or response_length/max should
+  demonstrate a repaired response budget near 1024.
 
 GLOBAL_JUDGE_POLICY:
-- The score must be exactly 0 or 1.
-- Agent A must explicitly classify the run as healthy or unhealthy.
-- An unhealthy answer may provide only one primary attribution.
-- A gold parameter bundle or computation chain counts as one attribution.
-- Broad labels without the required concrete attribution are insufficient.
-- Every REQUIRED_ALL item must be satisfied.
-- A verdict mismatch forces score 0.
-- Equivalent technical wording in any language is acceptable.
-- task.yaml may clarify targets and aliases but may not relax REQUIRED_ALL.
+- Grade the submitted repaired run artifacts, not a prose diagnosis.
+- Do not accept a solution that only proposes a fix without executing the run.
+- Do not accept artifacts that point outside the workspace or to the frozen
+  historical snapshot.
+- Do not accept a run that changes the verifier, oracle, dataset, reward stack,
+  held-out set, model, or training-step budget to manufacture a pass.

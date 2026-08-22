@@ -1,0 +1,8 @@
+[
+  {
+    "step": 0,
+    "eval_score": -0.6096609025871415,
+    "eval_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+    "truncate_ratio": 0.1328125
+  }
+]

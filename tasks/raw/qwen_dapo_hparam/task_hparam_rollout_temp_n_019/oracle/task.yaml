@@ -1,0 +1,16 @@
+task_id: task_hparam_rollout_temp_n_019
+category: qwen_dapo_hparam
+launch_script: examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh
+hollow_hparams:
+- ROLLOUT_TEMPERATURE
+- ROLLOUT_TOP_P
+- ROLLOUT_N
+- ROLLOUT_GPU_MEM_UTIL
+- MAX_RESPONSE_LENGTH
+baseline_path: hidden/baseline/examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh
+experiment_name: task_hparam_rollout_temp_n_019
+created_at: '2026-07-20T07:55:18.600770+00:00'
+note: 'qwen_dapo_hparam: Agent fills launch-script hyperparameter blanks. During _validate, sealed reward-stack .py under hidden/baseline are pasted; the Agent-edited launch script is NOT overwritten.'
+val_baseline_paste:
+- hidden/baseline/**/*.py (reward stack only; not the .sh)
+eval_metric: val-core/math_dapo/acc/mean@1 every test_freq=20 through 200 steps

@@ -1,0 +1,6 @@
+{"time":"2026-07-18T17:01:32.079017187Z","level":"INFO","msg":"stream: starting","core version":"0.25.0"}
+{"time":"2026-07-18T17:01:32.5984691Z","level":"INFO","msg":"stream: created new stream","id":"rwy11xsd"}
+{"time":"2026-07-18T17:01:32.598703568Z","level":"INFO","msg":"handler: started","stream_id":"rwy11xsd"}
+{"time":"2026-07-18T17:01:32.600807751Z","level":"INFO","msg":"stream: started","id":"rwy11xsd"}
+{"time":"2026-07-18T17:01:32.600841662Z","level":"INFO","msg":"writer: started","stream_id":"rwy11xsd"}
+{"time":"2026-07-18T17:01:32.600867792Z","level":"INFO","msg":"sender: started","stream_id":"rwy11xsd"}
