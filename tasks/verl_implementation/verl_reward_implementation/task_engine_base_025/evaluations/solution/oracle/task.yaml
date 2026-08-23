@@ -1,0 +1,40 @@
+task_id: task_engine_base_025
+category: verl_reward_implementation
+hollow_file: verl/workers/engine/base.py
+hollow_symbols: null
+hollowed_symbols:
+- BaseEngine.initialize
+- BaseEngine.is_param_offload_enabled
+- BaseEngine.is_optimizer_offload_enabled
+- BaseEngine.train_mode
+- BaseEngine.eval_mode
+- BaseEngine.optimizer_zero_grad
+- BaseEngine.optimizer_step
+- BaseEngine.lr_scheduler_step
+- BaseEngine.forward_backward_batch
+- BaseEngine.train_batch
+- BaseEngine.infer_batch
+- BaseEngine.get_per_tensor_param
+- BaseEngine.get_data_parallel_size
+- BaseEngine.get_data_parallel_rank
+- BaseEngine.get_data_parallel_group
+- BaseEngine.to
+- BaseEngine.save_checkpoint
+- BaseEngine.load_checkpoint
+- BaseEngine.is_mp_src_rank_with_outputs
+- BaseEngine.disable_adapter
+- BaseEngineCtx.__init__
+- BaseEngineCtx._context_switch
+- BaseEngineCtx.__enter__
+- BaseEngineCtx.__exit__
+- EngineRegistry.register
+- EngineRegistry.get_engine_cls
+- EngineRegistry.new
+baseline_path: hidden/baseline/verl/workers/engine/base.py
+experiment_name: task_engine_base_025
+created_at: '2026-07-17T05:38:17.419817+00:00'
+note: verl GRPO/GSM8K mother; no RLVE gym_eval. During _validate, ALL hidden/baseline/*.py are pasted onto workspace then restored; /hidden mounted only for GPU verify (Agent cannot read).
+val_baseline_paste:
+- hidden/baseline/** (all sealed .py; includes hollow + val stack)
+baselines:
+  verl/workers/engine/base.py: ed8612542e58e2c98306eb9cf0c066759ef1690e14b876b45a481bae1b5351e9

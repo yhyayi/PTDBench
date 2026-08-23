@@ -1,0 +1,18 @@
+title: 'verl_reward_implementation implementation diagnosis: task_engine_base_025'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-08'
+domain: post_train
+model:
+  name: Qwen2.5-0.5B-Instruct
+dataset:
+  name: GSM8K
+training:
+  framework: verl
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: implementation_bug
+  failure_reason: Rewritten BaseEngine, BaseEngineCtx, and EngineRegistry methods collapse GSM8K validation accuracy to zero with no reward rise versus a 47.8% baseline
