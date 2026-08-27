@@ -1,0 +1,18 @@
+category: hyperparameter
+framework: rlve
+task: task_009
+verdict: unhealthy
+root_cause:
+- kind: hparam
+  name: --lr
+  observed: 1e-08
+  expected: 2e-06
+evidence_metrics:
+- within 245 steps raw_reward -0.617 → -0.670
+- eval -0.611 → -0.573; improvement far below healthy p10 of +0.21
+- entropy is flat
+fix:
+  must:
+  - target: --lr
+    direction: increase
+    to: 2e-6

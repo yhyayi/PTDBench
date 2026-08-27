@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "task_id": "task_009",
+  "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",
+  "final_step": 100,
+  "historical_final_baseline": "-0.5731876952630935",
+  "required_final_score": "-0.24",
+  "log_roots": [
+    "experiment_logs"
+  ]
+}

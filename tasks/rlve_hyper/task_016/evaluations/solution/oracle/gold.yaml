@@ -1,0 +1,19 @@
+category: hyperparameter
+framework: rlve
+task: task_016
+verdict: unhealthy
+root_cause:
+- kind: hparam
+  name: --attention-dropout
+  observed: '0.7'
+  expected: '0'
+evidence_metrics:
+- raw_reward -0.595 → -0.592; barely moves
+- entropy 5.50 → 5.63; out of healthy range
+- grad_norm 30094 → 1672
+- eval −0.605 → −0.610
+fix:
+  must:
+  - target: --attention-dropout
+    direction: decrease
+    to: '0'

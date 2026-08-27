@@ -1,0 +1,18 @@
+title: 'rlve_hyper hyperparameter diagnosis: task_005'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-08'
+domain: post_train
+model:
+  name: Qwen2.5-0.5B-Instruct
+dataset:
+  name: RLVE held-out environments
+training:
+  framework: RLVE / slime + GRPO
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: training_collapse
+  failure_reason: '--eval-temperature=2 destabilizes held-out sampling and causes severe response truncation; eval starts at -1.000 and ends at -0.791 while training reward looks healthy'

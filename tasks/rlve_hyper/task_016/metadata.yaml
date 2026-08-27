@@ -1,0 +1,18 @@
+title: 'rlve_hyper hyperparameter diagnosis: task_016'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-08'
+domain: post_train
+model:
+  name: Qwen2.5-0.5B-Instruct
+dataset:
+  name: RLVE held-out environments
+training:
+  framework: RLVE / slime + GRPO
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: training_collapse
+  failure_reason: '--attention-dropout=0.7 leaves held-out eval around -0.61 with entropy and grad_norm well outside the healthy range'
