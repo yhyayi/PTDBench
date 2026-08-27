@@ -1,0 +1,25 @@
+# Frozen historical eval/train trace reconstructed from W&B history.
+# Cutoff: train step 100. Held-out eval interval is 10; last eval is step 99.
+# Metric eval/nq_test is Natural Questions exact-match accuracy on the Search-R1 test split.
+
+2026-08-21 03:45:55 step:0 - eval/nq_test:0.043 eval/nq_test/response_len/mean:1600.023 eval/nq_test/truncated_ratio:0.39066666666666666
+2026-08-21 03:57:34 step:9 - eval/nq_test:0.05 eval/nq_test/response_len/mean:1474.7666666666667 eval/nq_test/truncated_ratio:0.359
+2026-08-21 04:15:07 step:29 - eval/nq_test:0.09966666666666667 eval/nq_test/response_len/mean:242.25966666666667 eval/nq_test/truncated_ratio:0.041666666666666664
+2026-08-21 04:20:27 step:39 - eval/nq_test:0.11033333333333334 eval/nq_test/response_len/mean:61.131 eval/nq_test/truncated_ratio:0.005666666666666667
+2026-08-21 04:25:17 step:49 - eval/nq_test:0.126 eval/nq_test/response_len/mean:28.474333333333334 eval/nq_test/truncated_ratio:0.0033333333333333335
+2026-08-21 04:29:50 step:59 - eval/nq_test:0.14033333333333334 eval/nq_test/response_len/mean:17.736 eval/nq_test/truncated_ratio:0.0013333333333333333
+2026-08-21 04:34:11 step:69 - eval/nq_test:0.14433333333333334 eval/nq_test/response_len/mean:20.938 eval/nq_test/truncated_ratio:0.0016666666666666668
+2026-08-21 04:38:44 step:79 - eval/nq_test:0.136 eval/nq_test/response_len/mean:44.592666666666666 eval/nq_test/truncated_ratio:0.0023333333333333335
+2026-08-21 04:43:22 step:89 - eval/nq_test:0.15266666666666667 eval/nq_test/response_len/mean:27.213333333333335 eval/nq_test/truncated_ratio:0.0013333333333333333
+2026-08-21 04:47:31 step:99 - eval/nq_test:0.145 eval/nq_test/response_len/mean:13.329666666666666 eval/nq_test/truncated_ratio:0.001
+
+2026-08-21 03:46:20 step:0 - rollout/response_len/mean:1766.34765625 rollout/truncated_ratio:0.37109375
+2026-08-21 03:57:57 step:10 - rollout/response_len/mean:1523.90625 rollout/truncated_ratio:0.37890625
+2026-08-21 04:15:19 step:30 - rollout/response_len/mean:231.21484375 rollout/truncated_ratio:0.0546875
+2026-08-21 04:20:39 step:40 - rollout/response_len/mean:63.24609375 rollout/truncated_ratio:0.0078125
+2026-08-21 04:25:20 step:50 - rollout/response_len/mean:17.84765625 rollout/truncated_ratio:0.0
+2026-08-21 04:29:53 step:60 - rollout/response_len/mean:9.48828125 rollout/truncated_ratio:0.0
+2026-08-21 04:34:13 step:70 - rollout/response_len/mean:14.23828125 rollout/truncated_ratio:0.0
+2026-08-21 04:38:49 step:80 - rollout/response_len/mean:33.5625 rollout/truncated_ratio:0.0
+2026-08-21 04:43:24 step:90 - rollout/response_len/mean:21.60546875 rollout/truncated_ratio:0.0
+2026-08-21 04:47:35 step:100 - rollout/response_len/mean:13.8359375 rollout/truncated_ratio:0.0

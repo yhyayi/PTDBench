@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RL-Diagnosis submission",
+  "type": "object",
+  "required": ["verdict", "root_cause", "evidence", "fix"],
+  "additionalProperties": false,
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["healthy", "unhealthy"]
+    },
+    "root_cause": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string"},
+          "where": {"type": "string"},
+          "observed": {"type": "string"},
+          "expected": {"type": "string"}
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "fix": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["target", "change"],
+        "additionalProperties": false,
+        "properties": {
+          "target": {"type": "string"},
+          "change": {"type": "string"}
+        }
+      }
+    }
+  }
+}

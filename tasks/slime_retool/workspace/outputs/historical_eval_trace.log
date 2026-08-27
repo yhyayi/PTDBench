@@ -1,0 +1,27 @@
+# Frozen historical eval/train trace reconstructed from W&B history.
+# Cutoff: train step 100. Held-out eval interval is 10; last eval is step 99.
+# Metric eval/aime is the mean of custom_rm reward_func scores on AIME 2024.
+
+2026-08-20 10:41:46 step:0 - eval/aime:-0.59125 eval/aime/response_len/mean:4167.772916666667 eval/aime/truncated_ratio:0.010416666666666666
+2026-08-20 11:28:29 step:9 - eval/aime:-0.5203125 eval/aime/response_len/mean:3944.93125 eval/aime/truncated_ratio:0.010416666666666666
+2026-08-20 12:28:38 step:19 - eval/aime:-0.5375 eval/aime/response_len/mean:4079.4958333333334 eval/aime/truncated_ratio:0.00625
+2026-08-20 13:35:16 step:29 - eval/aime:-0.4747916666666666 eval/aime/response_len/mean:4956.88125 eval/aime/truncated_ratio:0.016666666666666666
+2026-08-20 14:12:08 step:39 - eval/aime:-0.4970833333333333 eval/aime/response_len/mean:5911.227083333333 eval/aime/truncated_ratio:0.01875
+2026-08-20 14:59:51 step:49 - eval/aime:-0.5113541666666667 eval/aime/response_len/mean:6809.020833333333 eval/aime/truncated_ratio:0.04791666666666667
+2026-08-20 15:46:22 step:59 - eval/aime:-0.45062499999999994 eval/aime/response_len/mean:7763.5625 eval/aime/truncated_ratio:0.08125
+2026-08-20 16:41:32 step:69 - eval/aime:-0.4748958333333333 eval/aime/response_len/mean:8376.89375 eval/aime/truncated_ratio:0.09791666666666667
+2026-08-20 17:32:09 step:79 - eval/aime:-0.5113541666666667 eval/aime/response_len/mean:8779.941666666668 eval/aime/truncated_ratio:0.11875
+2026-08-20 18:23:21 step:89 - eval/aime:-0.44635416666666666 eval/aime/response_len/mean:9309.516666666666 eval/aime/truncated_ratio:0.14791666666666667
+2026-08-20 19:18:07 step:99 - eval/aime:-0.49656249999999996 eval/aime/response_len/mean:10066.55625 eval/aime/truncated_ratio:0.21875
+
+2026-08-20 10:42:39 step:0 - rollout/response_len/mean:1959.09765625 rollout/truncated_ratio:0.0
+2026-08-20 11:30:23 step:10 - rollout/response_len/mean:2945.0390625 rollout/truncated_ratio:0.01171875
+2026-08-20 12:33:52 step:20 - rollout/response_len/mean:2701.01953125 rollout/truncated_ratio:0.00390625
+2026-08-20 13:36:51 step:30 - rollout/response_len/mean:2900.6484375 rollout/truncated_ratio:0.0
+2026-08-20 14:17:45 step:40 - rollout/response_len/mean:3312.8125 rollout/truncated_ratio:0.0
+2026-08-20 15:01:43 step:50 - rollout/response_len/mean:4231.16796875 rollout/truncated_ratio:0.015625
+2026-08-20 15:48:10 step:60 - rollout/response_len/mean:4421.3671875 rollout/truncated_ratio:0.01953125
+2026-08-20 16:45:16 step:70 - rollout/response_len/mean:5233.94921875 rollout/truncated_ratio:0.0390625
+2026-08-20 17:37:48 step:80 - rollout/response_len/mean:5833.6484375 rollout/truncated_ratio:0.015625
+2026-08-20 18:25:41 step:90 - rollout/response_len/mean:5850.10546875 rollout/truncated_ratio:0.03515625
+2026-08-20 19:20:13 step:100 - rollout/response_len/mean:6393.53125 rollout/truncated_ratio:0.05078125

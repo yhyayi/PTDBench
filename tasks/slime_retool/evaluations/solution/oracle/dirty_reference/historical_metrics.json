@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "historical_run",
+  "metric_status": "wandb_extracted",
+  "expected_metric_key": "eval/aime",
+  "historical_cutoff_train_step": 100,
+  "last_eval_step": 99,
+  "eval_interval": 10,
+  "eval_points": [
+    {
+      "step": 0,
+      "eval_score": -0.59125,
+      "eval_key": "eval/aime",
+      "truncate_ratio": 0.010416666666666666,
+      "response_len_mean": 4167.772916666667,
+      "held_out_accuracy": 0.20437499999999997
+    },
+    {
+      "step": 9,
+      "eval_score": -0.5203125,
+      "eval_key": "eval/aime",
+      "truncate_ratio": 0.010416666666666666,
+      "response_len_mean": 3944.93125,
+      "held_out_accuracy": 0.23984375000000002
+    },
+    {
+      "step": 19,
+      "eval_score": -0.5375,
+      "eval_key": "eval/aime",
+      "truncate_ratio": 0.00625,
+      "response_len_mean": 4079.4958333333334,
+      "held_out_accuracy": 0.23125
+    },
+    {
+      "step": 29,
+      "eval_score": -0.4747916666666666,
+      "eval_key": "eval/aime",
+      "truncate_ratio": 0.016666666666666666,
+      "response_len_mean": 4956.88125,
+      "held_out_accuracy": 0.2626041666666667
+    },
+    {
+      "step": 39,
+      "eval_score": -0.4970833333333333,
+      "eval_key": "eval/aime",
+      "truncate_ratio": 0.01875,
+      "response_len_mean": 5911.227083333333,
+      "held_out_accuracy": 0.25145833333333334
+    },
+    {
+      "step": 49,
+      "eval_score": -0.5113541666666667,
+      "eval_key": "eval/aime",
+      "truncate_ratio": 0.04791666666666667,
+      "response_len_mean": 6809.020833333333,
+      "held_out_accuracy": 0.24432291666666667
+    },
+    {
+      "step": 59,
+      "eval_score": -0.45062499999999994,
+      "eval_key": "eval/aime",
+      "truncate_ratio": 0.08125,
+      "response_len_mean": 7763.5625,
+      "held_out_accuracy": 0.27468750000000003
+    },
+    {
+      "step": 69,
+      "eval_score": -0.4748958333333333,
+      "eval_key": "eval/aime",
+      "truncate_ratio": 0.09791666666666667,
+      "response_len_mean": 8376.89375,
+      "held_out_accuracy": 0.26255208333333335
+    },
+    {
+      "step": 79,
+      "eval_score": -0.5113541666666667,
+      "eval_key": "eval/aime",
+      "truncate_ratio": 0.11875,
+      "response_len_mean": 8779.941666666668,
+      "held_out_accuracy": 0.24432291666666667
+    },
+    {
+      "step": 89,
+      "eval_score": -0.44635416666666666,
+      "eval_key": "eval/aime",
+      "truncate_ratio": 0.14791666666666667,
+      "response_len_mean": 9309.516666666666,
+      "held_out_accuracy": 0.2768229166666667
+    },
+    {
+      "step": 99,
+      "eval_score": -0.49656249999999996,
+      "eval_key": "eval/aime",
+      "truncate_ratio": 0.21875,
+      "response_len_mean": 10066.55625,
+      "held_out_accuracy": 0.25171875
+    }
+  ],
+  "train_points": [
+    {
+      "step": 0,
+      "response_len_mean": 1959.09765625,
+      "truncate_ratio": 0.0
+    },
+    {
+      "step": 10,
+      "response_len_mean": 2945.0390625,
+      "truncate_ratio": 0.01171875
+    },
+    {
+      "step": 20,
+      "response_len_mean": 2701.01953125,
+      "truncate_ratio": 0.00390625
+    },
+    {
+      "step": 30,
+      "response_len_mean": 2900.6484375,
+      "truncate_ratio": 0.0
+    },
+    {
+      "step": 40,
+      "response_len_mean": 3312.8125,
+      "truncate_ratio": 0.0
+    },
+    {
+      "step": 50,
+      "response_len_mean": 4231.16796875,
+      "truncate_ratio": 0.015625
+    },
+    {
+      "step": 60,
+      "response_len_mean": 4421.3671875,
+      "truncate_ratio": 0.01953125
+    },
+    {
+      "step": 70,
+      "response_len_mean": 5233.94921875,
+      "truncate_ratio": 0.0390625
+    },
+    {
+      "step": 80,
+      "response_len_mean": 5833.6484375,
+      "truncate_ratio": 0.015625
+    },
+    {
+      "step": 90,
+      "response_len_mean": 5850.10546875,
+      "truncate_ratio": 0.03515625
+    },
+    {
+      "step": 100,
+      "response_len_mean": 6393.53125,
+      "truncate_ratio": 0.05078125
+    }
+  ],
+  "n_eval_points": 11,
+  "eval_first": -0.59125,
+  "eval_last": -0.49656249999999996,
+  "eval_min": -0.59125,
+  "eval_max": -0.44635416666666666,
+  "attempt": 1,
+  "first_rollout_ok": true,
+  "run_once": {
+    "executed": true,
+    "ok": true,
+    "returncode": 0,
+    "receipt_path": "outputs/metrics.json"
+  },
+  "source_metrics": {
+    "path": "outputs/metrics.json",
+    "source_eval_points": 11
+  },
+  "source_logs": [
+    {
+      "path": "wandb/run-20260820_102600-pc70p4t4/files/output.log"
+    },
+    {
+      "path": "outputs/historical_eval_trace.log"
+    }
+  ],
+  "metrics_alignment": {
+    "path": "outputs/metrics.json",
+    "metric_key": "eval/aime",
+    "metric_status": "wandb_extracted",
+    "n_eval_points": 11
+  },
+  "wandb_run": {
+    "id": "pc70p4t4",
+    "group": "qwen3-4B-retool-multi-turn"
+  },
+  "task_id": "slime_retool",
+  "held_out_accuracy_first": 0.20437499999999997,
+  "held_out_accuracy_last": 0.25171875,
+  "train_step_100": {
+    "step": 100,
+    "response_len_mean": 6393.53125,
+    "truncate_ratio": 0.05078125
+  }
+}

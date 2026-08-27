@@ -1,0 +1,62 @@
+[
+  {
+    "step": 0,
+    "eval_score": 0.043,
+    "eval_key": "eval/nq_test",
+    "truncate_ratio": 0.39066666666666666
+  },
+  {
+    "step": 9,
+    "eval_score": 0.05,
+    "eval_key": "eval/nq_test",
+    "truncate_ratio": 0.359
+  },
+  {
+    "step": 29,
+    "eval_score": 0.09966666666666667,
+    "eval_key": "eval/nq_test",
+    "truncate_ratio": 0.041666666666666664
+  },
+  {
+    "step": 39,
+    "eval_score": 0.11033333333333334,
+    "eval_key": "eval/nq_test",
+    "truncate_ratio": 0.005666666666666667
+  },
+  {
+    "step": 49,
+    "eval_score": 0.126,
+    "eval_key": "eval/nq_test",
+    "truncate_ratio": 0.0033333333333333335
+  },
+  {
+    "step": 59,
+    "eval_score": 0.14033333333333334,
+    "eval_key": "eval/nq_test",
+    "truncate_ratio": 0.0013333333333333333
+  },
+  {
+    "step": 69,
+    "eval_score": 0.14433333333333334,
+    "eval_key": "eval/nq_test",
+    "truncate_ratio": 0.0016666666666666668
+  },
+  {
+    "step": 79,
+    "eval_score": 0.136,
+    "eval_key": "eval/nq_test",
+    "truncate_ratio": 0.0023333333333333335
+  },
+  {
+    "step": 89,
+    "eval_score": 0.15266666666666667,
+    "eval_key": "eval/nq_test",
+    "truncate_ratio": 0.0013333333333333333
+  },
+  {
+    "step": 99,
+    "eval_score": 0.145,
+    "eval_key": "eval/nq_test",
+    "truncate_ratio": 0.001
+  }
+]

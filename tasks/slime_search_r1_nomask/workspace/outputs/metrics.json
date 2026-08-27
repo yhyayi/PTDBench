@@ -1,0 +1,198 @@
+{
+  "task_id": "slime_search_r1_nomask",
+  "created_at": "2026-08-21T04:47:35+00:00",
+  "scoring_note": "Historical NQ-test evaluation metrics frozen from the original run through train step 100 (last eval at step 99; eval_interval=10).",
+  "run_once": {
+    "executed": true,
+    "ok": true,
+    "returncode": 0,
+    "note": "Original Cybertron job continued past the historical cutoff. This snapshot freezes train step 100 / eval step 99. Eval step 19 is missing from captured stdout fragments.",
+    "receipt_path": "outputs/metrics.json"
+  },
+  "logs": {
+    "run_log_dirs": [],
+    "source_logs": [
+      "wandb/offline-run-20260821_033838-wi4fh8cz/files/output.log",
+      "outputs/historical_eval_trace.log"
+    ]
+  },
+  "metrics": {
+    "eval_interval": 10,
+    "metric_key": "eval/nq_test",
+    "metric_status": "wandb_extracted",
+    "historical_cutoff_train_step": 100,
+    "last_eval_step": 99,
+    "eval_points": [
+      {
+        "step": 0,
+        "eval_score": 0.043,
+        "eval_key": "eval/nq_test",
+        "response_len_mean": 1600.023,
+        "truncate_ratio": 0.39066666666666666
+      },
+      {
+        "step": 9,
+        "eval_score": 0.05,
+        "eval_key": "eval/nq_test",
+        "response_len_mean": 1474.7666666666667,
+        "truncate_ratio": 0.359
+      },
+      {
+        "step": 29,
+        "eval_score": 0.09966666666666667,
+        "eval_key": "eval/nq_test",
+        "response_len_mean": 242.25966666666667,
+        "truncate_ratio": 0.041666666666666664
+      },
+      {
+        "step": 39,
+        "eval_score": 0.11033333333333334,
+        "eval_key": "eval/nq_test",
+        "response_len_mean": 61.131,
+        "truncate_ratio": 0.005666666666666667
+      },
+      {
+        "step": 49,
+        "eval_score": 0.126,
+        "eval_key": "eval/nq_test",
+        "response_len_mean": 28.474333333333334,
+        "truncate_ratio": 0.0033333333333333335
+      },
+      {
+        "step": 59,
+        "eval_score": 0.14033333333333334,
+        "eval_key": "eval/nq_test",
+        "response_len_mean": 17.736,
+        "truncate_ratio": 0.0013333333333333333
+      },
+      {
+        "step": 69,
+        "eval_score": 0.14433333333333334,
+        "eval_key": "eval/nq_test",
+        "response_len_mean": 20.938,
+        "truncate_ratio": 0.0016666666666666668
+      },
+      {
+        "step": 79,
+        "eval_score": 0.136,
+        "eval_key": "eval/nq_test",
+        "response_len_mean": 44.592666666666666,
+        "truncate_ratio": 0.0023333333333333335
+      },
+      {
+        "step": 89,
+        "eval_score": 0.15266666666666667,
+        "eval_key": "eval/nq_test",
+        "response_len_mean": 27.213333333333335,
+        "truncate_ratio": 0.0013333333333333333
+      },
+      {
+        "step": 99,
+        "eval_score": 0.145,
+        "eval_key": "eval/nq_test",
+        "response_len_mean": 13.329666666666666,
+        "truncate_ratio": 0.001
+      }
+    ],
+    "eval_scores": [
+      {
+        "step": 0,
+        "score": 0.043
+      },
+      {
+        "step": 9,
+        "score": 0.05
+      },
+      {
+        "step": 29,
+        "score": 0.09966666666666667
+      },
+      {
+        "step": 39,
+        "score": 0.11033333333333334
+      },
+      {
+        "step": 49,
+        "score": 0.126
+      },
+      {
+        "step": 59,
+        "score": 0.14033333333333334
+      },
+      {
+        "step": 69,
+        "score": 0.14433333333333334
+      },
+      {
+        "step": 79,
+        "score": 0.136
+      },
+      {
+        "step": 89,
+        "score": 0.15266666666666667
+      },
+      {
+        "step": 99,
+        "score": 0.145
+      }
+    ],
+    "train_points": [
+      {
+        "step": 0,
+        "response_len_mean": 1766.34765625,
+        "truncate_ratio": 0.37109375
+      },
+      {
+        "step": 10,
+        "response_len_mean": 1523.90625,
+        "truncate_ratio": 0.37890625
+      },
+      {
+        "step": 30,
+        "response_len_mean": 231.21484375,
+        "truncate_ratio": 0.0546875
+      },
+      {
+        "step": 40,
+        "response_len_mean": 63.24609375,
+        "truncate_ratio": 0.0078125
+      },
+      {
+        "step": 50,
+        "response_len_mean": 17.84765625,
+        "truncate_ratio": 0.0
+      },
+      {
+        "step": 60,
+        "response_len_mean": 9.48828125,
+        "truncate_ratio": 0.0
+      },
+      {
+        "step": 70,
+        "response_len_mean": 14.23828125,
+        "truncate_ratio": 0.0
+      },
+      {
+        "step": 80,
+        "response_len_mean": 33.5625,
+        "truncate_ratio": 0.0
+      },
+      {
+        "step": 90,
+        "response_len_mean": 21.60546875,
+        "truncate_ratio": 0.0
+      },
+      {
+        "step": 100,
+        "response_len_mean": 13.8359375,
+        "truncate_ratio": 0.0
+      }
+    ]
+  },
+  "first_rollout_ok": true,
+  "attempt": 1,
+  "wandb_run": {
+    "id": "wi4fh8cz",
+    "group": "search-r1_qwen2.5-3B-nomask"
+  }
+}

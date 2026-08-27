@@ -1,0 +1,43 @@
+task_id: slime_retool
+category: slime_implementation
+framework: slime
+launch_script: examples/retool/retool_qwen3_4b_rl.sh
+model: Qwen3-4B
+dataset: DAPO-Math-17k (RL) + ReTool-SFT (SFT)
+algo: grpo
+recipe: examples/retool
+expected_verdict: unhealthy
+evidence_kind: historical_run
+historical_cutoff_train_step: 100
+last_eval_step: 99
+eval_interval: 10
+eval_metric_key: eval/aime
+eval_first_raw: 0.8217626190185547
+eval_last_raw: 3.8410780588785807
+eval_last_decontaminated: -0.831261698404948
+held_out_accuracy_last: 0.084369150797526
+length_bonus_coefficient: 5.0
+note: >-
+  Defect task. The workspace is an upstream slime snapshot plus the in-tree
+  examples/retool recipe (multi-turn code-interpreter tool-use GRPO, adapted
+  from verl's recipe/retool), with a single injected defect: reward_func in
+  examples/retool/generate_with_retool.py adds an unconditional length bonus
+  (5 * min(response_length / rollout_max_response_len, 1.0)) on top of the
+  math_dapo exact-match score. The bonus is independent of correctness, so GRPO
+  advantages reward longer generations and the policy reward-hacks response
+  length. Frozen historical evidence covers train step 100 / last eval step 99
+  (eval_interval 10). New repair-and-rerun logs record eval/aime as exact-match
+  accuracy via --eval-reward-key acc. Solution grading is metric-only: eval/aime
+  at step 99 must be at least 0.18 (historical decontaminated accuracy about
+  8.4%; healthy protocol about 25%).
+key_files:
+- examples/retool/generate_with_retool.py
+- examples/retool/retool_qwen3_4b_rl.sh
+- examples/retool/retool_qwen3_4b_sft.sh
+- examples/retool/tool_sandbox.py
+- outputs/metrics.json
+- outputs/historical_eval_trace.log
+external_assets_not_packaged:
+- Qwen3-4B-Instruct-2507 HF + torch_dist checkpoints and the released font-info SFT checkpoint
+- DAPO-Math-17k RL prompts and aime-2024 eval set
+- ReTool-SFT dataset for the optional SFT warm-up stage

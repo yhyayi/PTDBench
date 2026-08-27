@@ -1,0 +1,34 @@
+task_id: slime_retool
+category: slime_implementation
+framework: slime
+launch_script: examples/retool/retool_qwen3_4b_rl.sh
+model: Qwen3-4B
+dataset: DAPO-Math-17k (RL) + ReTool-SFT (SFT)
+algo: grpo
+recipe: examples/retool
+expected_verdict: healthy
+evidence_kind: historical_run
+historical_cutoff_train_step: 100
+last_eval_step: 99
+eval_interval: 10
+eval_metric_key: eval/aime
+eval_first: -0.59125
+eval_last: -0.4965625
+held_out_accuracy_last: 0.25171875
+note: >-
+  Correct task. The workspace is a pristine upstream slime snapshot plus the
+  in-tree examples/retool recipe (multi-turn code-interpreter tool-use GRPO,
+  adapted from verl's recipe/retool). No defect is injected. Frozen historical
+  evidence covers train step 100 / last eval step 99 (eval_interval 10).
+  Expected root_cause and fix are empty.
+key_files:
+- examples/retool/retool_qwen3_4b_rl.sh
+- examples/retool/retool_qwen3_4b_sft.sh
+- examples/retool/generate_with_retool.py
+- examples/retool/tool_sandbox.py
+- outputs/metrics.json
+- outputs/historical_eval_trace.log
+external_assets_not_packaged:
+- Qwen3-4B-Instruct-2507 HF + torch_dist checkpoints and the released font-info SFT checkpoint
+- DAPO-Math-17k RL prompts and aime-2024 eval set
+- ReTool-SFT dataset for the optional SFT warm-up stage

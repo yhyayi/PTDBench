@@ -1,0 +1,18 @@
+title: Slime ReTool GRPO run assessment
+submitter:
+  name: chenyinghao
+license: Apache-2.0
+created_date: '2026-08-19'
+domain: math_tool_use
+model:
+  name: Qwen3-4B
+dataset:
+  name: DAPO-Math-17k (RL) + ReTool-SFT (SFT)
+training:
+  framework: slime
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: run_health_unknown
+  failure_reason: The staged ReTool recipe requires independent evidence-based assessment; the ground-truth verdict is healthy because the multi-turn code-interpreter rollout, observation masking, token/log-prob alignment, math_dapo exact-match reward, and GRPO configuration follow the canonical ReTool reproduction with no injected defect, and frozen eval/aime at step 99 is about 25.2% accuracy

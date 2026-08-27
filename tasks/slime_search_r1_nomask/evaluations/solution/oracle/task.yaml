@@ -1,0 +1,38 @@
+task_id: slime_search_r1_nomask
+category: slime_implementation
+framework: slime
+launch_script: examples/search-r1/run_qwen2.5_3B.sh
+model: Qwen2.5-3B
+dataset: Search-R1 nq_hotpotqa_train
+algo: grpo
+recipe: examples/search-r1
+expected_verdict: unhealthy
+evidence_kind: historical_run
+historical_cutoff_train_step: 100
+last_eval_step: 99
+eval_interval: 10
+eval_metric_key: eval/nq_test
+eval_first: 0.043
+eval_last: 0.145
+eval_max: 0.15266666666666667
+held_out_accuracy_last: 0.145
+healthy_eval_nq_test_at_step_99: 0.37533333333333335
+note: >-
+  Defect task. The workspace is an upstream slime snapshot plus the in-tree
+  examples/search-r1 recipe (multi-turn retrieval-augmented GRPO), with a
+  single injected defect: generate_with_search.py::generate appends retrieved
+  <information> tokens with loss_mask=1 so search-engine results are trained
+  on. Frozen historical evidence covers train step 100 / last eval step 99
+  (eval_interval 10; eval 19 missing from captured stdout). Solution grading
+  is metric-only after a repair-and-rerun: best eval/nq_test must be at
+  least 0.28 (historical 0.145; healthy protocol about 0.375).
+key_files:
+- examples/search-r1/generate_with_search.py
+- examples/search-r1/run_qwen2.5_3B.sh
+- examples/search-r1/qa_em_format.py
+- outputs/metrics.json
+- outputs/historical_eval_trace.log
+external_assets_not_packaged:
+- Qwen2.5-3B HF + torch_dist checkpoints
+- Search-R1 nq_hotpotqa_train / test parquet
+- wiki-18 e5 FAISS index + corpus (~130GB) for the local dense retriever

@@ -1,0 +1,190 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "historical_run",
+  "metric_status": "wandb_extracted",
+  "expected_metric_key": "eval/nq_test",
+  "historical_cutoff_train_step": 100,
+  "last_eval_step": 99,
+  "eval_interval": 10,
+  "eval_points": [
+    {
+      "step": 0,
+      "eval_score": 0.043,
+      "eval_key": "eval/nq_test",
+      "response_len_mean": 1600.023,
+      "truncate_ratio": 0.39066666666666666,
+      "held_out_accuracy": 0.043
+    },
+    {
+      "step": 9,
+      "eval_score": 0.05,
+      "eval_key": "eval/nq_test",
+      "response_len_mean": 1474.7666666666667,
+      "truncate_ratio": 0.359,
+      "held_out_accuracy": 0.05
+    },
+    {
+      "step": 29,
+      "eval_score": 0.09966666666666667,
+      "eval_key": "eval/nq_test",
+      "response_len_mean": 242.25966666666667,
+      "truncate_ratio": 0.041666666666666664,
+      "held_out_accuracy": 0.09966666666666667
+    },
+    {
+      "step": 39,
+      "eval_score": 0.11033333333333334,
+      "eval_key": "eval/nq_test",
+      "response_len_mean": 61.131,
+      "truncate_ratio": 0.005666666666666667,
+      "held_out_accuracy": 0.11033333333333334
+    },
+    {
+      "step": 49,
+      "eval_score": 0.126,
+      "eval_key": "eval/nq_test",
+      "response_len_mean": 28.474333333333334,
+      "truncate_ratio": 0.0033333333333333335,
+      "held_out_accuracy": 0.126
+    },
+    {
+      "step": 59,
+      "eval_score": 0.14033333333333334,
+      "eval_key": "eval/nq_test",
+      "response_len_mean": 17.736,
+      "truncate_ratio": 0.0013333333333333333,
+      "held_out_accuracy": 0.14033333333333334
+    },
+    {
+      "step": 69,
+      "eval_score": 0.14433333333333334,
+      "eval_key": "eval/nq_test",
+      "response_len_mean": 20.938,
+      "truncate_ratio": 0.0016666666666666668,
+      "held_out_accuracy": 0.14433333333333334
+    },
+    {
+      "step": 79,
+      "eval_score": 0.136,
+      "eval_key": "eval/nq_test",
+      "response_len_mean": 44.592666666666666,
+      "truncate_ratio": 0.0023333333333333335,
+      "held_out_accuracy": 0.136
+    },
+    {
+      "step": 89,
+      "eval_score": 0.15266666666666667,
+      "eval_key": "eval/nq_test",
+      "response_len_mean": 27.213333333333335,
+      "truncate_ratio": 0.0013333333333333333,
+      "held_out_accuracy": 0.15266666666666667
+    },
+    {
+      "step": 99,
+      "eval_score": 0.145,
+      "eval_key": "eval/nq_test",
+      "response_len_mean": 13.329666666666666,
+      "truncate_ratio": 0.001,
+      "held_out_accuracy": 0.145
+    }
+  ],
+  "train_points": [
+    {
+      "step": 0,
+      "response_len_mean": 1766.34765625,
+      "truncate_ratio": 0.37109375
+    },
+    {
+      "step": 10,
+      "response_len_mean": 1523.90625,
+      "truncate_ratio": 0.37890625
+    },
+    {
+      "step": 30,
+      "response_len_mean": 231.21484375,
+      "truncate_ratio": 0.0546875
+    },
+    {
+      "step": 40,
+      "response_len_mean": 63.24609375,
+      "truncate_ratio": 0.0078125
+    },
+    {
+      "step": 50,
+      "response_len_mean": 17.84765625,
+      "truncate_ratio": 0.0
+    },
+    {
+      "step": 60,
+      "response_len_mean": 9.48828125,
+      "truncate_ratio": 0.0
+    },
+    {
+      "step": 70,
+      "response_len_mean": 14.23828125,
+      "truncate_ratio": 0.0
+    },
+    {
+      "step": 80,
+      "response_len_mean": 33.5625,
+      "truncate_ratio": 0.0
+    },
+    {
+      "step": 90,
+      "response_len_mean": 21.60546875,
+      "truncate_ratio": 0.0
+    },
+    {
+      "step": 100,
+      "response_len_mean": 13.8359375,
+      "truncate_ratio": 0.0
+    }
+  ],
+  "n_eval_points": 10,
+  "eval_first": 0.043,
+  "eval_last": 0.145,
+  "eval_min": 0.043,
+  "eval_max": 0.15266666666666667,
+  "attempt": 1,
+  "first_rollout_ok": true,
+  "run_once": {
+    "executed": true,
+    "ok": true,
+    "returncode": 0,
+    "receipt_path": "outputs/metrics.json"
+  },
+  "source_metrics": {
+    "path": "outputs/metrics.json",
+    "source_eval_points": 10
+  },
+  "source_logs": [
+    {
+      "path": "wandb/offline-run-20260821_033838-wi4fh8cz/files/output.log"
+    },
+    {
+      "path": "outputs/historical_eval_trace.log"
+    }
+  ],
+  "metrics_alignment": {
+    "path": "outputs/metrics.json",
+    "metric_key": "eval/nq_test",
+    "metric_status": "wandb_extracted",
+    "n_eval_points": 10
+  },
+  "wandb_run": {
+    "id": "wi4fh8cz",
+    "group": "search-r1_qwen2.5-3B-nomask"
+  },
+  "task_id": "slime_search_r1_nomask",
+  "held_out_accuracy_first": 0.043,
+  "held_out_accuracy_last": 0.145,
+  "train_step_100": {
+    "step": 100,
+    "response_len_mean": 13.8359375,
+    "truncate_ratio": 0.0
+  },
+  "missing_eval_steps": [
+    19
+  ],
+  "healthy_eval_nq_test_at_step_99": 0.37533333333333335
+}
