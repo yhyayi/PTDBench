@@ -4,6 +4,7 @@ from ..core.harbor_types import (
     HarborEvaluationConfig,
     HarborEvaluationReport,
     HarborRun,
+    HarborTaskUnit,
     PreparedHarborTask,
 )
 from .evaluator import TaskEvaluator, PreparedRun
@@ -24,6 +25,7 @@ __all__ = [
     "HarborRun",
     "HarborRunner",
     "HarborTaskMaterializer",
+    "HarborTaskUnit",
     "PreparedHarborTask",
     "PreparedRun",
     "TaskEvaluator",

@@ -9,7 +9,11 @@ from .core.types import (
     ValidationIssue,
     ValidationReport,
 )
-from .core.harbor_types import HarborEvaluationConfig, HarborEvaluationReport
+from .core.harbor_types import (
+    HarborEvaluationConfig,
+    HarborEvaluationReport,
+    HarborTaskUnit,
+)
 from .tasks import load_task_package
 from .evaluation.evaluator import TaskEvaluator
 from .evaluation.harbor_evaluator import HarborEvaluator
@@ -31,6 +35,7 @@ __all__ = [
     "HarborEvaluator",
     "HarborEvaluationConfig",
     "HarborEvaluationReport",
+    "HarborTaskUnit",
     "EvaluationConfig",
     "EvaluationResult",
     "CommandSpec",

@@ -16,6 +16,7 @@ from .harbor_types import (
     HarborEvaluationConfig,
     HarborEvaluationReport,
     HarborRun,
+    HarborTaskUnit,
     PreparedHarborTask,
 )
 
@@ -30,6 +31,7 @@ __all__ = [
     "HarborEvaluationConfig",
     "HarborEvaluationReport",
     "HarborRun",
+    "HarborTaskUnit",
     "PreparedHarborTask",
     "StageArtifact",
     "ValidationIssue",
