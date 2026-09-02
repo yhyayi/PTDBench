@@ -8,11 +8,11 @@ rules, or rubrics. It strips ANSI escapes and reconstructs metrics from
 It reads every log under `experiment_logs` and assigns a weighted score:
 
 - validation: the highest finite `eval/HELD-OUT_ENVIRONMENTS_128` at any step
-  must be at least `-0.24` to score `1`, otherwise `0`. A later lower step
-  does not fail this component if an earlier peak already meets the threshold.
+must be at least `-0.24` to score `1`, otherwise `0`. A later lower step
+does not fail this component if an earlier peak already meets the threshold.
 - training reward: the mean of every logged `RLVE/*/accuracy` point must be at
-  least `0.2` to score `1`, otherwise `0`. These points come from offline W&B
-  files and any text logs that contain the same keys.
+least `0.2` to score `1`, otherwise `0`. These points come from offline W&B
+files and any text logs that contain the same keys.
 - final `score = 0.8 * validation + 0.2 * training reward`
 
 Pass requires both components (`score == 1.0`). The framework still records
