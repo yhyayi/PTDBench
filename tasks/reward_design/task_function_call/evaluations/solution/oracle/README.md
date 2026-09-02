@@ -22,7 +22,13 @@
 
 - `verl/utils/reward_score/taco.py::run_test`: `restore`; target state/value: if `fn_name` is set, use call-based compile and `method(*inputs)` return-value compare; stdin path unchanged.
 
-Machine grading reads only the new experiment logs. The required held-out
-metric is `val-core/taco/acc/mean@1` at any peak. The historical final
-baseline is `0.0`. The absolute pass line is `0.125` (12.5%).
-Pass is score `1`; otherwise `0`.
+Machine grading reads only the new experiment logs. Scoring is weighted:
+
+- validation: a finite `val-core/taco/acc/mean@1` peak of at least `0.125`
+  (12.5%). The historical final baseline is `0.0`.
+- training reward: mean `critic/rewards/mean` over training steps must be
+  strictly above `0.14`
+- final `score = 0.8 * validation + 0.2 * training reward`
+
+Pass requires both components (`score == 1.0`). The framework still records
+the weighted float when only one component passes.

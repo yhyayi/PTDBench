@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract the target RLVE held-out metric from fresh logs and assign a binary score."""
+"""Extract held-out eval and learning rate from fresh logs and assign a weighted score."""
 
 from __future__ import annotations
 
@@ -50,6 +50,10 @@ def load_spec(path: Path) -> dict[str, Any]:
         "final_step",
         "historical_final_baseline",
         "required_final_score",
+        "learning_rate_key",
+        "required_learning_rate",
+        "validation_weight",
+        "learning_rate_weight",
         "log_roots",
     }
     if not isinstance(value, dict) or set(value) != expected:
@@ -70,6 +74,15 @@ def metric_pattern(metric_key: str) -> re.Pattern[str]:
     escaped = re.escape(metric_key)
     return re.compile(
         rf"eval\s+(\d+)\s*:\s*\{{[^\n]*?['\"]({escaped})['\"](?!-)\s*:\s*({NUMBER})",
+        re.IGNORECASE,
+    )
+
+
+def learning_rate_pattern(key: str) -> re.Pattern[str]:
+    """Match slime train lines: `step 0: {'train/lr-pg_0': 1e-06, ...}`."""
+    escaped = re.escape(key)
+    return re.compile(
+        rf"(?:^|\s)step\s+(\d+)\s*:\s*\{{[^\n]*?['\"]({escaped})['\"]\s*:\s*({NUMBER})",
         re.IGNORECASE,
     )
 
@@ -96,10 +109,29 @@ def log_files(results: Path, roots: list[str]) -> list[Path]:
     return sorted(found, key=lambda path: (path.stat().st_mtime_ns, str(path)))
 
 
+def record_point(
+    values: dict[int, tuple[Any, Decimal, str]],
+    step: int,
+    value: Decimal,
+    rank: tuple[Any, ...],
+    relative: str,
+) -> None:
+    previous = values.get(step)
+    if (
+        previous is None
+        or value > previous[1]
+        or (value == previous[1] and rank > previous[0])
+    ):
+        values[step] = (rank, value, relative)
+
+
 def extract(spec: dict[str, Any], results: Path):
     expected_key = spec["metric_key"]
+    lr_key = spec["learning_rate_key"]
     pattern = metric_pattern(expected_key)
-    values = {}
+    lr_pattern = learning_rate_pattern(lr_key)
+    values: dict[int, tuple[Any, Decimal, str]] = {}
+    lr_values: dict[int, tuple[Any, Decimal, str]] = {}
     keys_seen: set[str] = set()
     source_logs = []
     for path in log_files(results, spec["log_roots"]):
@@ -127,14 +159,22 @@ def extract(spec: dict[str, Any], results: Path):
                 continue
             if not value.is_finite():
                 continue
-            rank = (mtime, relative, order)
-            previous = values.get(step)
-            if (
-                previous is None
-                or value > previous[1]
-                or (value == previous[1] and rank > previous[0])
-            ):
-                values[step] = (rank, value, relative)
+            record_point(values, step, value, (mtime, relative, order), relative)
+        for order, match in enumerate(lr_pattern.finditer(text)):
+            matched = True
+            step = int(match.group(1))
+            key = match.group(2)
+            token = match.group(3)
+            keys_seen.add(key)
+            if key != lr_key:
+                continue
+            try:
+                value = Decimal(token)
+            except InvalidOperation:
+                continue
+            if not value.is_finite():
+                continue
+            record_point(lr_values, step, value, (mtime, relative, order), relative)
         if matched:
             source_logs.append(relative)
 
@@ -153,6 +193,17 @@ def extract(spec: dict[str, Any], results: Path):
             }
         )
         scores.append({"step": step, "score": score})
+    lr_points = []
+    for step in sorted(lr_values):
+        rate = float(lr_values[step][1])
+        lr_points.append(
+            {
+                "step": step,
+                "learning_rate": rate,
+                "learning_rate_key": lr_key,
+                "source_log": lr_values[step][2],
+            }
+        )
     experiment = {
         "task_id": spec["task_id"],
         "logs": {"source_logs": sorted(set(source_logs))},
@@ -161,9 +212,12 @@ def extract(spec: dict[str, Any], results: Path):
             "metric_status": "available" if points else "missing",
             "eval_points": points,
             "eval_scores": scores,
+            "learning_rate_key": lr_key,
+            "learning_rate_status": "available" if lr_points else "missing",
+            "learning_rate_points": lr_points,
         },
     }
-    return experiment, values, keys_seen
+    return experiment, values, lr_values, keys_seen
 
 
 def select_best(values: dict[int, tuple[Any, Decimal, str]]):
@@ -175,18 +229,39 @@ def select_best(values: dict[int, tuple[Any, Decimal, str]]):
     return best
 
 
+def mean_value(values: dict[int, tuple[Any, Decimal, str]]):
+    if not values:
+        return None
+    total = sum(item[1] for item in values.values())
+    return total / Decimal(len(values))
+
+
+def binary_score(passed: bool) -> Decimal:
+    return Decimal("1") if passed else Decimal("0")
+
+
 def grade(spec: dict[str, Any], results: Path):
-    experiment, values, keys_seen = extract(spec, results)
+    experiment, values, lr_values, keys_seen = extract(spec, results)
     metric_key = spec["metric_key"]
+    lr_key = spec["learning_rate_key"]
     final_step = spec["final_step"]
     baseline = Decimal(str(spec["historical_final_baseline"]))
     required_score = Decimal(str(spec["required_final_score"]))
+    required_lr = Decimal(str(spec["required_learning_rate"]))
+    validation_weight = Decimal(str(spec["validation_weight"]))
+    learning_rate_weight = Decimal(str(spec["learning_rate_weight"]))
     errors = []
     best = select_best(values)
     best_value = best[0] if best is not None else None
     best_step = best[1] if best is not None else None
     best_source = best[3] if best is not None else None
     improvement = best_value - baseline if best_value is not None else None
+    lr_mean = mean_value(lr_values)
+    lr_source = None
+    if lr_values:
+        latest_step = max(lr_values)
+        lr_source = lr_values[latest_step][2]
+
     if best_value is None:
         if metric_key in keys_seen:
             errors.append(f"missing finite {metric_key}")
@@ -196,13 +271,33 @@ def grade(spec: dict[str, Any], results: Path):
             )
         else:
             errors.append(f"missing {metric_key} in experiment_logs")
+        validation_passed = False
     elif best_value < required_score:
         errors.append(
             f"best score {best_value} at step {best_step} is below "
             f"required score {required_score}"
         )
-    passed = not errors
-    score = 1.0 if passed else 0.0
+        validation_passed = False
+    else:
+        validation_passed = True
+
+    if lr_mean is None:
+        errors.append(f"missing finite {lr_key} in experiment_logs")
+        learning_rate_passed = False
+    elif lr_mean < required_lr:
+        errors.append(
+            f"mean learning rate {lr_mean} is below required rate {required_lr}"
+        )
+        learning_rate_passed = False
+    else:
+        learning_rate_passed = True
+
+    validation_score = binary_score(validation_passed)
+    learning_rate_score = binary_score(learning_rate_passed)
+    score = float(
+        validation_weight * validation_score + learning_rate_weight * learning_rate_score
+    )
+    passed = score == 1.0
     judged = float(best_value) if best_value is not None else None
     metrics = {
         "task_id": spec["task_id"],
@@ -217,6 +312,13 @@ def grade(spec: dict[str, Any], results: Path):
         "absolute_improvement": (
             float(improvement) if improvement is not None else None
         ),
+        "validation_score": float(validation_score),
+        "learning_rate_key": lr_key,
+        "learning_rate_mean": float(lr_mean) if lr_mean is not None else None,
+        "learning_rate_n": len(lr_values),
+        "learning_rate_source_log": lr_source,
+        "required_learning_rate": float(required_lr),
+        "learning_rate_score": float(learning_rate_score),
         "source_logs": experiment["logs"]["source_logs"],
         "errors": errors,
         "passed": passed,
@@ -228,6 +330,11 @@ def grade(spec: dict[str, Any], results: Path):
     experiment["metrics"]["best_step"] = best_step
     experiment["metrics"]["best_score"] = judged
     experiment["metrics"]["best_source_log"] = best_source
+    experiment["metrics"]["learning_rate_mean"] = metrics["learning_rate_mean"]
+    experiment["metrics"]["learning_rate_n"] = metrics["learning_rate_n"]
+    experiment["metrics"]["validation_score"] = metrics["validation_score"]
+    experiment["metrics"]["learning_rate_score"] = metrics["learning_rate_score"]
+    experiment["metrics"]["score"] = score
     return experiment, metrics, {"passed": passed, "score": score, "metrics": metrics}
 
 

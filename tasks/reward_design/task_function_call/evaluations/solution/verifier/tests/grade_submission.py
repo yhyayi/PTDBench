@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract the target Verl metric from fresh logs and assign a binary score."""
+"""Extract validation acc and training reward from fresh logs and assign a weighted score."""
 
 from __future__ import annotations
 
@@ -55,6 +55,10 @@ def load_spec(path: Path) -> dict[str, Any]:
         "final_step",
         "historical_final_baseline",
         "required_final_score",
+        "training_reward_key",
+        "required_training_reward",
+        "validation_weight",
+        "training_weight",
         "log_roots",
     }
     if not isinstance(value, dict) or set(value) != expected:
@@ -83,9 +87,35 @@ def log_files(results: Path, roots: list[str]) -> list[Path]:
     return sorted(found, key=lambda path: (path.stat().st_mtime_ns, str(path)))
 
 
+def record_point(
+    values: dict[int, tuple[Any, Decimal, str]],
+    step: int,
+    value: Decimal,
+    rank: tuple[Any, ...],
+    relative: str,
+) -> None:
+    previous = values.get(step)
+    if (
+        previous is None
+        or value > previous[1]
+        or (value == previous[1] and rank > previous[0])
+    ):
+        values[step] = (rank, value, relative)
+
+
+def train_reward_re(key: str) -> re.Pattern[str]:
+    return re.compile(
+        rf"(?:^|\s)step:(\d+)\s+-.*?\b{re.escape(key)}:({NUMBER})",
+        re.IGNORECASE,
+    )
+
+
 def extract(spec: dict[str, Any], results: Path):
     expected_key = spec["metric_key"]
-    values = {}
+    train_key = spec["training_reward_key"]
+    train_re = train_reward_re(train_key)
+    values: dict[int, tuple[Any, Decimal, str]] = {}
+    train_values: dict[int, tuple[Any, Decimal, str]] = {}
     keys_seen: set[str] = set()
     source_logs = []
     for path in log_files(results, spec["log_roots"]):
@@ -113,14 +143,21 @@ def extract(spec: dict[str, Any], results: Path):
                 continue
             if not value.is_finite():
                 continue
-            rank = (mtime, relative, order)
-            previous = values.get(step)
-            if (
-                previous is None
-                or value > previous[1]
-                or (value == previous[1] and rank > previous[0])
-            ):
-                values[step] = (rank, value, relative)
+            record_point(values, step, value, (mtime, relative, order), relative)
+        for order, match in enumerate(train_re.finditer(text)):
+            matched = True
+            step = int(match.group(1))
+            token = match.group(2)
+            keys_seen.add(train_key)
+            try:
+                value = Decimal(token)
+            except InvalidOperation:
+                continue
+            if not value.is_finite():
+                continue
+            record_point(
+                train_values, step, value, (mtime, relative, order), relative
+            )
         if matched:
             source_logs.append(relative)
 
@@ -139,6 +176,17 @@ def extract(spec: dict[str, Any], results: Path):
             }
         )
         scores.append({"step": step, "score": score})
+    train_points = []
+    for step in sorted(train_values):
+        reward = float(train_values[step][1])
+        train_points.append(
+            {
+                "step": step,
+                "train_reward": reward,
+                "train_key": train_key,
+                "source_log": train_values[step][2],
+            }
+        )
     experiment = {
         "task_id": spec["task_id"],
         "logs": {"source_logs": sorted(set(source_logs))},
@@ -147,9 +195,12 @@ def extract(spec: dict[str, Any], results: Path):
             "metric_status": "available" if points else "missing",
             "eval_points": points,
             "eval_scores": scores,
+            "train_reward_key": train_key,
+            "train_reward_status": "available" if train_points else "missing",
+            "train_reward_points": train_points,
         },
     }
-    return experiment, values, keys_seen
+    return experiment, values, train_values, keys_seen
 
 
 def select_best(values: dict[int, tuple[Any, Decimal, str]]):
@@ -161,18 +212,39 @@ def select_best(values: dict[int, tuple[Any, Decimal, str]]):
     return best
 
 
+def mean_reward(values: dict[int, tuple[Any, Decimal, str]]):
+    if not values:
+        return None
+    total = sum(item[1] for item in values.values())
+    return total / Decimal(len(values))
+
+
+def binary_score(passed: bool) -> Decimal:
+    return Decimal("1") if passed else Decimal("0")
+
+
 def grade(spec: dict[str, Any], results: Path):
-    experiment, values, keys_seen = extract(spec, results)
+    experiment, values, train_values, keys_seen = extract(spec, results)
     metric_key = spec["metric_key"]
+    train_key = spec["training_reward_key"]
     final_step = spec["final_step"]
     baseline = Decimal(str(spec["historical_final_baseline"]))
     required_score = Decimal(str(spec["required_final_score"]))
+    required_train_reward = Decimal(str(spec["required_training_reward"]))
+    validation_weight = Decimal(str(spec["validation_weight"]))
+    training_weight = Decimal(str(spec["training_weight"]))
     errors = []
     best = select_best(values)
     best_value = best[0] if best is not None else None
     best_step = best[1] if best is not None else None
     best_source = best[3] if best is not None else None
     improvement = best_value - baseline if best_value is not None else None
+    train_mean = mean_reward(train_values)
+    train_source = None
+    if train_values:
+        latest_step = max(train_values)
+        train_source = train_values[latest_step][2]
+
     if best_value is None:
         if metric_key in keys_seen:
             errors.append(f"missing finite {metric_key}")
@@ -182,13 +254,32 @@ def grade(spec: dict[str, Any], results: Path):
             )
         else:
             errors.append(f"missing {metric_key} in experiment_logs")
+        validation_passed = False
     elif best_value < required_score:
         errors.append(
             f"best score {best_value} at step {best_step} is below "
             f"required score {required_score}"
         )
-    passed = not errors
-    score = 1.0 if passed else 0.0
+        validation_passed = False
+    else:
+        validation_passed = True
+
+    if train_mean is None:
+        errors.append(f"missing finite {train_key} in experiment_logs")
+        training_passed = False
+    elif train_mean <= required_train_reward:
+        errors.append(
+            f"mean training reward {train_mean} is not above "
+            f"required reward {required_train_reward}"
+        )
+        training_passed = False
+    else:
+        training_passed = True
+
+    validation_score = binary_score(validation_passed)
+    training_score = binary_score(training_passed)
+    score = float(validation_weight * validation_score + training_weight * training_score)
+    passed = score == 1.0
     judged = float(best_value) if best_value is not None else None
     metrics = {
         "task_id": spec["task_id"],
@@ -203,6 +294,15 @@ def grade(spec: dict[str, Any], results: Path):
         "absolute_improvement": (
             float(improvement) if improvement is not None else None
         ),
+        "validation_score": float(validation_score),
+        "training_reward_key": train_key,
+        "training_reward_mean": (
+            float(train_mean) if train_mean is not None else None
+        ),
+        "training_reward_n": len(train_values),
+        "training_reward_source_log": train_source,
+        "required_training_reward": float(required_train_reward),
+        "training_reward_score": float(training_score),
         "source_logs": experiment["logs"]["source_logs"],
         "errors": errors,
         "passed": passed,
@@ -214,6 +314,11 @@ def grade(spec: dict[str, Any], results: Path):
     experiment["metrics"]["best_step"] = best_step
     experiment["metrics"]["best_score"] = judged
     experiment["metrics"]["best_source_log"] = best_source
+    experiment["metrics"]["training_reward_mean"] = metrics["training_reward_mean"]
+    experiment["metrics"]["training_reward_n"] = metrics["training_reward_n"]
+    experiment["metrics"]["validation_score"] = metrics["validation_score"]
+    experiment["metrics"]["training_reward_score"] = metrics["training_reward_score"]
+    experiment["metrics"]["score"] = score
     return experiment, metrics, {"passed": passed, "score": score, "metrics": metrics}
 
 

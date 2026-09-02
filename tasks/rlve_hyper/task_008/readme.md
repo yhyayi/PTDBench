@@ -110,9 +110,17 @@ The listed expected learning rate is a reference; the judge may accept any
 larger value it considers reasonable.
 
 `solution` does not grade a structured diagnosis. The agent must repair the
-staged workspace, run the designated launch script, and produce a finite
-`eval/HELD-OUT_ENVIRONMENTS_128` of at least `-0.24`. Pass is score `1`;
-otherwise `0`.
+staged workspace, run the designated launch script, and produce fresh
+experiment logs. Scoring is weighted:
+
+- validation: a finite `eval/HELD-OUT_ENVIRONMENTS_128` peak of at least
+  `-0.24` scores `1`, otherwise `0`
+- learning rate: the mean `train/lr-pg_0` over training steps must be at
+  least `8e-7` to score `1`, otherwise `0`
+- final `score = 0.8 * validation + 0.2 * learning rate`
+
+Pass requires both components (`score == 1.0`). The framework still records
+the weighted float when only one component passes.
 
 ## External dataset asset
 
