@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Harbor is provided by the local clone. Credentials stay in environment vars.
+# Harbor is provided by the local clone. PTDBENCH_TASK may be one task or a
+# directory whose direct children are tasks. Credentials stay in environment vars.
 : "${OPENAI_API_KEY:?Set OPENAI_API_KEY before running}"
 
 export OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://yeysai.com/v1}"
@@ -30,6 +31,7 @@ args=(
   --agent-env "NVM_NODEJS_ORG_MIRROR=${PTDBENCH_NODE_MIRROR:-https://npmmirror.com/mirrors/node}"
   --agent-env "npm_config_registry=${PTDBENCH_NPM_REGISTRY:-https://registry.npmmirror.com}"
   --env "${PTDBENCH_BACKEND:-docker}"
+  --n-concurrent "${PTDBENCH_N_CONCURRENT:-1}"
   --timeout-multiplier "${PTDBENCH_TIMEOUT_MULTIPLIER:-4}"
   --jobs-dir "${PTDBENCH_JOBS_DIR:-outputs/harbor-swe-debug}"
   --yes

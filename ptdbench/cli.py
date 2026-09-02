@@ -28,6 +28,45 @@ def _parse_env_assignments(assignments: list[str]) -> dict[str, str]:
     return env
 
 
+def _is_task_root(path: Path) -> bool:
+    """A PTDBench task is identified by its metadata file, as the loader does."""
+    return any((path / name).is_file() for name in ("metadata.yaml", "metadata.yml"))
+
+
+def expand_task_roots(paths: list[str]) -> list[Path]:
+    """Expand each argument into task roots, keeping the caller's order.
+
+    Accepts either a task directory or a directory whose children are task
+    directories, so a whole family of tasks can be submitted as one argument.
+    """
+    roots: list[Path] = []
+    seen: set[Path] = set()
+    for raw in paths:
+        path = Path(raw).expanduser()
+        if not path.is_dir():
+            raise SystemExit(f"task path does not exist or is not a directory: {raw}")
+        if _is_task_root(path):
+            found = [path]
+        else:
+            found = sorted(
+                child
+                for child in path.iterdir()
+                if child.is_dir() and _is_task_root(child)
+            )
+        if not found:
+            raise SystemExit(
+                f"{raw} is neither a task directory (no metadata.yaml) nor a "
+                "directory containing task directories"
+            )
+        for task_root in found:
+            resolved = task_root.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            roots.append(task_root)
+    return roots
+
+
 def build_parser() -> argparse.ArgumentParser:
     # 两个 evaluator 使用两个明确的入口，避免把 Harbor 混进 runtime 选择。
     ap = argparse.ArgumentParser(prog="ptdbench", allow_abbrev=False)
@@ -115,11 +154,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     h = sub.add_parser(
         "harbor-evaluate",
-        help="materialize a PTDBench task and run native Harbor arguments",
+        help="materialize one or more PTDBench tasks and run Harbor",
         allow_abbrev=False,
         epilog="All other arguments are forwarded unchanged to `harbor run`.",
     )
-    h.add_argument("task_root")
+    h.add_argument(
+        "task_root",
+        nargs="+",
+        help=(
+            "task directory or a directory whose direct children are tasks; "
+            "all task paths must precede forwarded Harbor arguments"
+        ),
+    )
     h.add_argument(
         "--evaluation-level",
         choices=["issue", "solution"],
@@ -257,7 +303,7 @@ def main(argv=None) -> int:
     if args.command == "harbor-evaluate":
         harbor_command = tuple(shlex.split(args.harbor_command))
         report = HarborEvaluator().evaluate(
-            args.task_root,
+            expand_task_roots(args.task_root),
             HarborEvaluationConfig(
                 evaluation_level=args.evaluation_level,
                 judge_model=args.judge_model,
@@ -270,7 +316,11 @@ def main(argv=None) -> int:
                 harbor_args=tuple(harbor_args),
             ),
         )
-        result = report.trials[0] if len(report.trials) == 1 else report
+        result = (
+            report.trials[0]
+            if len(report.task_ids) == 1 and len(report.trials) == 1
+            else report
+        )
         print(json.dumps(result.to_dict(), indent=2, ensure_ascii=False))
         return 0 if result.passed else 1
 

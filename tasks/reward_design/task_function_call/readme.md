@@ -1,9 +1,9 @@
-# verl_coding implementation diagnosis: task_function_call
+# reward_design implementation diagnosis: task_function_call
 
 ## Case overview
 
-- Evaluation key: `verl_coding/task_function_call`
-- Case family: `verl_coding`
+- Evaluation key: `reward_design/task_function_call`
+- Case family: `reward_design`
 - Schema version: `2`
 - Evaluation levels: `issue`, `solution`
 - Model: `Qwen2.5-1.5B-Instruct`
@@ -39,7 +39,7 @@ The following source and historical packaging fields were moved from
 schema. They are preserved here without changing their meaning.
 
 ```yaml
-bench_category: verl_coding
+bench_category: reward_design
 source_task: Benchmark_Evaluation/tasks/task_verl_coding/tasks_function_call
 evidence_kind: injected_implementation_defect
 packaging_tier: B0

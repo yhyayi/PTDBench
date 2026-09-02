@@ -255,6 +255,37 @@ Select the issue evaluation in the same way:
 PTDBENCH_EVALUATION_LEVEL=issue ./run.sh
 ```
 
+### Harbor batch evaluation
+
+`harbor-evaluate` accepts one or more task directories. It also accepts a
+directory whose direct children are tasks; expansion is deliberately not
+recursive. PTDBench materializes all selected tasks as one temporary Harbor
+dataset and starts one Harbor job. Harbor's native `--n-concurrent` option
+controls trial concurrency:
+
+```bash
+python3 -m ptdbench harbor-evaluate \
+  tasks/raw/rlve_hyper/task_001 \
+  tasks/raw/rlve_hyper/task_002 \
+  --agent codex \
+  --model gpt-5.5 \
+  --n-concurrent 2
+```
+
+Keep every task path before forwarded Harbor options. The included batch
+script makes that boundary explicit: arguments before `--` are task paths and
+arguments after it are passed to `harbor run`.
+
+```bash
+./run_harbor_multi.sh
+./run_harbor_multi.sh tasks/raw/rlve_hyper -- --n-attempts 2
+```
+
+Each trial keeps its singular `task_id`. A batch report uses `task_ids` and
+also reports `n_tasks`, `n_completed_tasks`, and `missing_task_ids`. It passes
+only when every submitted task produced at least one trial and every trial
+passed.
+
 To add a new agent, put its runner under `ptdbench/agents/installed/`, register
 it with the factory, and keep `evaluator.py` untouched. Its `run` method should
 only construct a `CommandSpec` and call the supplied `SandboxRuntime`.

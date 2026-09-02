@@ -2,7 +2,7 @@
   "schema_version": 1,
   "evidence_kind": "injected_implementation_defect",
   "task_id": "task_evaluator",
-  "family": "verl_coding",
+  "family": "reward_design",
   "validation_stack": "TACO_EASY",
   "metrics": {
     "metric_status": "log_reconstructed",

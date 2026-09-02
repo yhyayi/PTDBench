@@ -183,6 +183,32 @@ adapter 覆盖。
 `HarborEvaluationReport`。默认只有一个 trial；`--n-attempts` 或多 model 产生多个 trial 时，
 它们仍然包含在同一个 report 中。
 
+`harbor-evaluate` 也可以一次提交多个 task。多个显式路径必须写在 Harbor 原生参数之前；也可以
+只传一个父目录，此时只展开它的直接子目录，不递归扫描更深层级。所有 task 会被物化到同一个
+临时 Harbor dataset，并通过一次 `harbor run` 提交。并发调度由 Harbor 原生的
+`--n-concurrent` 负责，PTDBench 不另开线程或进程：
+
+```bash
+python3 -m ptdbench harbor-evaluate \
+  tasks/raw/rlve_hyper/task_001 \
+  tasks/raw/rlve_hyper/task_002 \
+  --agent codex \
+  --model gpt-5.5 \
+  --n-concurrent 2
+```
+
+也可以直接运行多任务脚本。无参数时它使用上面两个 task；传一个集合目录时会运行该目录的
+直接子 task。脚本参数中的 `--` 用来分隔任务路径和额外 Harbor 参数：
+
+```bash
+./run_harbor_multi.sh
+./run_harbor_multi.sh tasks/raw/rlve_hyper -- --n-attempts 2
+```
+
+批次报告顶层使用 `task_ids`，并包含 `n_tasks`、`n_completed_tasks` 和
+`missing_task_ids`；每条 trial 仍使用单数 `task_id`。只有每个提交的 task 都至少产生一条
+trial 且所有 trial 均通过时，批次的 `passed` 才为 `true`。
+
 Python API 同样只区分 PTDBench 转换配置和 Harbor 原生 argv：
 
 ```python
@@ -198,11 +224,11 @@ HarborEvaluationConfig(
 )
 ```
 
-`run_harbor.sh` 可通过 `PTDBENCH_TASK`、`PTDBENCH_MODEL`、`PTDBENCH_EVALUATION_LEVEL`、
+`run_harbor.sh` 和 `run_harbor_fit.sh` 可通过 `PTDBENCH_TASK`、`PTDBENCH_MODEL`、`PTDBENCH_EVALUATION_LEVEL`、
 `PTDBENCH_JUDGE_MODEL`、`PTDBENCH_REASONING_EFFORT`、`PTDBENCH_BACKEND`、
 `PTDBENCH_AGENT_NETWORK`、`PTDBENCH_VERIFIER_NETWORK`、`PTDBENCH_VERIFIER_MODE`、
 `PTDBENCH_DEBIAN_MIRROR`、`PTDBENCH_HARBOR_COMMAND`、`PTDBENCH_HARBOR_TEMP_DIR`、
-`PTDBENCH_TIMEOUT_MULTIPLIER` 和 `PTDBENCH_JOBS_DIR` 覆盖默认值；
+`PTDBENCH_TIMEOUT_MULTIPLIER`、`PTDBENCH_N_CONCURRENT` 和 `PTDBENCH_JOBS_DIR` 覆盖默认值；
 额外 CLI 参数可以直接追加在脚本命令后。
 
 Docker 默认使用 bridge 网络直连外网；宿主机开启 Clash 不会自动让容器使用 Clash。

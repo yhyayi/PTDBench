@@ -1,5 +1,5 @@
 task_id: task_evaluator
-category: verl_coding
+category: reward_design
 hollow_file: verl/utils/reward_score/taco.py
 hollow_symbols: null
 hollowed_symbols:
