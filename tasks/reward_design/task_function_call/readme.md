@@ -51,7 +51,7 @@ already_at_baseline: false
 metric_status: log_reconstructed
 verify:
   num_gpus: 8
-  timeout_minutes: 960
+  timeout_minutes: 660
   max_train_steps: 400
   eval_metric_key: val-core/taco/acc/mean@1
 historical_baseline:
