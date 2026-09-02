@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract the target RLVE held-out metric from fresh logs and assign a binary score."""
+"""Extract held-out eval and RLVE training accuracy and assign a weighted score."""
 
 from __future__ import annotations
 
@@ -21,6 +21,10 @@ NUMBER = (
 )
 TEXT_SUFFIXES = {".json", ".jsonl", ".log", ".out", ".txt", ""}
 MAX_FILE_BYTES = 128 * 1024 * 1024
+TEXT_ACC_RE = re.compile(
+    rf"['\"]RLVE/([A-Za-z0-9_]+)/accuracy['\"]\s*:\s*({NUMBER})"
+)
+WANDB_ACC_RE = re.compile(rb"RLVE/([A-Za-z0-9_]+)/accuracy\x82\x01(.)", re.DOTALL)
 
 
 def write_json(path: Path, value: dict[str, Any]) -> None:
@@ -50,6 +54,10 @@ def load_spec(path: Path) -> dict[str, Any]:
         "final_step",
         "historical_final_baseline",
         "required_final_score",
+        "training_reward_key",
+        "required_training_reward",
+        "validation_weight",
+        "training_weight",
         "log_roots",
     }
     if not isinstance(value, dict) or set(value) != expected:
@@ -58,6 +66,8 @@ def load_spec(path: Path) -> dict[str, Any]:
         raise ValueError("unsupported grader spec")
     if value["log_roots"] != ["experiment_logs"]:
         raise ValueError("log roots must be experiment_logs")
+    if value["training_reward_key"] != "RLVE/*/accuracy":
+        raise ValueError("training reward key must be RLVE/*/accuracy")
     return value
 
 
@@ -74,20 +84,22 @@ def metric_pattern(metric_key: str) -> re.Pattern[str]:
     )
 
 
-def log_files(results: Path, roots: list[str]) -> list[Path]:
+def iter_log_files(results: Path, roots: list[str], include_wandb: bool):
     found = []
     for root_name in roots:
         root = results / root_name
         if root.is_symlink() or not root.is_dir():
             continue
         for path in root.rglob("*"):
-            if path.is_symlink() or not path.is_file():
-                continue
-            if path.suffix.lower() == ".wandb":
-                continue
-            if path.suffix.lower() not in TEXT_SUFFIXES:
-                continue
             try:
+                if path.is_symlink() or not path.is_file():
+                    continue
+                suffix = path.suffix.lower()
+                if suffix == ".wandb":
+                    if not include_wandb:
+                        continue
+                elif suffix not in TEXT_SUFFIXES:
+                    continue
                 if path.stat().st_size > MAX_FILE_BYTES:
                     continue
             except OSError:
@@ -96,13 +108,78 @@ def log_files(results: Path, roots: list[str]) -> list[Path]:
     return sorted(found, key=lambda path: (path.stat().st_mtime_ns, str(path)))
 
 
+def record_point(
+    values: dict[int, tuple[Any, Decimal, str]],
+    step: int,
+    value: Decimal,
+    rank: tuple[Any, ...],
+    relative: str,
+) -> None:
+    previous = values.get(step)
+    if (
+        previous is None
+        or value > previous[1]
+        or (value == previous[1] and rank > previous[0])
+    ):
+        values[step] = (rank, value, relative)
+
+
+def parse_accuracy_token(token: str) -> Decimal | None:
+    try:
+        value = Decimal(token)
+    except InvalidOperation:
+        return None
+    if not value.is_finite() or value < 0 or value > 1:
+        return None
+    return value
+
+
+def extract_text_accuracy(text: str, relative: str) -> list[dict[str, Any]]:
+    points = []
+    for match in TEXT_ACC_RE.finditer(text):
+        value = parse_accuracy_token(match.group(2))
+        if value is None:
+            continue
+        points.append(
+            {
+                "env": match.group(1),
+                "accuracy": float(value),
+                "source_log": relative,
+            }
+        )
+    return points
+
+
+def extract_wandb_accuracy(data: bytes, relative: str) -> list[dict[str, Any]]:
+    points = []
+    for match in WANDB_ACC_RE.finditer(data):
+        length = match.group(2)[0]
+        raw = data[match.end() : match.end() + length]
+        try:
+            token = raw.decode("ascii")
+        except UnicodeDecodeError:
+            continue
+        value = parse_accuracy_token(token)
+        if value is None:
+            continue
+        points.append(
+            {
+                "env": match.group(1).decode("ascii"),
+                "accuracy": float(value),
+                "source_log": relative,
+            }
+        )
+    return points
+
+
 def extract(spec: dict[str, Any], results: Path):
     expected_key = spec["metric_key"]
     pattern = metric_pattern(expected_key)
-    values = {}
+    values: dict[int, tuple[Any, Decimal, str]] = {}
+    train_points: list[dict[str, Any]] = []
     keys_seen: set[str] = set()
     source_logs = []
-    for path in log_files(results, spec["log_roots"]):
+    for path in iter_log_files(results, spec["log_roots"], include_wandb=False):
         try:
             data = path.read_bytes()
             if b"\x00" in data[:4096]:
@@ -127,15 +204,25 @@ def extract(spec: dict[str, Any], results: Path):
                 continue
             if not value.is_finite():
                 continue
-            rank = (mtime, relative, order)
-            previous = values.get(step)
-            if (
-                previous is None
-                or value > previous[1]
-                or (value == previous[1] and rank > previous[0])
-            ):
-                values[step] = (rank, value, relative)
+            record_point(values, step, value, (mtime, relative, order), relative)
+        acc_points = extract_text_accuracy(text, relative)
+        if acc_points:
+            matched = True
+            train_points.extend(acc_points)
         if matched:
+            source_logs.append(relative)
+
+    for path in iter_log_files(results, spec["log_roots"], include_wandb=True):
+        if path.suffix.lower() != ".wandb":
+            continue
+        try:
+            data = path.read_bytes()
+        except OSError:
+            continue
+        relative = path.relative_to(results).as_posix()
+        acc_points = extract_wandb_accuracy(data, relative)
+        if acc_points:
+            train_points.extend(acc_points)
             source_logs.append(relative)
 
     points = []
@@ -161,9 +248,13 @@ def extract(spec: dict[str, Any], results: Path):
             "metric_status": "available" if points else "missing",
             "eval_points": points,
             "eval_scores": scores,
+            "train_reward_key": spec["training_reward_key"],
+            "train_reward_status": "available" if train_points else "missing",
+            "train_reward_n": len(train_points),
+            "train_reward_points": train_points,
         },
     }
-    return experiment, values, keys_seen
+    return experiment, values, train_points, keys_seen
 
 
 def select_best(values: dict[int, tuple[Any, Decimal, str]]):
@@ -175,18 +266,36 @@ def select_best(values: dict[int, tuple[Any, Decimal, str]]):
     return best
 
 
+def mean_accuracy(points: list[dict[str, Any]]):
+    if not points:
+        return None
+    total = sum(Decimal(str(item["accuracy"])) for item in points)
+    return total / Decimal(len(points))
+
+
+def binary_score(passed: bool) -> Decimal:
+    return Decimal("1") if passed else Decimal("0")
+
+
 def grade(spec: dict[str, Any], results: Path):
-    experiment, values, keys_seen = extract(spec, results)
+    experiment, values, train_points, keys_seen = extract(spec, results)
     metric_key = spec["metric_key"]
+    train_key = spec["training_reward_key"]
     final_step = spec["final_step"]
     baseline = Decimal(str(spec["historical_final_baseline"]))
     required_score = Decimal(str(spec["required_final_score"]))
+    required_train = Decimal(str(spec["required_training_reward"]))
+    validation_weight = Decimal(str(spec["validation_weight"]))
+    training_weight = Decimal(str(spec["training_weight"]))
     errors = []
     best = select_best(values)
     best_value = best[0] if best is not None else None
     best_step = best[1] if best is not None else None
     best_source = best[3] if best is not None else None
     improvement = best_value - baseline if best_value is not None else None
+    train_mean = mean_accuracy(train_points)
+    train_source = train_points[-1]["source_log"] if train_points else None
+
     if best_value is None:
         if metric_key in keys_seen:
             errors.append(f"missing finite {metric_key}")
@@ -196,13 +305,32 @@ def grade(spec: dict[str, Any], results: Path):
             )
         else:
             errors.append(f"missing {metric_key} in experiment_logs")
+        validation_passed = False
     elif best_value < required_score:
         errors.append(
             f"best score {best_value} at step {best_step} is below "
             f"required score {required_score}"
         )
-    passed = not errors
-    score = 1.0 if passed else 0.0
+        validation_passed = False
+    else:
+        validation_passed = True
+
+    if train_mean is None:
+        errors.append(f"missing finite {train_key} in experiment_logs")
+        training_passed = False
+    elif train_mean < required_train:
+        errors.append(
+            f"mean training reward {train_mean} is below "
+            f"required reward {required_train}"
+        )
+        training_passed = False
+    else:
+        training_passed = True
+
+    validation_score = binary_score(validation_passed)
+    training_score = binary_score(training_passed)
+    score = float(validation_weight * validation_score + training_weight * training_score)
+    passed = score == 1.0
     judged = float(best_value) if best_value is not None else None
     metrics = {
         "task_id": spec["task_id"],
@@ -217,6 +345,15 @@ def grade(spec: dict[str, Any], results: Path):
         "absolute_improvement": (
             float(improvement) if improvement is not None else None
         ),
+        "validation_score": float(validation_score),
+        "training_reward_key": train_key,
+        "training_reward_mean": (
+            float(train_mean) if train_mean is not None else None
+        ),
+        "training_reward_n": len(train_points),
+        "training_reward_source_log": train_source,
+        "required_training_reward": float(required_train),
+        "training_reward_score": float(training_score),
         "source_logs": experiment["logs"]["source_logs"],
         "errors": errors,
         "passed": passed,
@@ -228,6 +365,11 @@ def grade(spec: dict[str, Any], results: Path):
     experiment["metrics"]["best_step"] = best_step
     experiment["metrics"]["best_score"] = judged
     experiment["metrics"]["best_source_log"] = best_source
+    experiment["metrics"]["training_reward_mean"] = metrics["training_reward_mean"]
+    experiment["metrics"]["training_reward_n"] = metrics["training_reward_n"]
+    experiment["metrics"]["validation_score"] = metrics["validation_score"]
+    experiment["metrics"]["training_reward_score"] = metrics["training_reward_score"]
+    experiment["metrics"]["score"] = score
     return experiment, metrics, {"passed": passed, "score": score, "metrics": metrics}
 
 

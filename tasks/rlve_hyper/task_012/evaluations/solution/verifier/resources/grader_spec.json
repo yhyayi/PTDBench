@@ -5,6 +5,10 @@
   "final_step": 100,
   "historical_final_baseline": "-0.613648950688992",
   "required_final_score": "-0.24",
+  "training_reward_key": "RLVE/*/accuracy",
+  "required_training_reward": "0.2",
+  "validation_weight": "0.8",
+  "training_weight": "0.2",
   "log_roots": [
     "experiment_logs"
   ]
