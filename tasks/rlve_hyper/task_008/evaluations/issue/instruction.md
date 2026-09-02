@@ -12,7 +12,7 @@ held-out health. A truncated log is not by itself proof of a defect.
 
 Do not launch a full training run, use the network, or modify the historical
 snapshot. The dataset, held-out set, model, training-step budget, and evaluation
-interval are fixed.
+interval are fixed. This run only trains 100 steps, numbered 0 through 99.
 
 ## Deliverable
 

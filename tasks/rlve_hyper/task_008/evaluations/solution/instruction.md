@@ -14,7 +14,9 @@ held-out health.
 If you find a defect, fix it in the staged workspace at `/workspace`. Then run
 the experiment as a foreground process and wait until it returns. Do not use
 the network. Do not use `nohup`, `&`, `tmux`, `screen`, or any detach
-mechanism. The dataset, held-out set, and model are fixed.
+mechanism. The dataset, held-out set, model, and training-step budget are
+fixed. This run only trains 100 steps, numbered 0 through 99. Do not extend
+that budget.
 
 The launch script is:
 
@@ -38,6 +40,7 @@ The effective run must use:
 - `LOG_DIR=$PTDBENCH_RESULTS/experiment_logs`
 - `WANDB_MODE=offline`
 - `WANDB_DIR=$PTDBENCH_RESULTS/experiment_logs`
+- training budget 100 steps (0-99)
 
 Create `$PTDBENCH_RESULTS/experiment_logs` first. Offline W&B data must be
 created below `$PTDBENCH_RESULTS/experiment_logs/wandb`. If the launch script
