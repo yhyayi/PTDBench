@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataCall — Open Data for Scalable RL Training</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav>
+        <a href="index.html" class="nav-logo">DataCall</a>
+        <div class="nav-links">
+            <a href="#tasks">Tasks</a>
+            <a href="#leaderboard">Leaderboard</a>
+            <a href="#timeline">Timeline</a>
+            <a href="#contribute">Contribute</a>
+            <a href="https://github.com">GitHub</a>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1>Open Data Call for<br>Scalable RL Training</h1>
+        <p>A community-driven initiative to collect, curate, and benchmark high-quality training data for reinforcement learning at scale.</p>
+        <div class="hero-stats">
+            <div class="stat">
+                <div class="stat-number">12</div>
+                <div class="stat-label">Tasks</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">50K+</div>
+                <div class="stat-label">Samples</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">8</div>
+                <div class="stat-label">Domains</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">3</div>
+                <div class="stat-label">Eval Modes</div>
+            </div>
+        </div>
+        <div class="hero-buttons">
+            <a href="#contribute" class="btn btn-primary">Submit Data</a>
+            <a href="#tasks" class="btn btn-secondary">Explore Tasks</a>
+        </div>
+    </section>
+
+    <!-- Principles -->
+    <section id="principles">
+        <h2 class="section-title">Design Principles</h2>
+        <p class="section-subtitle">Every dataset in DataCall is held to strict standards to ensure reproducibility and fairness.</p>
+        <div class="principles-grid">
+            <div class="principle-card">
+                <div class="principle-icon">◇</div>
+                <h3>Verifiable Rewards</h3>
+                <p>All tasks include programmatic reward functions that can be automatically computed without human annotation.</p>
+            </div>
+            <div class="principle-card">
+                <div class="principle-icon">△</div>
+                <h3>Diverse Difficulty</h3>
+                <p>Tasks span multiple difficulty levels, enabling curriculum learning and progressive skill acquisition.</p>
+            </div>
+            <div class="principle-card">
+                <div class="principle-icon">○</div>
+                <h3>Reproducible Evaluation</h3>
+                <p>Standardized evaluation pipelines with fixed seeds, deterministic environments, and published baselines.</p>
+            </div>
+            <div class="principle-card">
+                <div class="principle-icon">□</div>
+                <h3>Open & Extensible</h3>
+                <p>Apache-2.0 licensed. Community contributions welcome. Modular design for easy integration.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tasks -->
+    <section id="tasks">
+        <h2 class="section-title">Task Catalog</h2>
+        <p class="section-subtitle">Browse available tasks across domains. Each task includes training data, reward functions, and evaluation harness.</p>
+        <div class="tasks-grid">
+            <a href="tasks/math.html" class="task-card">
+                <span class="task-tag">Math</span>
+                <h3>Competition Mathematics</h3>
+                <p>Problems from AMC, AIME, and olympiad-level competitions with step-by-step verifiable solutions.</p>
+                <div class="task-meta">
+                    <span>8,200 samples</span>
+                    <span>Hard</span>
+                </div>
+            </a>
+            <a href="tasks/code.html" class="task-card">
+                <span class="task-tag">Code</span>
+                <h3>Program Synthesis</h3>
+                <p>Generate correct programs from natural language specifications with unit-test-based reward signals.</p>
+                <div class="task-meta">
+                    <span>15,000 samples</span>
+                    <span>Medium–Hard</span>
+                </div>
+            </a>
+            <a href="tasks/reasoning.html" class="task-card">
+                <span class="task-tag">Reasoning</span>
+                <h3>Logical Deduction</h3>
+                <p>Multi-step logical reasoning tasks with formal proof verification as the reward signal.</p>
+                <div class="task-meta">
+                    <span>5,400 samples</span>
+                    <span>Medium</span>
+                </div>
+            </a>
+            <a href="tasks/science.html" class="task-card">
+                <span class="task-tag">Science</span>
+                <h3>Scientific QA</h3>
+                <p>Graduate-level questions across physics, chemistry, and biology with derivation-based grading.</p>
+                <div class="task-meta">
+                    <span>6,800 samples</span>
+                    <span>Hard</span>
+                </div>
+            </a>
+            <a href="tasks/planning.html" class="task-card">
+                <span class="task-tag">Planning</span>
+                <h3>Multi-step Planning</h3>
+                <p>Complex planning tasks in simulated environments with goal-achievement reward computation.</p>
+                <div class="task-meta">
+                    <span>4,100 samples</span>
+                    <span>Hard</span>
+                </div>
+            </a>
+            <a href="tasks/language.html" class="task-card">
+                <span class="task-tag">Language</span>
+                <h3>Constrained Generation</h3>
+                <p>Text generation under hard constraints (format, length, style) with automated constraint checking.</p>
+                <div class="task-meta">
+                    <span>10,500 samples</span>
+                    <span>Easy–Medium</span>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    <!-- Leaderboard -->
+    <section id="leaderboard">
+        <h2 class="section-title">Leaderboard</h2>
+        <p class="section-subtitle">Agent performance on DataCall benchmark. Each entry is an agent framework paired with a backbone model.</p>
+        <div class="leaderboard-controls">
+            <div class="leaderboard-filters">
+                <button class="filter-btn active" data-task="all">All Tasks</button>
+                <button class="filter-btn" data-task="math">Math</button>
+                <button class="filter-btn" data-task="code">Code</button>
+                <button class="filter-btn" data-task="reasoning">Reasoning</button>
+                <button class="filter-btn" data-task="science">Science</button>
+                <button class="filter-btn" data-task="planning">Planning</button>
+            </div>
+            <div class="filter-selects">
+                <select class="filter-select" id="agent-filter">
+                    <option value="all">All Agents</option>
+                    <option value="ReasonAgent">ReasonAgent</option>
+                    <option value="DeepAgent-R">DeepAgent-R</option>
+                    <option value="ToolFormer-X">ToolFormer-X</option>
+                    <option value="PlanExec">PlanExec</option>
+                    <option value="Vanilla-CoT">Vanilla-CoT</option>
+                </select>
+                <select class="filter-select" id="model-filter">
+                    <option value="all">All Models</option>
+                    <option value="Qwen3-235B-DAPO">Qwen3-235B-DAPO</option>
+                    <option value="DeepSeek-R1">DeepSeek-R1</option>
+                    <option value="Llama-3-70B-RL">Llama-3-70B-RL</option>
+                    <option value="Qwen3-32B-GRPO">Qwen3-32B-GRPO</option>
+                    <option value="Mistral-Large-RL">Mistral-Large-RL</option>
+                </select>
+            </div>
+        </div>
+        <div class="lb-header">
+            <span>#</span>
+            <span>Agent</span>
+            <span>Model</span>
+            <span class="lb-header-scores">Scores</span>
+            <span style="text-align:right">Avg</span>
+        </div>
+        <div class="leaderboard-list"></div>
+    </section>
+
+    <!-- Timeline -->
+    <section id="timeline">
+        <h2 class="section-title">Timeline</h2>
+        <p class="section-subtitle">Key milestones for the DataCall initiative.</p>
+        <div class="timeline">
+            <div class="timeline-item">
+                <div class="timeline-date">September 2026</div>
+                <h3>Data Call Opens</h3>
+                <p>Public submission portal launches. Community can contribute task proposals and datasets.</p>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-date">October 2026</div>
+                <h3>Review & Curation</h3>
+                <p>Submitted data undergoes quality review, deduplication, and reward function validation.</p>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-date">November 2026</div>
+                <h3>Benchmark v1.0 Release</h3>
+                <p>First official release of the curated benchmark with evaluation harness and baselines.</p>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-date">December 2026</div>
+                <h3>Competition Launch</h3>
+                <p>Open competition for RL training on the DataCall benchmark with public leaderboard.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contribute -->
+    <section id="contribute">
+        <h2 class="section-title">How to Contribute</h2>
+        <p class="section-subtitle">Join the community effort to build the largest open RL training dataset.</p>
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">01</div>
+                <h3>Choose a Domain</h3>
+                <p>Pick from our list of target domains or propose a new one.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">02</div>
+                <h3>Format Your Data</h3>
+                <p>Follow our schema: problem, solution, reward function, metadata.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">03</div>
+                <h3>Submit via GitHub</h3>
+                <p>Open a PR with your dataset. Our CI runs automated quality checks.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">04</div>
+                <h3>Get Credit</h3>
+                <p>Contributors are listed on the leaderboard and in all publications.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <div class="nav-logo">DataCall</div>
+                <p>An open community initiative for collecting and benchmarking RL training data at scale.</p>
+            </div>
+            <div class="footer-col">
+                <h4>Benchmark</h4>
+                <a href="#tasks">Tasks</a>
+                <a href="#leaderboard">Leaderboard</a>
+                <a href="#">Evaluation</a>
+                <a href="#">Baselines</a>
+            </div>
+            <div class="footer-col">
+                <h4>Build</h4>
+                <a href="#">Quick Start</a>
+                <a href="#">Documentation</a>
+                <a href="#">API Reference</a>
+                <a href="#">Examples</a>
+            </div>
+            <div class="footer-col">
+                <h4>Community</h4>
+                <a href="#">GitHub</a>
+                <a href="#">Discord</a>
+                <a href="#">Twitter</a>
+                <a href="#">Contact</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            &copy; 2026 DataCall. Released under Apache-2.0 License.
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
