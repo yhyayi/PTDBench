@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 from urllib.parse import urlsplit
 
-from .types import CommandResult, EvaluationResult
+from .types import CommandResult, EvaluationPaths, EvaluationResult, TaskPackage
+
+
+def harbor_task_name(task_id: str, evaluation_level: str) -> str:
+    """Harbor task 名；同时用于把 trial 结果映射回 PTDBench task。"""
+    safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", task_id).strip("-.") or "task"
+    return f"ptdbench/{safe_id}-{evaluation_level}"
 
 
 @dataclass(frozen=True)
@@ -65,11 +72,41 @@ class HarborEvaluationConfig:
 
 
 @dataclass(frozen=True)
+class HarborTaskUnit:
+    """批次中的一个待评测单元：一个 task 的一个 evaluation。"""
+
+    package: TaskPackage
+    evaluation: EvaluationPaths
+    workspace_before_hash: str
+
+    @property
+    def harbor_task_name(self) -> str:
+        """写进 task.toml 的 Harbor task 名，也是 trial 的回溯键。"""
+        return harbor_task_name(self.package.task_id, self.evaluation.level)
+
+    @property
+    def dir_name(self) -> str:
+        """批次目录下的子目录名；Harbor task 名含 '/'，不能直接做目录。"""
+        return self.harbor_task_name.split("/", 1)[1]
+
+
+@dataclass(frozen=True)
 class PreparedHarborTask:
-    """在线生成的临时 Harbor task。"""
+    """在线生成的一批临时 Harbor task。"""
 
     root: Path
-    task_dir: Path
+    tasks_dir: Path
+    units: Sequence[HarborTaskUnit] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "units", tuple(self.units))
+
+    def task_dir(self, unit: HarborTaskUnit) -> Path:
+        return self.tasks_dir / unit.dir_name
+
+    @property
+    def units_by_task_name(self) -> Dict[str, HarborTaskUnit]:
+        return {unit.harbor_task_name: unit for unit in self.units}
 
 
 @dataclass(frozen=True)
@@ -84,18 +121,33 @@ class HarborRun:
 class HarborEvaluationReport:
     """一个 Harbor job 中所有 trial 的 PTDBench 结果。"""
 
-    task_id: str
+    task_ids: Sequence[str]
     evaluation_level: str
     trials: Sequence[EvaluationResult]
     report_dir: Path
     command: CommandResult
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "task_ids", tuple(self.task_ids))
         object.__setattr__(self, "trials", tuple(self.trials))
 
     @property
+    def completed_task_ids(self) -> tuple[str, ...]:
+        completed = {trial.task_id for trial in self.trials}
+        return tuple(task_id for task_id in self.task_ids if task_id in completed)
+
+    @property
+    def missing_task_ids(self) -> tuple[str, ...]:
+        completed = {trial.task_id for trial in self.trials}
+        return tuple(task_id for task_id in self.task_ids if task_id not in completed)
+
+    @property
     def passed(self) -> bool:
-        return bool(self.trials) and all(trial.passed for trial in self.trials)
+        return (
+            bool(self.task_ids)
+            and not self.missing_task_ids
+            and all(trial.passed for trial in self.trials)
+        )
 
     @property
     def score(self) -> Optional[float]:
@@ -104,10 +156,13 @@ class HarborEvaluationReport:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "task_id": self.task_id,
+            "task_ids": list(self.task_ids),
             "evaluation_level": self.evaluation_level,
             "passed": self.passed,
             "score": self.score,
+            "n_tasks": len(self.task_ids),
+            "n_completed_tasks": len(self.completed_task_ids),
+            "missing_task_ids": list(self.missing_task_ids),
             "n_trials": len(self.trials),
             "n_passed": sum(trial.passed for trial in self.trials),
             "report_dir": str(self.report_dir),
@@ -120,5 +175,7 @@ __all__ = [
     "HarborEvaluationConfig",
     "HarborEvaluationReport",
     "HarborRun",
+    "HarborTaskUnit",
     "PreparedHarborTask",
+    "harbor_task_name",
 ]

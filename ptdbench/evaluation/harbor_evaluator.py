@@ -18,7 +18,9 @@ from ..core.harbor_types import (
     HarborEvaluationConfig,
     HarborEvaluationReport,
     HarborRun,
+    HarborTaskUnit,
     PreparedHarborTask,
+    harbor_task_name,
 )
 from ..core.types import (
     CommandResult,
@@ -35,24 +37,54 @@ class HarborAdapterError(RuntimeError):
 
 
 class HarborTaskMaterializer:
-    """把一个选定的 PTDBench evaluation 在线物化为 Harbor task。"""
+    """把选定的 PTDBench evaluation 在线物化为一批 Harbor task。"""
 
     def materialize(
         self,
-        package: TaskPackage,
-        evaluation: EvaluationPaths,
+        units: Sequence[HarborTaskUnit],
         destination: Path,
         config: HarborEvaluationConfig,
     ) -> PreparedHarborTask:
+        if not units:
+            raise HarborAdapterError("at least one task is required")
         root = destination.resolve()
-        task_dir = ensure_dir(root / "task")
+        # Harbor 的 -p/--path 接受"父目录下每个子目录是一个 task"，批量与单任务同构。
+        tasks_dir = ensure_dir(root / "tasks")
+        prepared = PreparedHarborTask(root=root, tasks_dir=tasks_dir, units=units)
+        self._reject_duplicate_task_names(units)
+        for unit in units:
+            self._materialize_one(unit, prepared.task_dir(unit), config)
+        return prepared
+
+    @staticmethod
+    def _reject_duplicate_task_names(units: Sequence[HarborTaskUnit]) -> None:
+        """同名 task 会互相覆盖物化结果，也无法从 trial 反查来源。"""
+        seen: Dict[str, Path] = {}
+        for unit in units:
+            name = unit.harbor_task_name
+            previous = seen.get(name)
+            if previous is not None:
+                raise HarborAdapterError(
+                    f"duplicate Harbor task name {name!r} from "
+                    f"{previous} and {unit.package.paths.root}"
+                )
+            seen[name] = unit.package.paths.root
+
+    def _materialize_one(
+        self,
+        unit: HarborTaskUnit,
+        task_dir: Path,
+        config: HarborEvaluationConfig,
+    ) -> None:
+        package = unit.package
+        evaluation = unit.evaluation
+        ensure_dir(task_dir)
 
         self._write_instruction(evaluation, task_dir)
         self._write_environment(package, evaluation, task_dir, config)
         self._write_tests(evaluation, task_dir, config)
         self._write_task_config(package, evaluation, task_dir, config)
         self._write_manifest(package, evaluation, task_dir, config)
-        return PreparedHarborTask(root=root, task_dir=task_dir)
 
     @staticmethod
     def _write_instruction(evaluation: EvaluationPaths, task_dir: Path) -> None:
@@ -233,7 +265,7 @@ exit "$verifier_status"
         config: HarborEvaluationConfig,
     ) -> None:
         oracle_path = "/tests/oracle.md" if evaluation.oracle.is_file() else "/tests/oracle"
-        task_name = self._task_name(package.task_id, evaluation.level)
+        task_name = harbor_task_name(package.task_id, evaluation.level)
         title = str(package.metadata.get("title") or package.task_id)
         verifier_env = {
             "PTDBENCH_TASK_ID": package.task_id,
@@ -295,11 +327,6 @@ PTDBENCH_STAGE = "agent"
         )
 
     @staticmethod
-    def _task_name(task_id: str, evaluation_level: str) -> str:
-        safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", task_id).strip("-.") or "task"
-        return f"ptdbench/{safe_id}-{evaluation_level}"
-
-    @staticmethod
     def _toml_string(value: str) -> str:
         return json.dumps(value, ensure_ascii=False)
 
@@ -355,7 +382,7 @@ class HarborRunner:
             *config.harbor_command,
             "run",
             "--path",
-            str(prepared.task_dir),
+            str(prepared.tasks_dir),
             *injected_args,
             *harbor_args,
         ]
@@ -497,11 +524,9 @@ class HarborResultMapper:
 
     def map(
         self,
-        package: TaskPackage,
-        evaluation: EvaluationPaths,
+        prepared: PreparedHarborTask,
         run: HarborRun,
         config: HarborEvaluationConfig,
-        workspace_before_hash: str,
     ) -> HarborEvaluationReport:
         if not (run.job_dir / "result.json").is_file() and run.command.returncode != 0:
             raise HarborAdapterError(
@@ -510,25 +535,18 @@ class HarborResultMapper:
             )
         job_result = self._read_json(run.job_dir / "result.json", "Harbor job result")
         trials = self._trial_results(run.job_dir, job_result)
+        units = prepared.units_by_task_name
 
         results = []
         for trial in trials:
             if not isinstance(trial, dict):
                 raise HarborAdapterError("Harbor trial result must be a JSON object")
-            results.append(
-                self._map_trial(
-                    package,
-                    evaluation,
-                    run,
-                    config,
-                    workspace_before_hash,
-                    trial,
-                )
-            )
+            unit = self._unit_for_trial(trial, units, prepared.units)
+            results.append(self._map_trial(unit, run, config, trial))
 
         report = HarborEvaluationReport(
-            task_id=package.task_id,
-            evaluation_level=evaluation.level,
+            task_ids=[unit.package.task_id for unit in prepared.units],
+            evaluation_level=config.evaluation_level,
             trials=results,
             report_dir=run.job_dir,
             command=run.command,
@@ -538,6 +556,24 @@ class HarborResultMapper:
             json.dumps(report.to_dict(), indent=2, ensure_ascii=False),
         )
         return report
+
+    @staticmethod
+    def _unit_for_trial(
+        trial: Dict[str, Any],
+        units: Dict[str, HarborTaskUnit],
+        all_units: Sequence[HarborTaskUnit],
+    ) -> HarborTaskUnit:
+        """按 Harbor 的 task_name 把 trial 归回它的 PTDBench task。"""
+        task_name = trial.get("task_name")
+        if isinstance(task_name, str) and task_name in units:
+            return units[task_name]
+        # 单任务批次里 task_name 缺失仍可无歧义归属，历史 Harbor 版本依赖这一点。
+        if task_name is None and len(all_units) == 1:
+            return all_units[0]
+        raise HarborAdapterError(
+            f"Harbor trial task_name {task_name!r} does not match any "
+            f"materialized task: {', '.join(sorted(units))}"
+        )
 
     def _trial_results(
         self,
@@ -572,13 +608,13 @@ class HarborResultMapper:
 
     def _map_trial(
         self,
-        package: TaskPackage,
-        evaluation: EvaluationPaths,
+        unit: HarborTaskUnit,
         run: HarborRun,
         config: HarborEvaluationConfig,
-        workspace_before_hash: str,
         trial: Dict[str, Any],
     ) -> EvaluationResult:
+        package = unit.package
+        evaluation = unit.evaluation
         trial_dir = self._trial_dir(run.job_dir, trial.get("trial_name"))
 
         artifact_error = self._workspace_artifact_error(trial_dir)
@@ -621,7 +657,7 @@ class HarborResultMapper:
             agent_setup=None,
             agent=None,
             verifier=None,
-            workspace_before_hash=workspace_before_hash,
+            workspace_before_hash=unit.workspace_before_hash,
             workspace_after_hash=workspace_after_hash,
             metadata=package.metadata,
         )
@@ -789,45 +825,64 @@ class HarborEvaluator:
 
     def evaluate(
         self,
-        task_root: str | Path,
+        task_roots: str | Path | Sequence[str | Path],
         config: Optional[HarborEvaluationConfig] = None,
         strict: bool = True,
     ) -> HarborEvaluationReport:
-        """运行一个 Harbor job，并返回其中的所有 trial。"""
+        """把一批 task 物化进同一个 Harbor job，并返回其中的所有 trial。"""
         config = config or HarborEvaluationConfig()
-        package = self.load(task_root, strict=strict)
-        if not package.report.ok:
-            raise SchemaError("task package failed validation")
-        evaluation = self._select_evaluation(package, config.evaluation_level)
-        root = self._make_run_dir(
-            package.task_id,
-            evaluation.level,
-            config.temp_dir,
-        )
+        units = [
+            self._load_unit(task_root, config.evaluation_level, strict)
+            for task_root in self._normalize_task_roots(task_roots)
+        ]
+        root = self._make_run_dir(units, config.temp_dir)
         try:
             print(
-                f"[ptdbench] Materializing {package.task_id}:{evaluation.level}",
+                "[ptdbench] Materializing "
+                + ", ".join(
+                    f"{unit.package.task_id}:{unit.evaluation.level}" for unit in units
+                ),
                 file=sys.stderr,
                 flush=True,
             )
-            prepared = self.materializer.materialize(package, evaluation, root, config)
-            workspace_before_hash = tree_digest(package.paths.workspace)
+            prepared = self.materializer.materialize(units, root, config)
             run = self.runner.run(prepared, config)
             print(
                 f"[ptdbench] Reading Harbor results from {run.job_dir}",
                 file=sys.stderr,
                 flush=True,
             )
-            return self.result_mapper.map(
-                package,
-                evaluation,
-                run,
-                config,
-                workspace_before_hash,
-            )
+            return self.result_mapper.map(prepared, run, config)
         finally:
             # Harbor job 保存在原生 --jobs-dir；这里只清理在线转换出的临时 task。
             shutil.rmtree(root, ignore_errors=True)
+
+    @staticmethod
+    def _normalize_task_roots(
+        task_roots: str | Path | Sequence[str | Path],
+    ) -> list[Path]:
+        if isinstance(task_roots, (str, Path)):
+            return [Path(task_roots)]
+        roots = [Path(task_root) for task_root in task_roots]
+        if not roots:
+            raise HarborAdapterError("at least one task root is required")
+        return roots
+
+    def _load_unit(
+        self,
+        task_root: str | Path,
+        evaluation_level: str,
+        strict: bool,
+    ) -> HarborTaskUnit:
+        package = self.load(task_root, strict=strict)
+        if not package.report.ok:
+            raise SchemaError(f"task package failed validation: {package.paths.root}")
+        evaluation = self._select_evaluation(package, evaluation_level)
+        return HarborTaskUnit(
+            package=package,
+            evaluation=evaluation,
+            workspace_before_hash=tree_digest(package.paths.workspace),
+        )
 
     @staticmethod
     def _select_evaluation(package: TaskPackage, level: str) -> EvaluationPaths:
@@ -841,12 +896,15 @@ class HarborEvaluator:
 
     @staticmethod
     def _make_run_dir(
-        task_id: str,
-        level: str,
+        units: Sequence[HarborTaskUnit],
         temp_dir: Optional[Path] = None,
     ) -> Path:
-        safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", task_id).strip("-.") or "task"
-        prefix = f"ptdbench-harbor-{safe_id}-{level}-"
+        if len(units) == 1:
+            unit = units[0]
+            safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", unit.package.task_id).strip("-.")
+            prefix = f"ptdbench-harbor-{safe_id or 'task'}-{unit.evaluation.level}-"
+        else:
+            prefix = f"ptdbench-harbor-batch-{len(units)}-"
         parent = ensure_dir(temp_dir).resolve() if temp_dir is not None else None
         return Path(
             tempfile.mkdtemp(
@@ -865,5 +923,6 @@ __all__ = [
     "HarborRun",
     "HarborRunner",
     "HarborTaskMaterializer",
+    "HarborTaskUnit",
     "PreparedHarborTask",
 ]

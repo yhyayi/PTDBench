@@ -1,0 +1,18 @@
+category: hyperparameter
+framework: rlve
+task: task_008
+verdict: unhealthy
+root_cause:
+- kind: hparam
+  name: --lr
+  observed: 1e-09
+  expected: 2e-06
+evidence_metrics:
+- within 329 steps raw_reward -0.640 → -0.618 (+0.023)
+- eval -0.563 → -0.613; no improvement
+- entropy does not fall (0.76 → 0.81); grad_norm stays single-digit (normal)
+fix:
+  must:
+  - target: --lr
+    direction: increase
+    to: 2e-6

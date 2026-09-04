@@ -1,0 +1,18 @@
+title: 'reward_design diagnosis: task_evaluator'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-22'
+domain: post_train
+model:
+  name: Qwen2.5-1.5B-Instruct
+dataset:
+  name: TACO
+training:
+  framework: verl
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: implementation_bug
+  failure_reason: taco.py removes list unwrap and stdin fuzzy fallbacks so only literal output == expected counts as correct, treating [1, 2] and [[1, 2]] as different

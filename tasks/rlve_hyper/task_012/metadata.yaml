@@ -1,0 +1,18 @@
+title: 'rlve_hyper hyperparameter diagnosis: task_012'
+submitter:
+  name: benchmark_evaluation
+license: MIT
+created_date: '2026-08-08'
+domain: post_train
+model:
+  name: Qwen2.5-0.5B-Instruct
+dataset:
+  name: RLVE held-out environments
+training:
+  framework: RLVE / slime + GRPO
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: training_collapse
+  failure_reason: '--hidden-dropout=0.5 freezes training (raw_reward stuck at -0.604) with entropy and KL far above a healthy run'
