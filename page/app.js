@@ -50,6 +50,31 @@ const LEADERBOARD_DATA = [
     }
 ];
 
+const EVALUATION_DATA = {
+    summary: [
+        { value: '74.8', label: 'Mean hidden score', note: 'across published runs' },
+        { value: '6', label: 'Domains covered', note: 'with a shared harness' },
+        { value: '42m', label: 'Median run time', note: 'per agent evaluation' },
+        { value: '18k', label: 'Median output tokens', note: 'per completed run' }
+    ],
+    domains: [
+        { label: 'Math', score: 78.4 },
+        { label: 'Code', score: 76.9 },
+        { label: 'Reasoning', score: 73.8 },
+        { label: 'Science', score: 71.6 },
+        { label: 'Planning', score: 69.2 },
+        { label: 'Language', score: 67.5 }
+    ],
+    resources: [
+        { label: 'ReasonAgent', score: 75.2, runtime: '42m' },
+        { label: 'DeepAgent-R', score: 74.8, runtime: '57m' },
+        { label: 'ToolFormer-X', score: 73.5, runtime: '31m' },
+        { label: 'PlanExec', score: 69.4, runtime: '26m' }
+    ]
+};
+
+const PTDBENCH_TASKS = window.PTDBENCH_TASKS || [];
+
 let currentTask = 'all';
 let currentAgent = 'all';
 let currentModel = 'all';
@@ -113,12 +138,19 @@ function renderLeaderboard() {
 function initLeaderboard() {
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+            });
             btn.classList.add('active');
+            btn.setAttribute('aria-pressed', 'true');
             currentTask = btn.dataset.task;
             renderLeaderboard();
         });
     });
+
+    const initialFilter = document.querySelector('.filter-btn.active');
+    if (initialFilter) initialFilter.setAttribute('aria-pressed', 'true');
 
     const agentFilter = document.getElementById('agent-filter');
     const modelFilter = document.getElementById('model-filter');
@@ -140,4 +172,120 @@ function initLeaderboard() {
     renderLeaderboard();
 }
 
-document.addEventListener('DOMContentLoaded', initLeaderboard);
+function taskCard(task) {
+    return `
+        <a href="task.html?id=${encodeURIComponent(task.id)}" class="task-card">
+            <span class="task-tag">${task.domain}</span>
+            <h3>${task.title}</h3>
+            <p>${task.summary}</p>
+            <div class="task-meta">
+                <span>${task.family}</span>
+                <span>${task.failureType}</span>
+            </div>
+        </a>
+    `;
+}
+
+function renderTaskCatalog() {
+    const mount = document.getElementById('task-groups');
+    if (!mount || !PTDBENCH_TASKS.length) return;
+
+    const groups = PTDBENCH_TASKS.reduce((map, task) => {
+        if (!map.has(task.family)) map.set(task.family, []);
+        map.get(task.family).push(task);
+        return map;
+    }, new Map());
+
+    mount.innerHTML = [...groups.entries()].map(([family, tasks], index) => `
+        <details class="task-group" ${index === 0 ? 'open' : ''}>
+            <summary>
+                <span>${family}</span>
+                <span class="task-group-count">${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}</span>
+            </summary>
+            <div class="tasks-grid">${tasks.map(taskCard).join('')}</div>
+        </details>
+    `).join('');
+}
+
+function renderEvaluation() {
+    const summary = document.getElementById('eval-summary');
+    const domains = document.getElementById('domain-score-chart');
+    const resources = document.getElementById('resource-chart');
+    if (!summary || !domains || !resources) return;
+
+    summary.innerHTML = EVALUATION_DATA.summary.map(item => `
+        <div class="eval-stat">
+            <strong>${item.value}</strong>
+            <span>${item.label}</span>
+            <small>${item.note}</small>
+        </div>
+    `).join('');
+
+    domains.innerHTML = EVALUATION_DATA.domains.map(item => `
+        <div class="chart-row">
+            <span class="chart-label">${item.label}</span>
+            <span class="chart-track"><i style="width:${item.score}%"></i></span>
+            <strong class="chart-value">${item.score.toFixed(1)}</strong>
+        </div>
+    `).join('');
+
+    resources.innerHTML = EVALUATION_DATA.resources.map(item => `
+        <div class="chart-row">
+            <span class="chart-label">${item.label}</span>
+            <span class="chart-track"><i style="width:${item.score}%"></i></span>
+            <strong class="chart-value">${item.score.toFixed(1)} <small>${item.runtime}</small></strong>
+        </div>
+    `).join('');
+}
+
+function initScrollMotion() {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) return;
+
+    document.documentElement.classList.add('motion-ready');
+
+    const sections = document.querySelectorAll('body > section:not(.hero), body > footer');
+    sections.forEach(section => section.classList.add('scroll-reveal'));
+
+    const revealAll = () => sections.forEach(section => section.classList.add('is-visible'));
+    const hashId = window.location.hash.slice(1);
+    const hashTarget = hashId ? document.getElementById(hashId) : null;
+    if (hashTarget) hashTarget.classList.add('is-visible');
+
+    requestAnimationFrame(() => {
+        sections.forEach(section => {
+            const rect = section.getBoundingClientRect();
+            if (rect.top < window.innerHeight * 1.15 && rect.bottom > 0) {
+                section.classList.add('is-visible');
+            }
+        });
+    });
+
+    if (!('IntersectionObserver' in window)) {
+        sections.forEach(section => section.classList.add('is-visible'));
+        return;
+    }
+
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+        });
+    }, {
+        threshold: 0.08,
+        rootMargin: '0px 0px -8% 0px'
+    });
+
+    sections.forEach(section => observer.observe(section));
+
+    // Keep direct hash links and static hosts usable if observers are delayed.
+    window.setTimeout(revealAll, 1200);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderTaskCatalog();
+    initLeaderboard();
+    renderEvaluation();
+    initScrollMotion();
+});

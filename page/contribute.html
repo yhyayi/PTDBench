@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contribution guide — DataCall</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23171716'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="guide-page">
+    <nav>
+        <a href="index.html" class="nav-logo">DataCall</a>
+        <div class="nav-links">
+            <a href="index.html#tasks">Tasks</a>
+            <a href="index.html#leaderboard">Leaderboard</a>
+            <a href="index.html#evaluation">Evaluation</a>
+            <a href="contribute.html" class="is-current">Contribute</a>
+        </div>
+    </nav>
+
+    <main class="guide-main">
+        <div class="guide-breadcrumb"><a href="index.html">DataCall</a><span>/</span><span>Contribute</span></div>
+
+        <header class="guide-hero">
+            <div class="guide-hero-copy">
+                <span class="guide-eyebrow">CONTRIBUTOR GUIDE</span>
+                <h1>Ship a task that another agent can actually run.</h1>
+                <p>A DataCall task is a small, reproducible experiment package. Keep the public evidence inspectable, define separate Issue and Solution contracts, and include the verifier that turns an agent's output into a score.</p>
+                <a class="guide-hero-link" href="#package">Start with the package format <span aria-hidden="true">↓</span></a>
+            </div>
+            <aside class="guide-hero-card">
+                <div class="guide-card-label">THE SUBMISSION CONTRACT</div>
+                <div class="guide-hero-row"><span>01</span><strong>Metadata</strong><em>describe the run</em></div>
+                <div class="guide-hero-row"><span>02</span><strong>Workspace</strong><em>show the evidence</em></div>
+                <div class="guide-hero-row"><span>03</span><strong>Evaluations</strong><em>issue + solution</em></div>
+                <div class="guide-hero-row"><span>04</span><strong>Verifier</strong><em>make the score repeatable</em></div>
+            </aside>
+        </header>
+
+        <section class="guide-section guide-overview">
+            <div class="guide-overview-item"><span class="guide-overview-mark">A</span><div><strong>Reproducible</strong><p>Pin the model, dataset, training setup, environment, and metric in metadata.</p></div></div>
+            <div class="guide-overview-item"><span class="guide-overview-mark">B</span><div><strong>Inspectable</strong><p>Include the source, configuration, logs, and frozen evidence an agent needs.</p></div></div>
+            <div class="guide-overview-item"><span class="guide-overview-mark">C</span><div><strong>Verifiable</strong><p>Ship a testable <code>verifier/test.sh</code> for every evaluation level.</p></div></div>
+        </section>
+
+        <section class="guide-section" id="package">
+            <div class="guide-section-heading"><span class="guide-eyebrow">01 / PACKAGE FORMAT</span><h2>One directory, one complete case.</h2><p>The validator checks the required paths below. Add supporting files when they help an agent understand or reproduce the failure.</p></div>
+            <div class="guide-package-layout">
+                <pre class="guide-tree"><code>your_task_id/
+├── metadata.yaml
+├── readme.md                  # recommended
+├── workspace/                 # public agent workspace
+├── environment/
+│   ├── Dockerfile
+│   └── hydrate-assets.sh      # optional
+└── evaluations/
+    ├── issue/
+    │   ├── instruction.md
+    │   ├── oracle.md           # hidden reference
+    │   └── verifier/
+    │       └── test.sh
+    └── solution/
+        ├── instruction.md
+        ├── oracle/             # hidden reference
+        └── verifier/
+            └── test.sh</code></pre>
+                <div class="guide-package-notes">
+                    <div><span class="guide-note-dot is-solid"></span><strong>Required</strong><p><code>metadata.yaml</code>, <code>workspace/</code>, <code>environment/</code>, and at least one evaluation.</p></div>
+                    <div><span class="guide-note-dot"></span><strong>Recommended</strong><p><code>readme.md</code>, historical logs, frozen metrics, and a short case overview.</p></div>
+                    <div><span class="guide-note-dot is-dark"></span><strong>Grading-only</strong><p>Oracle files and verifier implementations should not be exposed in the agent workspace.</p></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="guide-section" id="evaluations">
+            <div class="guide-section-heading"><span class="guide-eyebrow">02 / EVALUATIONS</span><h2>Two contracts, two kinds of work.</h2><p>Issue asks for a diagnosis. Solution asks for a repair and a fresh run. Keep the instruction, oracle, and verifier for each level together.</p></div>
+            <div class="guide-evaluation-grid">
+                <article class="guide-evaluation-card">
+                    <div class="guide-card-top"><span>ISSUE</span><code>evaluations/issue/</code></div>
+                    <h3>Diagnose the run</h3>
+                    <p>Ask the agent to inspect the historical snapshot, identify the root cause, and support the diagnosis with concrete evidence. The workspace should remain unchanged.</p>
+                    <div class="guide-file-rows"><div><code>instruction.md</code><span>agent-facing task and deliverables</span></div><div><code>oracle.md</code><span>hidden reference diagnosis</span></div><div><code>verifier/test.sh</code><span>score the submitted diagnosis</span></div></div>
+                </article>
+                <article class="guide-evaluation-card is-dark">
+                    <div class="guide-card-top"><span>SOLUTION</span><code>evaluations/solution/</code></div>
+                    <h3>Repair and rerun</h3>
+                    <p>Ask the agent to fix the defect in the staged workspace, run the designated command in the foreground, and leave the fresh artifacts that the verifier reads.</p>
+                    <div class="guide-file-rows"><div><code>instruction.md</code><span>fixed paths, command, and constraints</span></div><div><code>oracle/</code><span>hidden reference materials</span></div><div><code>verifier/test.sh</code><span>score the resulting artifacts</span></div></div>
+                </article>
+            </div>
+        </section>
+
+        <section class="guide-section" id="metadata">
+            <div class="guide-section-heading"><span class="guide-eyebrow">03 / METADATA</span><h2>Make the experiment legible.</h2><p>These mappings are required by the current validator. Use exact names and a short, evidence-based outcome description.</p></div>
+            <div class="guide-metadata-layout">
+                <pre class="guide-code"><code>title: "Reward scorer diagnosis"
+submitter:
+  name: "your-name-or-team"
+license: MIT
+created_date: "2026-09-07"
+domain: post_train
+model:
+  name: "Qwen2.5-0.5B-Instruct"
+dataset:
+  name: "your-dataset"
+training:
+  framework: verl
+  algo: grpo
+environment:
+  dockerfile: environment/Dockerfile
+outcome:
+  failure_type: implementation_bug
+  failure_reason: "Short, evidence-based description"</code></pre>
+                <div class="guide-field-list">
+                    <div><code>submitter</code><span>Contributor or team name.</span></div>
+                    <div><code>model / dataset</code><span>Exact names used by the run.</span></div>
+                    <div><code>training</code><span>Framework and algorithm.</span></div>
+                    <div><code>environment</code><span>Path to the Dockerfile.</span></div>
+                    <div><code>outcome</code><span>Failure type and concise reason.</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="guide-section" id="workspace">
+            <div class="guide-section-heading"><span class="guide-eyebrow">04 / WORKSPACE &amp; VERIFIER</span><h2>Package evidence, not an empty project.</h2></div>
+            <div class="guide-check-grid">
+                <div class="guide-check"><span>01</span><strong>Workspace</strong><p>Source code, launch scripts, effective configuration, logs, outputs, and frozen evidence the agent can inspect.</p></div>
+                <div class="guide-check"><span>02</span><strong>Environment</strong><p>A Dockerfile and optional hydration script that prepare the run with the required local assets.</p></div>
+                <div class="guide-check"><span>03</span><strong>Verifier</strong><p>Read the result files named in the instruction and return a deterministic score or pass/fail outcome.</p></div>
+            </div>
+        </section>
+
+        <section class="guide-section guide-publish" id="checklist">
+            <div class="guide-section-heading"><span class="guide-eyebrow">05 / BEFORE YOU PUBLISH</span><h2>Run the same checks the catalog will run.</h2><p>Resolve every structural error locally, then exercise both evaluation levels with a known-good fixture.</p></div>
+            <div class="guide-publish-layout">
+                <ol class="guide-publish-steps"><li><span>01</span><div><strong>Freeze the case</strong><p>Capture the workspace, environment, configuration, logs, and held-out evidence.</p></div></li><li><span>02</span><div><strong>Write the contracts</strong><p>State the action, constraints, deliverables, and scoring behavior in each instruction.</p></div></li><li><span>03</span><div><strong>Validate and exercise</strong><p>Run the structural validator and test each verifier against a known result.</p></div></li></ol>
+                <div class="guide-command-box"><span>Structural validation</span><pre><code>PYTHONDONTWRITEBYTECODE=1 \
+python3 -m ptdbench validate path/to/your_task</code></pre><p>A task is ready for the catalog when the command passes and its public workspace is usable offline.</p></div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-grid"><div class="footer-brand"><div class="nav-logo">DataCall</div><p>An open community initiative for collecting and benchmarking RL training data at scale.</p></div><div class="footer-col"><h4>Benchmark</h4><a href="index.html#tasks">Tasks</a><a href="index.html#leaderboard">Leaderboard</a><a href="index.html#evaluation">Evaluation</a></div><div class="footer-col"><h4>Build</h4><a href="contribute.html#package">Task format</a><a href="contribute.html#checklist">Checklist</a></div><div class="footer-col"><h4>Community</h4><a href="contribute.html">Contribute</a></div></div>
+        <div class="footer-bottom">&copy; 2026 DataCall. Released under Apache-2.0 License.</div>
+    </footer>
+</body>
+</html>

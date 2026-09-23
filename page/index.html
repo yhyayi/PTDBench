@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DataCall — Open Data for Scalable RL Training</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23171716'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,9 +13,8 @@
         <div class="nav-links">
             <a href="#tasks">Tasks</a>
             <a href="#leaderboard">Leaderboard</a>
-            <a href="#timeline">Timeline</a>
-            <a href="#contribute">Contribute</a>
-            <a href="https://github.com">GitHub</a>
+            <a href="#evaluation">Evaluation</a>
+            <a href="contribute.html">Contribute</a>
         </div>
     </nav>
 
@@ -24,116 +24,34 @@
         <p>A community-driven initiative to collect, curate, and benchmark high-quality training data for reinforcement learning at scale.</p>
         <div class="hero-stats">
             <div class="stat">
-                <div class="stat-number">12</div>
-                <div class="stat-label">Tasks</div>
+                <div class="stat-number">10</div>
+                <div class="stat-label">Task packages</div>
             </div>
             <div class="stat">
-                <div class="stat-number">50K+</div>
-                <div class="stat-label">Samples</div>
+                <div class="stat-number">4</div>
+                <div class="stat-label">Families</div>
             </div>
             <div class="stat">
-                <div class="stat-number">8</div>
-                <div class="stat-label">Domains</div>
+                <div class="stat-number">2</div>
+                <div class="stat-label">Eval levels</div>
             </div>
             <div class="stat">
-                <div class="stat-number">3</div>
-                <div class="stat-label">Eval Modes</div>
+                <div class="stat-number">0</div>
+                <div class="stat-label">Public runs</div>
             </div>
         </div>
         <div class="hero-buttons">
             <a href="#contribute" class="btn btn-primary">Submit Data</a>
             <a href="#tasks" class="btn btn-secondary">Explore Tasks</a>
         </div>
-    </section>
-
-    <!-- Principles -->
-    <section id="principles">
-        <h2 class="section-title">Design Principles</h2>
-        <p class="section-subtitle">Every dataset in DataCall is held to strict standards to ensure reproducibility and fairness.</p>
-        <div class="principles-grid">
-            <div class="principle-card">
-                <div class="principle-icon">◇</div>
-                <h3>Verifiable Rewards</h3>
-                <p>All tasks include programmatic reward functions that can be automatically computed without human annotation.</p>
-            </div>
-            <div class="principle-card">
-                <div class="principle-icon">△</div>
-                <h3>Diverse Difficulty</h3>
-                <p>Tasks span multiple difficulty levels, enabling curriculum learning and progressive skill acquisition.</p>
-            </div>
-            <div class="principle-card">
-                <div class="principle-icon">○</div>
-                <h3>Reproducible Evaluation</h3>
-                <p>Standardized evaluation pipelines with fixed seeds, deterministic environments, and published baselines.</p>
-            </div>
-            <div class="principle-card">
-                <div class="principle-icon">□</div>
-                <h3>Open & Extensible</h3>
-                <p>Apache-2.0 licensed. Community contributions welcome. Modular design for easy integration.</p>
-            </div>
-        </div>
+        <a class="contribute-guide-link" href="contribute.html">Read the full contribution guide <span aria-hidden="true">→</span></a>
     </section>
 
     <!-- Tasks -->
     <section id="tasks">
         <h2 class="section-title">Task Catalog</h2>
-        <p class="section-subtitle">Browse available tasks across domains. Each task includes training data, reward functions, and evaluation harness.</p>
-        <div class="tasks-grid">
-            <a href="tasks/math.html" class="task-card">
-                <span class="task-tag">Math</span>
-                <h3>Competition Mathematics</h3>
-                <p>Problems from AMC, AIME, and olympiad-level competitions with step-by-step verifiable solutions.</p>
-                <div class="task-meta">
-                    <span>8,200 samples</span>
-                    <span>Hard</span>
-                </div>
-            </a>
-            <a href="tasks/code.html" class="task-card">
-                <span class="task-tag">Code</span>
-                <h3>Program Synthesis</h3>
-                <p>Generate correct programs from natural language specifications with unit-test-based reward signals.</p>
-                <div class="task-meta">
-                    <span>15,000 samples</span>
-                    <span>Medium–Hard</span>
-                </div>
-            </a>
-            <a href="tasks/reasoning.html" class="task-card">
-                <span class="task-tag">Reasoning</span>
-                <h3>Logical Deduction</h3>
-                <p>Multi-step logical reasoning tasks with formal proof verification as the reward signal.</p>
-                <div class="task-meta">
-                    <span>5,400 samples</span>
-                    <span>Medium</span>
-                </div>
-            </a>
-            <a href="tasks/science.html" class="task-card">
-                <span class="task-tag">Science</span>
-                <h3>Scientific QA</h3>
-                <p>Graduate-level questions across physics, chemistry, and biology with derivation-based grading.</p>
-                <div class="task-meta">
-                    <span>6,800 samples</span>
-                    <span>Hard</span>
-                </div>
-            </a>
-            <a href="tasks/planning.html" class="task-card">
-                <span class="task-tag">Planning</span>
-                <h3>Multi-step Planning</h3>
-                <p>Complex planning tasks in simulated environments with goal-achievement reward computation.</p>
-                <div class="task-meta">
-                    <span>4,100 samples</span>
-                    <span>Hard</span>
-                </div>
-            </a>
-            <a href="tasks/language.html" class="task-card">
-                <span class="task-tag">Language</span>
-                <h3>Constrained Generation</h3>
-                <p>Text generation under hard constraints (format, length, style) with automated constraint checking.</p>
-                <div class="task-meta">
-                    <span>10,500 samples</span>
-                    <span>Easy–Medium</span>
-                </div>
-            </a>
-        </div>
+        <p class="section-subtitle">Browse the active PTDBench packages. Raw snapshots and hidden evaluation materials are intentionally excluded from the public index.</p>
+        <div class="task-groups" id="task-groups"></div>
     </section>
 
     <!-- Leaderboard -->
@@ -178,58 +96,40 @@
         <div class="leaderboard-list"></div>
     </section>
 
-    <!-- Timeline -->
-    <section id="timeline">
-        <h2 class="section-title">Timeline</h2>
-        <p class="section-subtitle">Key milestones for the DataCall initiative.</p>
-        <div class="timeline">
-            <div class="timeline-item">
-                <div class="timeline-date">September 2026</div>
-                <h3>Data Call Opens</h3>
-                <p>Public submission portal launches. Community can contribute task proposals and datasets.</p>
+    <!-- Evaluation -->
+    <section id="evaluation" class="evaluation-section">
+        <h2 class="section-title">Evaluation Snapshot</h2>
+        <p class="section-subtitle">A compact view of benchmark quality, domain coverage, and the cost of running each agent.</p>
+        <div class="eval-summary-grid" id="eval-summary"></div>
+        <div class="eval-chart-grid">
+            <div class="chart-card">
+                <div class="chart-heading">
+                    <h3>Score by domain</h3>
+                    <span>Mean hidden-set score</span>
+                </div>
+                <div class="bar-chart" id="domain-score-chart"></div>
             </div>
-            <div class="timeline-item">
-                <div class="timeline-date">October 2026</div>
-                <h3>Review & Curation</h3>
-                <p>Submitted data undergoes quality review, deduplication, and reward function validation.</p>
-            </div>
-            <div class="timeline-item">
-                <div class="timeline-date">November 2026</div>
-                <h3>Benchmark v1.0 Release</h3>
-                <p>First official release of the curated benchmark with evaluation harness and baselines.</p>
-            </div>
-            <div class="timeline-item">
-                <div class="timeline-date">December 2026</div>
-                <h3>Competition Launch</h3>
-                <p>Open competition for RL training on the DataCall benchmark with public leaderboard.</p>
+            <div class="chart-card">
+                <div class="chart-heading">
+                    <h3>Agent efficiency</h3>
+                    <span>Score compared with run time</span>
+                </div>
+                <div class="bar-chart" id="resource-chart"></div>
             </div>
         </div>
     </section>
 
     <!-- Contribute -->
-    <section id="contribute">
-        <h2 class="section-title">How to Contribute</h2>
-        <p class="section-subtitle">Join the community effort to build the largest open RL training dataset.</p>
-        <div class="steps">
-            <div class="step">
-                <div class="step-number">01</div>
-                <h3>Choose a Domain</h3>
-                <p>Pick from our list of target domains or propose a new one.</p>
+    <section id="contribute" class="contribute-section">
+        <div class="contribute-cta">
+            <div class="contribute-cta-copy">
+                <span class="contribute-kicker">CONTRIBUTE</span>
+                <h2>Turn a reproducible failure into a benchmark task.</h2>
+                <p>Package the workspace, environment, Issue/Solution evaluations, and verifier that make your case useful to other agents and researchers.</p>
             </div>
-            <div class="step">
-                <div class="step-number">02</div>
-                <h3>Format Your Data</h3>
-                <p>Follow our schema: problem, solution, reward function, metadata.</p>
-            </div>
-            <div class="step">
-                <div class="step-number">03</div>
-                <h3>Submit via GitHub</h3>
-                <p>Open a PR with your dataset. Our CI runs automated quality checks.</p>
-            </div>
-            <div class="step">
-                <div class="step-number">04</div>
-                <h3>Get Credit</h3>
-                <p>Contributors are listed on the leaderboard and in all publications.</p>
+            <div class="contribute-cta-action">
+                <div class="contribute-cta-meta"><span>Task package format</span><span>Local validation</span></div>
+                <a class="btn btn-primary" href="contribute.html">Read the contribution guide <span aria-hidden="true">→</span></a>
             </div>
         </div>
     </section>
@@ -250,14 +150,13 @@
             </div>
             <div class="footer-col">
                 <h4>Build</h4>
-                <a href="#">Quick Start</a>
-                <a href="#">Documentation</a>
+                <a href="contribute.html">Quick Start</a>
+                <a href="contribute.html">Task format</a>
                 <a href="#">API Reference</a>
                 <a href="#">Examples</a>
             </div>
             <div class="footer-col">
                 <h4>Community</h4>
-                <a href="#">GitHub</a>
                 <a href="#">Discord</a>
                 <a href="#">Twitter</a>
                 <a href="#">Contact</a>
@@ -268,6 +167,7 @@
         </div>
     </footer>
 
+    <script src="task-data.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
