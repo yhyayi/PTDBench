@@ -31,7 +31,12 @@ from slime.utils.types import Sample
 
 from ..utils.metric_utils import has_repetition
 from .rollout_validation import validate_server_group_gpu_indices
-from .utils import NOSET_VISIBLE_DEVICES_ENV_VARS_LIST, Lock, add_default_ray_env_vars
+from .utils import (
+    NOSET_VISIBLE_DEVICES_ENV_VARS_LIST,
+    Lock,
+    add_default_ray_env_vars,
+    memory_saver_loader_env,
+)
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -250,6 +255,8 @@ class ServerGroup:
                     "SGLANG_ENABLE_STRICT_MEM_CHECK_DURING_IDLE": "false",
                 }.items()
             }
+            if self.args.offload_rollout:
+                env_vars.update(memory_saver_loader_env())
             rollout_engine = RolloutRayActor.options(
                 num_cpus=num_cpus,
                 num_gpus=num_gpus,

@@ -5,11 +5,13 @@ PTDBench（PostTrainDiagnosisBench）是一个面向社区提交的后训练诊�
 
 ## 核心流程
 
-1. 提交一个 task package，里面包含公开说明、可写 workspace、隐藏 oracle、环境镜像和 verifier。
+1. 提交一个 task package，里面包含公开说明、可写 workspace、隐藏 oracle、环境声明和 verifier。
 2. 评测器把 `workspace/` 复制到 staging 目录。
-3. 指定的 agent 在 staging workspace 上修改代码。
-4. verifier 运行 `verifier/test.sh`，读取修复后的 workspace 并输出结果。
-5. 评测器汇总 `report.json`，同时保留 agent 轨迹和 verifier 结果。
+3. **prepare 阶段**跑任务的 `environment/prepare.sh`：下模型、下数据集、写环境变量。
+   这是三个阶段里唯一联网、也唯一能写共享下载缓存的一个（后两个阶段只读挂）。
+4. 指定的 agent 在 staging workspace 上修改代码。
+5. verifier 运行 `verifier/test.sh`，读取修复后的 workspace 并输出结果。
+6. 评测器汇总 `report.json`，同时保留 agent 轨迹和 verifier 结果。
 
 ## 先跑 example
 
@@ -84,8 +86,10 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
 ```
 
 运行前需要确保 Docker daemon 已启动，并允许 Docker Desktop 访问当前仓库目录。
-评测器会自动读取 task 的 `environment/Dockerfile`，构建 task 基础镜像，并分别启动 agent/verifier
-容器。`--backend` 是整次评测唯一的 runtime backend，agent 和 verifier 始终使用同一个 backend；
+评测器按 `metadata.yaml` 的 `environment` 段决定环境：写 `conda` 的任务直接用统一镜像
+（`--image` / `PTDBENCH_IMAGE_TAG` 可覆盖），写 `dockerfile` 的 legacy 任务仍然逐任务构建
+基础镜像。两种情况都分别启动 agent/verifier 容器。
+`--backend` 是整次评测唯一的 runtime backend，agent 和 verifier 始终使用同一个 backend；
 两者的网络策略仍可分别通过 `--agent-network` 和 `--verifier-network` 配置。
 task 镜像不需要预装 Codex，框架会在 agent 容器启动后安装 `@openai/codex@latest`。
 安装完成后，框架会根据 `--base-url` 在容器内生成 Codex model provider 配置，并通过 stdin
@@ -272,7 +276,9 @@ example/your_task/
 ├── workspace/
 ├── oracle/
 ├── environment/
-│   └── Dockerfile
+│   ├── requirements.txt # 新形态：该 conda 环境的完整依赖闭包
+│   ├── prepare.sh       # 新形态：跑训练前要准备的东西（下模型、下数据集）
+│   └── Dockerfile      # legacy 形态
 └── verifier/
     ├── test.sh
     ├── tests/
@@ -283,7 +289,8 @@ example/your_task/
 
 - `instruction.md`：agent 可见
 - `workspace/`：agent 可写
-- `environment/Dockerfile`：用于构建运行环境
+- `environment/`：环境声明（`requirements.txt` / `prepare.sh`，legacy 任务是 `Dockerfile`）；
+  三个阶段都以**只读**挂在 `/ptdbench/environment`
 - `oracle/`：仅 verifier 可见
 - `verifier/`、`verifier/tests/`、`verifier/resources/`：仅 verifier 可见
 - `readme.md`：仅人类审核用
@@ -342,9 +349,121 @@ outcome:
 - `dataset.name`：训练或数据来源名称
 - `training.framework`：训练框架
 - `training.algo`：训练算法
-- `environment.dockerfile`：环境 Dockerfile 路径
+- `training.script`：训练启动脚本，写成相对 `workspace/` 的路径
+- `training.script_args`：启动脚本的位置参数，列表，一项一个参数
+- `environment`：运行环境，两种形态二选一，见下一节
 - `outcome.failure_type`：失败类型
 - `outcome.failure_reason`：失败原因说明
+
+### training.script：任务怎么跑起来
+
+`training.script` 是"这个任务的训练入口是哪个脚本"的唯一出处：`docker/debug-env.sh
+run` 读它来跑训练，`instruction.md` 里写给 agent 看的也应该是同一条路径。路径相对
+`workspace/`，因为容器里 workspace 挂在 `/workspace`，训练脚本是在那儿跑的。
+
+启动脚本需要位置参数才能跑起来时（RLVE 的 `rlve.sh` 要 `WANDB_PROJECT`、
+`RUN_NAME` 和一个占位的环境列表 token），用 `script_args` 一并写上，否则任务卡上
+记的那条命令是跑不通的：
+
+```yaml
+training:
+  framework: RLVE / slime + GRPO
+  algo: grpo
+  script: scripts/training/Qwen2.5-0.5B-Instruct/rlve.sh
+  script_args:
+    - ptdbench
+    - solution_rerun
+    - _
+```
+
+只有真的没有训练脚本的任务（比如 `framework: none` 的纯代码修复）可以不写这两个
+字段；声明了训练框架却没写 `script`，校验会给一条 warning。
+
+### environment 的两种形态
+
+**形态一：统一镜像 + conda 环境（新任务用这个）**
+
+```yaml
+environment:
+  conda: verl                                  # docker/envs/ 下的目录名
+  requirements: environment/requirements.txt   # 可选，默认就是这个路径
+  prepare: environment/prepare.sh              # 可选，默认就是这个路径
+  env:                                         # 可选，逐任务不同的环境变量
+    CUDA_VISIBLE_DEVICES: "0,1"
+```
+
+- `conda`：用镜像里预建的哪个 conda 环境。可选值就是 `docker/envs/` 下的目录名
+  （目前是 `verl` 和 `slime`），镜像本来就是照它构建的，所以这里没有第二份常量表。
+  要加新环境得先加 `docker/envs/<name>/` 和 `docker/Dockerfile` 里对应的
+  `env-<name>` stage。
+- 用 conda 而不是 venv，是因为 slime-rc0 编译时对的是 CUDA 12.6、verl 对的是 12.9、
+  slime-v0.3.1 对的是 13.0，**一个 venv 装不下三个 nvcc**（何况跨了大版本）。每个环境都在自己的构建 stage 里落在
+  `/opt/conda/envs/<name>`，再原样 COPY 进最终镜像——路径一致，shebang、`.pth`、
+  RPATH、`conda-meta` 里记的 prefix 才都还成立。
+- `requirements` / `prepare`：不写就按约定路径找，找得到才算数。写了则以写的为准，
+  但必须待在 `environment/` 里——只有那个目录会被挂进（或 COPY 进）容器。
+- `requirements.txt` 是**这个 conda 环境的完整闭包**，不是"额外再装的东西"。
+  同一个 `conda` 名下的所有任务必须给出**完全一致**的一份，`docker/build.sh` 会校验。
+  取并集是不行的：加一个任务就会悄悄改掉另一个任务的环境，连带改掉它的 ground truth。
+- `env`：值**必须是字符串**。YAML 里 `CUDA_VISIBLE_DEVICES: 0,1` 会读成字符串，
+  但 `: 0` 会读成整数——后者会被拒掉而不是悄悄转成 `"0"`，因为"只用 0 号卡"和
+  "写错了"必须能分清。另外不允许设 `PTDBENCH_*`，那是 harness 自己的通道。
+- 不写 `dockerfile`。两个都写会报错，因为运行时只有一个生效，不该让读者猜。
+
+`environment/prepare.sh`：跑训练前要准备的一切。它跑在一个独立的 **prepare 阶段**
+容器里，是三个阶段里**唯一联网**的一个，也是唯一挂到共享下载缓存的一个：
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+ptdbench_fetch_hf \
+    --repo LIF1014/ptdbench-Qwen2.5-0.5B-Instruct \
+    --revision e967ddaecb746b9cea032fc1ae80c29a9a49bb73 \
+    --allow config.json --allow tokenizer.json --allow model.safetensors \
+    --expect model.safetensors=fdf756fa...288fb7fe \
+    --expect-size model.safetensors=988097824 \
+    --dest "$PTDBENCH_WORKSPACE/verl/Qwen2.5-0.5B-Instruct"
+
+ptdbench_dataset --recipe gsm8k --dest "$PTDBENCH_WORKSPACE/gsm8k_verl"
+```
+
+脚本可以用的变量和命令：
+
+| 名字 | 是什么 |
+| --- | --- |
+| `$PTDBENCH_WORKSPACE` | agent 会拿到的 workspace，**prepare 阶段可写**；权重和数据集下到这里 |
+| `$PTDBENCH_PREPARED` | 交给后两个阶段的产物目录；往 `$PTDBENCH_PREPARED/env` 写 `KEY=VALUE` 行即可给 agent/verifier 传环境变量 |
+| `$PTDBENCH_MODELS` | 跨 run、跨任务共享的模型下载缓存；`--models-dir` 指定，默认仓库根的 `models/`。prepare 可写，agent/verifier 只读挂 |
+| `$PTDBENCH_DATASETS` | 同上，数据集用；`--datasets-dir` 指定，默认仓库根的 `datasets/` |
+| `$PTDBENCH_ENVIRONMENT` | 任务自己的 `environment/` 目录（只读） |
+| `ptdbench_fetch_hf` | 从 HF 仓库按 allow 列表取文件，带 sha256/size 硬校验，走缓存 |
+| `ptdbench_fetch_url` | 同上，但取单个 URL |
+| `ptdbench_dataset` | 跑镜像内置的数据集配方（`docker/ptdbench_datasets/`），产物同样走缓存 |
+
+`$PTDBENCH_MODELS` / `$PTDBENCH_DATASETS` 是缓存，不是交付路径。任务脚本要引用的
+永远是 `--dest` 写出去的那份——Harbor 后端在构建期跑完 prepare.sh 就会把这两个目录
+`rm -rf` 掉，直接引用 `/ptdbench/models/...` 的任务在那条路径上会找不到文件。
+
+`$PTDBENCH_PREPARED/env` 是被当成**数据**逐行读取的，不会被 `.` 进任何 shell——
+否则一个任务包就能在 verifier 前面跑任意命令。
+
+校验不过是**硬失败**，不会降级成"重新下一遍"——那会把一次数据损坏变成一行看不见
+的重试日志。
+
+评测机没网的话，先在有网的机器上跑一次
+`docker/warm-cache.sh [--models-dir DIR] [--datasets-dir DIR]`，它会把每个任务的
+`prepare.sh` 各跑一遍填满这两个目录；之后把它们搬到评测机上，用 `--models-dir`
+和 `--datasets-dir` 指过去就能离线评测。
+
+**形态二：逐任务 Dockerfile（legacy，`tasks/raw/` 下还没迁的任务用）**
+
+```yaml
+environment:
+  dockerfile: environment/Dockerfile
+```
+
+字段缺省时按约定路径 `environment/Dockerfile` 算。
 
 ### 失败类型
 
@@ -372,6 +491,7 @@ outcome:
 3. `metadata.yaml`
    - 填完整元数据
    - 至少把 `title`、`submitter`、`license`、`created_date`、`domain`、`model`、`dataset`、`training`、`environment`、`outcome` 写全
+   - 训练类任务还要写 `training.script`（必要时加 `script_args`），否则没人知道这个任务该跑哪个脚本
 
 4. `workspace/`
    - 放有 bug 的可写工作区

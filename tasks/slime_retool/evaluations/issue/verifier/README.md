@@ -5,8 +5,7 @@ This verifier grades `$PTDBENCH_RESULTS/agent_answer.md` against hidden
 `judge_prompt.md`).
 
 The judge scores verdict, root-cause, and evidence agreement (weights
-0.2 / 0.6 / 0.2). Pass is a weighted score of at least `0.8`. The gold
-verdict for this task is `healthy` with an empty root-cause list.
+0.2 / 0.6 / 0.2). Pass is a weighted score of at least `0.8`.
 
 `gold.yaml` is retained as a reviewer-facing reference. Machine grading
 reads `oracle.md`, not `gold.yaml`.

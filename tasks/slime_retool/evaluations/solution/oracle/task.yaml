@@ -28,7 +28,11 @@ key_files:
 - examples/retool/tool_sandbox.py
 - outputs/metrics.json
 - outputs/historical_eval_trace.log
-external_assets_not_packaged:
-- Qwen3-4B-Instruct-2507 HF + torch_dist checkpoints and the released font-info SFT checkpoint
-- DAPO-Math-17k RL prompts and aime-2024 eval set
-- ReTool-SFT dataset for the optional SFT warm-up stage
+external_assets_not_in_git:
+- the released font-info SFT checkpoint and the torch_dist reference converted
+  from it -- both delivered by environment/prepare.sh, the latter built on the
+  spot because it has no upstream repo
+- DAPO-Math-17k RL prompts and the aime-2024 eval set, both delivered by
+  environment/prepare.sh
+- ReTool-SFT dataset for the optional SFT warm-up stage, which this task does
+  not run

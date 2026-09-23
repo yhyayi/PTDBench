@@ -1,0 +1,42 @@
+Tag every TELinear parameter with its `parallel_mode`, which is how slime
+decides whether a weight is sharded before shipping it to the rollout engine.
+
+Same provenance as 0001: the Megatron working tree inside
+slimerl/slime:v0.5.0rc0-cu126.
+
+Why we need it. slime reads the attribute in three places while building the
+weight update it sends to SGLang:
+
+    slime/backends/megatron_utils/update_weight_utils.py:33
+        if not param.tensor_model_parallel or getattr(param, "parallel_mode", None) == "duplicated":
+    slime/backends/megatron_utils/update_weight_utils.py:79   (same test)
+    slime/backends/megatron_utils/update_weight_utils.py:220
+        "parallel_mode": getattr(param, "parallel_mode", None),
+
+Transformer Engine sets parallel_mode on the *module*, not on the parameters, so
+without this line the getattr always returns None and a "duplicated" parameter
+is treated as tensor-parallel -- i.e. slime gathers a shard that does not exist
+and writes the wrong tensor into the inference weights. There is no exception;
+the run trains on quietly wrong rollout weights.
+
+Honest scope note: the four rlve_hyper tasks on this environment run
+--tensor-model-parallel-size 1 (rlve.sh:136), where `param.tensor_model_parallel`
+is False for every parameter and the left half of the `or` already short-circuits
+to the correct branch. So this patch changes nothing for them *today*. It is
+here because it is one line, because it is what the image the ground truth was
+recorded on actually ran, and because the failure it prevents is the silent kind
+-- the first task added to this environment with TP>1 would otherwise get
+corrupted rollout weights with no error to point at. The other direction (drop
+it now, rediscover it later from a diverging reward curve) is a much worse trade.
+diff --git a/megatron/core/extensions/transformer_engine.py b/megatron/core/extensions/transformer_engine.py
+index 99c3edc0..26ea5cb4 100644
+--- a/megatron/core/extensions/transformer_engine.py
++++ b/megatron/core/extensions/transformer_engine.py
+@@ -404,6 +404,7 @@ class TELinear(te.pytorch.Linear):
+         )
+ 
+         for param in self.parameters():
++            setattr(param, "parallel_mode", parallel_mode)
+             if is_expert:
+                 # Reduce the gradient on the expert_data_parallel group for expert linear layers
+                 setattr(param, "allreduce", not self.expert_parallel)

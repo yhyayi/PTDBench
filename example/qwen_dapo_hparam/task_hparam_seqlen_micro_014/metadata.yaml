@@ -11,6 +11,7 @@ dataset:
 training:
   framework: verl
   algo: grpo
+  script: examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh
 environment:
   dockerfile: environment/Dockerfile
 outcome:

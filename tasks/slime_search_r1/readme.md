@@ -30,12 +30,12 @@ shows a clear held-out gain, not a collapse.
 | --- | --- |
 | `workspace/` | Agent-visible historical experiment snapshot; evidence rather than canonical ground truth. |
 | `evaluations/issue/` | Neutral diagnosis instruction, issue oracle, and task-local issue verifier. |
-| `evaluations/solution/` | Diagnosis/remediation instruction, hidden reference material, and combined verifier. |
+| `evaluations/solution/` | Repair-and-run instruction, hidden reference material, and metric-only verifier. |
 
 The agent cannot read oracle or verifier paths. `issue` grading compares
 `$PTDBENCH_RESULTS/agent_answer.md` to hidden `oracle.md` with an LLM
-judge. `solution` grading reads `$PTDBENCH_RESULTS/submission.json` against
-`verifier/gold.yaml`.
+judge. `solution` grading reconstructs `eval/nq_test` from the logs the agent's
+own run wrote under `$PTDBENCH_RESULTS/experiment_logs`.
 
 ## Source and preserved context
 
@@ -74,8 +74,9 @@ binary history).
 - train response length at step 100 is about 39 tokens with a 0% truncate
   ratio
 
-The preserved source metric is `eval/nq_test`. The frozen workspace remains
-the evidence package; a full training rerun is outside verifier scope.
+The preserved source metric is `eval/nq_test`. The frozen workspace is the
+evidence package the agent diagnoses from; it is also the calibration source
+for the solution-level threshold (see below).
 
 ## Why the recipe is healthy
 
@@ -123,21 +124,109 @@ defects.
 `issue` grades `$PTDBENCH_RESULTS/agent_answer.md` against hidden
 `oracle.md`. The judge scores verdict, root-cause, and evidence agreement
 (weights 0.2 / 0.6 / 0.2). Pass is a weighted score of at least `0.8`.
+Diagnosis is from the frozen snapshot only — the instruction forbids launching
+training, exactly as in the bug-injected tasks.
 
-`solution` grades `$PTDBENCH_RESULTS/submission.json` against
-`verifier/gold.yaml`. Because the gold verdict is `healthy`, once the issue
-stage is `correct` the solution stage is `n/a` and the combined score is
-`1.0`; no remediation is required.
+`solution` is deterministic and metric-only, in the same shape as
+`slime_search_r1_nomask` and `slime_retool`: fix what you found, run the
+experiment for real, and the verifier reconstructs `eval/nq_test` from the logs
+under `$PTDBENCH_RESULTS/experiment_logs`. Nothing about the protocol tells the
+agent whether this run is healthy — that is the point. The bar is `0.28` on the
+best eval point, the same bar the injected twin uses, so the threshold itself
+is not a tell either; it fails an untrained step 0 (`0.046`) and the twin's
+failure mode (peak `0.1527`), and an unmodified run clears it by `0.096`
+(historical peak `0.3763`). See
+`evaluations/solution/verifier/README.md`.
 
-The verifier does not launch training or require network access.
+**Scheduling note for maintainers.** This task has no injected defect, so its
+solution level asks for a fix that does not exist. That is resolved outside
+the task package: tasks with no injected defect are scheduled at the `issue`
+level only. The solution level is kept in the bug-injected shape so that the
+task package itself carries no tell.
 
 ## Environment requirement
 
-Use the Docker agent backend. `environment/Dockerfile` builds from the public
-`slimerl/slime` image so the verifier's Python is available. It intentionally
-does **not** download the Qwen2.5-3B checkpoint, the `nq_hotpotqa_train`
-Parquet data, or the ~130 GB wiki-18 FAISS retrieval index: diagnosis uses the
-frozen historical snapshot, and those assets are neither committed to the
-repository nor practically packageable.
+The task runs on the unified PTDBench image, in the `slime-v0.3.1` conda
+environment (`environment: conda: slime-v0.3.1`). There is no per-task
+Dockerfile any more; `environment/prepare.sh` does that work instead.
+
+`metadata.yaml`'s `environment.env` block is byte-for-byte the one
+`slime_search_r1_nomask` uses — the eight GPUs and the offline W&B settings.
+The two tasks are the same recipe, so a difference in container environment
+between them would be both a tell and a reason their reruns would not be
+comparable. `WANDB_API_KEY` has to carry a placeholder value rather than be
+unset: `run_qwen2.5_3B.sh` builds `--wandb-key ${WANDB_API_KEY}` unquoted, and
+an empty expansion silently shifts the argument list.
+
+It deliberately does **not** set `HF_HUB_OFFLINE` / `TRANSFORMERS_OFFLINE`.
+The framework sets those per stage (`ptdbench/runtimes/base.py:215-237`), so
+the agent and verifier stages are off the hub either way, while `prepare` —
+the one stage that is supposed to have network — keeps it. A task-level copy
+applies to all three stages and would silently disable every download in
+`prepare.sh`; that is exactly the failure this block used to have.
+
+`prepare.sh` installs one thing: `faiss-gpu-cuvs` (plus the four cuVS runtime
+wheels it dlopens), which only the two search-r1 tasks need. It goes into
+`$PTDBENCH_PREPARED` rather than into the environment, because the shared
+`slime-v0.3.1` closure has to stay byte-identical across all four tasks on it
+— adding a package there would change `slime_retool`'s runtime.
+The GPU build is required, not the CPU one:
+`local_dense_retriever/retrieval_server.py:211-214` calls
+`faiss.index_cpu_to_all_gpus`, which `faiss-cpu` does not define.
+It is the `-cuvs` build rather than plain `faiss-gpu` because this environment
+is CUDA 13 (`torch==2.11.0+cu130`, unsuffixed `nvidia-*` wheels under
+`nvidia/cu13/`); `faiss-gpu` is the CUDA 12 build and looks for
+`nvidia-*-cu12` modules that are not here. The cuVS wheels are pinned to
+26.6 rather than 26.8 because 26.8 wants `nvidia-nvjitlink>=13.3` and the
+closure pins 13.0.88.
+
+`prepare.sh` also stages every asset a real run needs, into
+`$PTDBENCH_WORKSPACE` (which is `$PWD` for the launch script, so the recipe's
+own `DATA_DIR`/`MODEL_DIR` defaults find them):
+
+| Asset | How |
+| --- | --- |
+| `Qwen2.5-3B/` | `ptdbench_fetch_hf`, revision-pinned, both shards checksummed |
+| `Qwen2.5-3B_torch_dist/` | converted on the spot by `tools/convert_hf_to_torch_dist.py`, when the prepare stage finds a GPU with at least 12 GiB free; otherwise left to the launch script's own guard |
+| `e5-base-v2/` | `ptdbench_fetch_hf`; the retrieval server loads the query encoder by name and would otherwise want the hub |
+| `nq_hotpotqa_train/{train,test}.parquet` | `ptdbench_dataset --recipe search_r1_nq_hotpotqa` |
+| `wiki-18/{e5_Flat.index,wiki-18.jsonl}` | `ptdbench_dataset --recipe wiki18_e5` |
+
+Issue-level diagnosis needs none of them; a solution-level rerun needs all of
+them, which is why they are fetched rather than assumed. About 90 GB is cached
+under `$PTDBENCH_DATASETS` / `$PTDBENCH_MODELS` and hardlinked into each run's
+workspace, so the cost is paid once per host, not once per evaluation. Both
+recipes are deterministic and revision-pinned for the same reason the
+`requirements.txt` files must agree: the solution threshold was calibrated
+against these exact bytes.
+
+The two `ptdbench_dataset` recipes are the pinned equivalent of the recipe's
+own `examples/search-r1/prepare_data.sh`, whose `-f` guards then make the
+`prepare_data.sh` call at `run_qwen2.5_3B.sh:62` a no-op. What prepare does
+*not* do is start the retrieval server — it cannot: the prepare stage is a
+container created and removed around `prepare.sh`
+(`ptdbench/runtimes/providers/docker.py::close_sandbox`), so a server
+backgrounded there does not outlive the stage. `run_qwen2.5_3B.sh` therefore
+brings it up itself (`examples/search-r1/start_retriver.sh`) whenever `:8000`
+has no listener, and waits for readiness. What prepare *can* do, and does, is
+warm the corpus's `datasets` arrow cache so that start pays only the index
+load: the persistent copy lives under `$PTDBENCH_DATASETS`, hardlinked into
+`$PTDBENCH_WORKSPACE/.hf_datasets_cache` because the agent stage needs a
+writable cache directory and only the workspace is one.
+`slime_search_r1_nomask` stages the same five assets with a byte-identical
+`prepare.sh` body.
+
+Two more things to know before attempting a real run:
+
+- The recipe needs **8 GPUs** (`ray start --num-gpus 8`,
+  `--actor-num-gpus-per-node 8`). `metadata.yaml` declares them through
+  `NVIDIA_VISIBLE_DEVICES`, which the docker runtime turns into `--gpus`.
+  On the harbor backend that translation does not exist, so
+  `environment/docker-compose.yaml` carries the device reservation and
+  `shm_size` instead. That file is inert on the native docker path.
+- The retrieval server holds the FAISS index in GPU memory alongside the
+  training job and takes minutes to load. `run_qwen2.5_3B.sh` refuses to start
+  without a listener on `:8000`, and its rerun preamble deliberately spares the
+  retriever process so it survives across attempts.
 
 The workspace code and the Search-R1 recipe are distributed under Apache-2.0.

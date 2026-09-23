@@ -16,7 +16,7 @@ export UV_DEFAULT_INDEX="${UV_DEFAULT_INDEX:-https://pypi.tuna.tsinghua.edu.cn/s
 
 args=(
   -m ptdbench harbor-evaluate
-  "${PTDBENCH_TASK:-example/swe_slugfix}"
+  "${PTDBENCH_TASK:-tasks/slime_retool}"
   --evaluation-level "${PTDBENCH_EVALUATION_LEVEL:-solution}"
   --judge-model "${PTDBENCH_JUDGE_MODEL:-${PTDBENCH_MODEL:-gpt-5.5}}"
   --debian-mirror "${PTDBENCH_DEBIAN_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn}"
@@ -33,7 +33,10 @@ args=(
   --env "${PTDBENCH_BACKEND:-docker}"
   --n-concurrent "${PTDBENCH_N_CONCURRENT:-1}"
   --timeout-multiplier "${PTDBENCH_TIMEOUT_MULTIPLIER:-4}"
-  --jobs-dir "${PTDBENCH_JOBS_DIR:-outputs/harbor-swe-debug}"
+  --jobs-dir "${PTDBENCH_JOBS_DIR:-outputs/harbor-slime-retool}"
+  --image "${PTDBENCH_IMAGE_TAG:-ptdbench/env:latest}"
+  --environment-build-timeout-multiplier 36
+  --verifier-timeout-multiplier 12
   --yes
   --debug
 )

@@ -1,7 +1,0 @@
-{
-  "failure_class": "incomplete_historical_run",
-  "historical_eval_points": 2,
-  "baseline_status": "measured",
-  "heldout_environment_count": 39,
-  "authoritative_baseline_archive": "20260724T112035Z"
-}

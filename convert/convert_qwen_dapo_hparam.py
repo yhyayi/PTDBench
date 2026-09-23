@@ -356,8 +356,12 @@ def metadata_for(
         "training": {
             "framework": "verl",
             "algo": "grpo",
+            "script": str(LAUNCH_REL),
         },
-        "environment": {"dockerfile": "environment/Dockerfile"},
+        "environment": {
+            "venv": "verl",
+            "assets": "environment/assets.yaml",
+        },
         "outcome": {
             "failure_type": "metric_failure",
             "failure_reason": (
@@ -594,11 +598,19 @@ def materialize_one(
 
     environment = target / "environment"
     environment.mkdir()
-    (environment / "Dockerfile").write_text(
-        "FROM verlai/verl:vllm017.latest\n"
-        "WORKDIR /workspace\n"
-        "RUN mkdir -p /models /hidden\n"
-        'CMD ["tail", "-f", "/dev/null"]\n',
+    # 环境不再逐任务建镜像：统一镜像 + metadata.environment.venv
+    # 决定用哪套栈。这里只铺一个 assets.yaml 骨架，给 environment/
+    # 留个存在的理由（git 不跟空目录），具体内容靠打包时人工填。
+    (environment / "assets.yaml").write_text(
+        "# 这个任务要用的模型 / 数据集。迁移时必须填：\n"
+        "#   - id / kind / destination（destination 是 /workspace 下的相对路径）\n"
+        "#   - hf_repo + hf_revision（下载用）\n"
+        "#   - files: 里至少给权重 / parquet 的 sha256 + size（只校大文件，见 PLAN §7）\n"
+        "#\n"
+        "# 现在是空的——意味着容器里不会挂任何模型，训练会在\n"
+        "# “模型路径不存在”上失败。raw 任务里没有 repo/revision/sha256，\n"
+        "# 所以这一段只能人工补。\n"
+        "assets:\n",
         encoding="utf-8",
     )
 

@@ -7,7 +7,11 @@ import ray
 from ray.util.placement_group import PlacementGroup
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
-from slime.ray.utils import NOSET_VISIBLE_DEVICES_ENV_VARS_LIST, add_default_ray_env_vars
+from slime.ray.utils import (
+    NOSET_VISIBLE_DEVICES_ENV_VARS_LIST,
+    add_default_ray_env_vars,
+    memory_saver_preload_env,
+)
 
 
 class RayTrainGroup:
@@ -71,27 +75,7 @@ class RayTrainGroup:
         }
 
         if self.args.offload_train and self.args.train_backend == "megatron":
-            import torch_memory_saver
-
-            for path in [
-                "torch_memory_saver_hook_mode_preload_cu13.abi3.so",
-                "torch_memory_saver_hook_mode_preload_cu12.abi3.so",
-                "torch_memory_saver_hook_mode_preload.abi3.so",
-            ]:
-                dynlib_path = os.path.join(
-                    os.path.dirname(os.path.dirname(torch_memory_saver.__file__)),
-                    path,
-                )
-                if os.path.exists(dynlib_path):
-                    break
-            else:
-                raise FileNotFoundError(
-                    "Cannot find torch_memory_saver dynamic library. Please make sure torch_memory_saver is properly installed."
-                )
-
-            env_vars["LD_PRELOAD"] = dynlib_path
-            env_vars["TMS_INIT_ENABLE"] = "1"
-            env_vars["TMS_INIT_ENABLE_CPU_BACKUP"] = "1"
+            env_vars.update(memory_saver_preload_env(enable_from_start=True))
 
         # We cannot do routing replay for critic.
         if self.args.use_routing_replay and self.role == "actor":

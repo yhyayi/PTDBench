@@ -11,8 +11,12 @@ dataset:
 training:
   framework: verl
   algo: grpo
+  script: examples/grpo_trainer/run_llama3_2_1b_instruct_dapo_math_fsdp.sh
 environment:
-  dockerfile: environment/Dockerfile
+  conda: verl
+  env:
+    CUDA_VISIBLE_DEVICES: "0,1"
+    NVIDIA_VISIBLE_DEVICES: "0,1"
 outcome:
   failure_type: implementation_contract_regression
   failure_reason: Rewritten agent-loop methods break rollout and reward assembly, while the Answer-only scorer lacks the healthy format stack's boxed-answer fallback; validation reaches only 1.23% versus a healthy protocol baseline of 8.4% at 200 steps (11.8% at 1000 steps)

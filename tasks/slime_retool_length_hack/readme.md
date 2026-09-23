@@ -151,11 +151,15 @@ reaches about 25% at the same horizon.
 
 ## Environment requirement
 
-Use the Docker agent backend. `environment/Dockerfile` builds from the public
-`slimerl/slime` image so the verifier's Python is available. It intentionally
-does **not** download the Qwen3-4B checkpoint or the DAPO-Math-17k /
-ReTool-SFT data. Issue diagnosis uses the frozen historical snapshot.
-Solution reruns still need those host-side assets already present under
-`/workspace`.
+The task runs on the unified PTDBench image, in the `slime-v0.3.1` conda
+environment (`environment: conda: slime-v0.3.1`) — the same environment as
+`slime_retool`, which is the same recipe. There is no per-task Dockerfile any
+more; `environment/prepare.sh` does that work instead.
+
+`prepare.sh` fetches the same four assets as `slime_retool` — DAPO-Math-17k
+jsonl, AIME-2024 jsonl, the SFT'd HF checkpoint, and the torch_dist conversion
+of it. The two files are deliberately kept identical: this task is the
+bug-injected twin of `slime_retool`, so the only difference between them must
+be the injected defect. Edit one, edit both.
 
 The workspace code and the ReTool recipe are distributed under Apache-2.0.

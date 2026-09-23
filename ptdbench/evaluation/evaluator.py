@@ -13,6 +13,7 @@ from typing import Any, Dict, Optional
 
 from ..agents import AgentExecutionContext, AgentRunner, create_agent_runner, resolve_agent_spec
 from ..core.types import (
+    PTDBENCH_ENVIRONMENT_DIR,
     AgentSpec,
     TaskPackage,
     CommandResult,
@@ -39,6 +40,11 @@ class PreparedRun:
     visible_task: Path
     workspace: Path
     results: Path
+    # prepare 阶段的产物落点。prepare 可写，agent / verifier 只读挂同一个目录。
+    prepared: Path
+    # 跨 run、跨任务共享的下载缓存。prepare 可写，agent / verifier 只读。
+    models: Path
+    datasets: Path
 
 
 @dataclass(frozen=True)
@@ -97,21 +103,26 @@ class TaskEvaluator:
                     run.results,
                     f"[START] environment_prepare backend={self.runtime.name}",
                 )
-                environment_dir = package.paths.environment
-                dockerfile = self._environment_dockerfile(package)
-                if config.debian_mirror or config.huggingface_mirror:
-                    environment_dir = self._prepare_environment(
-                        package,
-                        run,
+                if package.environment.is_legacy:
+                    environment_dir = package.paths.environment
+                    dockerfile = self._environment_dockerfile(package)
+                    if config.debian_mirror or config.huggingface_mirror:
+                        environment_dir = self._prepare_environment(
+                            package,
+                            run,
+                            dockerfile=dockerfile,
+                            debian_mirror=config.debian_mirror,
+                            huggingface_mirror=config.huggingface_mirror,
+                        )
+                    artifact = self.runtime.build_environment(
+                        environment_dir,
                         dockerfile=dockerfile,
-                        debian_mirror=config.debian_mirror,
-                        huggingface_mirror=config.huggingface_mirror,
+                        tag_prefix=config.image_tag_prefix,
                     )
-                artifact = self.runtime.build_environment(
-                    environment_dir,
-                    dockerfile=dockerfile,
-                    tag_prefix=config.image_tag_prefix,
-                )
+                else:
+                    # 非 raw 任务全部复用 docker/build.sh 产出的那一个镜像，不再每个
+                    # 任务建一份。几套栈都在里面，靠 PTDBENCH_CONDA_ENV 选。
+                    artifact = self.runtime.prebuilt_environment(config.image)
                 self._append_run_log(
                     run.results,
                     f"[OK] environment_prepare backend={self.runtime.name} "
@@ -119,6 +130,20 @@ class TaskEvaluator:
                 )
 
             workspace_before_hash = tree_digest(package.paths.workspace)
+            prepare_result = self._run_prepare(
+                package, evaluation, run, config, artifact
+            )
+            if prepare_result is not None and prepare_result.returncode != 0:
+                # prepare 失败了还往下跑，agent 会在一个没有模型的 workspace 里作业，
+                # 最后的失败会被记成 agent 的失败——那是一条查半天的假线索。
+                self._append_run_log(
+                    run.results, "[SKIP] agent reason=prepare_failed"
+                )
+                raise RuntimeError(
+                    f"task {package.task_id!r}: prepare failed with exit "
+                    f"{prepare_result.returncode}; see prepare.stderr.log"
+                )
+
             agent_setup_result = None
             agent_result = None
             if agent_runner is not None:
@@ -218,12 +243,21 @@ class TaskEvaluator:
         visible_task = ensure_dir(root / "visible_task")
         workspace = ensure_dir(root / "workspace")
         results = ensure_dir(root / "results")
+        prepared = ensure_dir(root / "prepared")
+        # 缓存留在 run 目录之外才有意义：run 目录跑完就删，模型下一次还得重下。
+        # EvaluationConfig 保证这两个值一定有（默认是仓库根的 models/ 和 datasets/），
+        # 所以这里没有"这次没有缓存"的分支。
+        models = ensure_dir(config.models_dir)
+        datasets = ensure_dir(config.datasets_dir)
+        # Agent 改的是这份副本，不是仓库里的任务目录。
         copy_tree(package.paths.workspace, workspace)
         write_text(
             visible_task / "instruction.md",
             evaluation.instruction_md.read_text(encoding="utf-8"),
         )
-        return PreparedRun(root, visible_task, workspace, results)
+        return PreparedRun(
+            root, visible_task, workspace, results, prepared, models, datasets
+        )
 
     @staticmethod
     def _run_directory_prefix(task_id: str, evaluation_level: str) -> str:
@@ -252,7 +286,123 @@ class TaskEvaluator:
             evaluation_level=evaluation.level,
             log_level=config.log_level,
             debian_mirror=config.debian_mirror,
+            conda_env=package.environment.conda,
+            environment_dir=self._environment_mount(package),
+            prepared_dir=run.prepared,
+            models_dir=run.models,
+            datasets_dir=run.datasets,
+            task_env=dict(package.environment.env),
         )
+
+    @staticmethod
+    def _environment_mount(package: TaskPackage) -> Optional[Path]:
+        """任务的 environment/ 目录，没有就不挂。
+
+        raw 任务的 environment/ 里只有一个 Dockerfile，已经在构建阶段用过了，
+        再挂一遍只会让容器里多一个没人读的目录。
+        """
+        if package.environment.is_legacy:
+            return None
+        return package.paths.environment if package.paths.environment.is_dir() else None
+
+    @staticmethod
+    def _prepare_script(package: TaskPackage) -> Optional[str]:
+        """prepare.sh 在容器里的路径，任务没有这个脚本就返回 None。
+
+        脚本必须待在任务的 `environment/` 目录里，因为那是唯一被挂进容器的那一份。
+        声明一个在外面的路径会在容器里变成"文件不存在"，报错点离原因很远，所以在
+        这里就拦掉。
+        """
+        prepare = package.environment.prepare
+        if prepare is None:
+            return None
+        if not prepare.is_file():
+            raise SchemaError(
+                f"task {package.task_id!r}: metadata.environment.prepare points to "
+                f"{prepare}, which does not exist"
+            )
+        try:
+            relative = prepare.resolve().relative_to(package.paths.environment.resolve())
+        except ValueError as exc:
+            raise SchemaError(
+                f"task {package.task_id!r}: metadata.environment.prepare must stay under "
+                f"{package.paths.environment}; only that directory is mounted into the "
+                f"prepare container"
+            ) from exc
+        return f"{PTDBENCH_ENVIRONMENT_DIR}/{relative.as_posix()}"
+
+    def _run_prepare(
+        self,
+        package: TaskPackage,
+        evaluation: EvaluationPaths,
+        run: PreparedRun,
+        config: EvaluationConfig,
+        artifact: Optional[EnvironmentArtifact],
+    ) -> Optional[CommandResult]:
+        """跑任务的 prepare.sh：下模型、下数据集、写 prepared/env。
+
+        这是三个阶段里**唯一**联网的一个。放在 agent 之前而不是烘进镜像，是因为
+        下载的东西是逐任务的，烘进去就等于每个任务一个几十 GB 的镜像层——那正是
+        这次改造要去掉的东西。
+        """
+        script = self._prepare_script(package)
+        if script is None:
+            return None
+        request = SandboxRequest(
+            stage="prepare",
+            task_id=package.task_id,
+            host_task_root=run.visible_task,
+            host_visible_task=run.visible_task,
+            host_workspace=run.workspace,
+            host_results=run.results,
+            evaluation_level=evaluation.level,
+            host_environment=self._environment_mount(package),
+            host_prepared=run.prepared,
+            host_models=run.models,
+            host_datasets=run.datasets,
+            env=self._prepare_mirror_env(config),
+            # prepare 是唯一该联网的阶段；把它也断网，模型就没人下了。
+            network="bridge",
+            timeout_s=config.timeout_s,
+            workdir="workspace",
+            conda_env=package.environment.conda,
+            task_env=dict(package.environment.env),
+        )
+        if artifact is None:
+            if self.runtime.needs_environment_image:
+                raise ValueError("prepare runtime needs a built environment artifact")
+            artifact = EnvironmentArtifact(backend=self.runtime.name)
+        self._append_run_log(
+            run.results, f"[START] prepare script={script}"
+        )
+        sandbox = self.runtime.create_sandbox(request, artifact=artifact)
+        try:
+            result = self.runtime.exec(
+                sandbox,
+                CommandSpec(
+                    shell=f"bash {shlex.quote(script)}",
+                    timeout_s=config.timeout_s,
+                    live_log_name="prepare",
+                    live_log_to_stderr=config.log_level == "debug",
+                ),
+            )
+        finally:
+            self.runtime.close_sandbox(sandbox)
+        self._write_stage_logs(run.results, "prepare", result)
+        self._append_command_summary(run.results, "prepare", result)
+        return result
+
+    @staticmethod
+    def _prepare_mirror_env(config: EvaluationConfig) -> Dict[str, str]:
+        """把镜像源交给 prepare 阶段。
+
+        以前这些是构建参数，因为下载发生在 Dockerfile 里；下载搬到 prepare 之后，
+        它们就得跟着搬到这个阶段的环境变量里，否则在墙内的机器上一个模型都下不来。
+        """
+        env: Dict[str, str] = {}
+        if config.huggingface_mirror:
+            env["HF_ENDPOINT"] = config.huggingface_mirror
+        return env
 
     def _run_agent(
         self,
@@ -346,6 +496,18 @@ class TaskEvaluator:
             network=config.verifier_network,
             timeout_s=config.timeout_s,
             workdir="task_root",
+            conda_env=package.environment.conda,
+            host_environment=self._environment_mount(package),
+            # verifier 也要看得到 prepare 交付的东西：判分脚本经常要读 checkpoint
+            # 或对齐数据集里的样本。只读挂，所以读到的一定是 prepare 写的那一份。
+            host_prepared=run.prepared,
+            # 下载缓存只读挂：判分脚本要对着模型或数据集的原始副本核对时用得上，
+            # 而只读保证它核对的不是一份 agent 能改的东西。
+            host_models=run.models,
+            host_datasets=run.datasets,
+            # 任务声明的 env 两个阶段都给：verifier 判分时往往要按同样的卡数
+            # 加载 checkpoint，少了 CUDA_VISIBLE_DEVICES 会跟 agent 看到的不是一台机器。
+            task_env=dict(package.environment.env),
         )
         command = CommandSpec(
             shell=config.verifier_cmd or 'bash "$PTDBENCH_VERIFIER/test.sh"',

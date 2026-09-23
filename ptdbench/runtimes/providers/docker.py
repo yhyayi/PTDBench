@@ -10,7 +10,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
-from ...core.types import CommandResult
+from ...core.types import (
+    DATASETS_DIR,
+    MODELS_DIR,
+    PREPARED_DIR,
+    PTDBENCH_ENVIRONMENT_DIR,
+    CommandResult,
+)
 from ...utils.filesystem import tree_digest
 from ..base import (
     CommandSpec,
@@ -20,6 +26,11 @@ from ..base import (
     SandboxRuntime,
 )
 from ..factory import register_runtime
+
+
+# ray + sglang 的 worker 之间通过 /dev/shm 传张量，NCCL 也在那里开缓冲区。Docker
+# 的默认值是 64MB，第一次 rollout 就会爆，而报出来的是一个看不懂的 bus error。
+DEFAULT_SHM_SIZE = "16g"
 
 
 @dataclass(frozen=True)
@@ -78,12 +89,24 @@ class DockerRuntime(SandboxRuntime):
         )
         return EnvironmentArtifact(backend=self.name, reference=self._build(image))
 
+    def prebuilt_environment(self, image: str) -> EnvironmentArtifact:
+        if not self._image_exists(image):
+            raise RuntimeError(
+                f"image {image!r} not found locally; build it first with "
+                "`bash docker/build.sh` (or set PTDBENCH_IMAGE_TAG to an existing tag)"
+            )
+        return EnvironmentArtifact(backend=self.name, reference=image)
+
     def path(self, request: SandboxRequest, name: str) -> str:
         paths = {
             "task_root": "/task",
             "visible_task": "/task",
             "workspace": "/workspace",
             "results": "/results",
+            "environment": PTDBENCH_ENVIRONMENT_DIR,
+            "prepared": PREPARED_DIR,
+            "models": MODELS_DIR,
+            "datasets": DATASETS_DIR,
         }
         selected_paths = {
             "oracle": request.host_oracle,
@@ -135,6 +158,7 @@ class DockerRuntime(SandboxRuntime):
             "-w",
             self.path(request, request.workdir),
         ]
+        argv.extend(self._gpu_args(request))
         if request.network:
             argv.append(f"--network={request.network}")
         for mount in self._mounts(request):
@@ -345,6 +369,34 @@ class DockerRuntime(SandboxRuntime):
         return result
 
     @staticmethod
+    def _gpu_args(request: SandboxRequest) -> list[str]:
+        """把任务声明的 NVIDIA_VISIBLE_DEVICES 翻译成 docker 的 `--gpus`。
+
+        镜像侧一直是按 `--gpus` 写的——见 docker/ptdbench-activate.sh 里那句
+        "that is where --gpus puts libcuda.so.1"——缺的只是这一半。把变量 `-e`
+        进容器并不会让容器看见 GPU：宿主机的 default runtime 是 runc，只有
+        `--gpus` 才会让 nvidia 的 hook 真正注入设备节点和 libcuda.so.1。
+
+        没有声明就一个 flag 都不加，纯 CPU 的任务和阶段（判分几乎都是）行为与
+        接线前完全相同。`none` / `void` 是 NVIDIA_VISIBLE_DEVICES 自己的"不要
+        GPU"取值，按同一条处理。
+
+        PTDBENCH_DOCKER_GPUS 是宿主机侧的覆盖，沿用 _proxy_env 的 opt-in 惯例：
+        一台只有 2 张卡的机器不该因为任务卡片写着 8 张就跑不起来。
+        """
+        spec = os.environ.get("PTDBENCH_DOCKER_GPUS", "").strip()
+        if not spec:
+            spec = str(request.task_env.get("NVIDIA_VISIBLE_DEVICES", "")).strip()
+        if not spec or spec in {"none", "void"}:
+            return []
+        # `all` 和 `device=...` 本身就是 --gpus 的语法；任务卡片里写的是裸设备表
+        # （"0,1,2,3"），要包一层才能被 docker 认出来。
+        if spec != "all" and not spec.startswith("device="):
+            spec = f"device={spec}"
+        shm = os.environ.get("PTDBENCH_DOCKER_SHM_SIZE", "").strip() or DEFAULT_SHM_SIZE
+        return ["--gpus", spec, f"--shm-size={shm}"]
+
+    @staticmethod
     def _redact_argv(argv: list[str]) -> list[str]:
         redacted = list(argv)
         sensitive = ("KEY", "TOKEN", "SECRET", "PASSWORD")
@@ -358,30 +410,55 @@ class DockerRuntime(SandboxRuntime):
         return redacted
 
     def _mounts(self, request: SandboxRequest) -> Sequence[DockerMount]:
-        if request.stage == "agent":
-            return [
+        """每个阶段挂什么，以及谁能写。
+
+        三张表的差别就是这套设计的访问控制，值得挨条说清楚：
+
+        * **workspace**：prepare 和 agent 可写，verifier 只读。prepare 要写是因为
+          权重就下在任务脚本引用的那个相对路径上（`./Qwen2.5-0.5B-Instruct`）；
+          verifier 只读是因为判分不能改现场。
+        * **/task**：prepare 和 agent 挂的是 visible_task（只有 instruction），
+          verifier 挂的是整个 evaluation 目录（含 oracle 和判分脚本）。这条是"别剧透"——
+          prepare 跑的是任务自带的脚本，没有理由让它读到答案。
+        * **prepared**：prepare 可写，后两个阶段只读。verifier 要读 prepare 交付的
+          模型路径，但不能读到一份 agent 改过的——否则判分依据是可以被应试者编辑的。
+        * **models / datasets**：prepare 可写，后两个阶段只读。见
+          SandboxRequest.host_models。
+        """
+        if request.stage == "prepare":
+            mounts = [
+                DockerMount(request.host_workspace, "/workspace"),
+                DockerMount(request.host_visible_task, "/task", read_only=True),
+                DockerMount(request.host_prepared, PREPARED_DIR),
+            ]
+        elif request.stage == "agent":
+            mounts = [
                 DockerMount(request.host_workspace, "/workspace"),
                 DockerMount(request.host_visible_task, "/task", read_only=True),
                 DockerMount(request.host_results, "/results"),
             ]
-        return [
-            DockerMount(request.host_workspace, "/workspace", read_only=True),
-            DockerMount(request.host_task_root, "/task", read_only=True),
-            DockerMount(request.host_results, "/results"),
-        ]
-
-    def _build(self, image: DockerImageSpec) -> str:
-        """构建镜像；相同 digest 的镜像直接使用本地缓存。"""
-        if self._image_exists(image.tag):
-            return image.tag
-        command = ["docker", "build"]
-        for key, value in sorted(image.build_args.items()):
-            command.extend(["--build-arg", f"{key}={value}"])
-        command.extend(
-            ["-f", str(image.context_dir / image.dockerfile), "-t", image.tag, str(image.context_dir)]
-        )
-        subprocess.run(command, check=True)
-        return image.tag
+        else:
+            mounts = [
+                DockerMount(request.host_workspace, "/workspace", read_only=True),
+                DockerMount(request.host_task_root, "/task", read_only=True),
+                DockerMount(request.host_results, "/results"),
+            ]
+        if request.host_environment is not None:
+            # 三个阶段都只读：没有任何一个阶段有理由改仓库里的任务定义。
+            mounts.append(
+                DockerMount(request.host_environment, PTDBENCH_ENVIRONMENT_DIR, read_only=True)
+            )
+        if request.stage != "prepare" and request.host_prepared is not None:
+            mounts.append(DockerMount(request.host_prepared, PREPARED_DIR, read_only=True))
+        # 下载缓存：只有 prepare 需要写，后两个阶段挂只读的同一份。
+        read_only = request.stage != "prepare"
+        for host, container in (
+            (request.host_models, MODELS_DIR),
+            (request.host_datasets, DATASETS_DIR),
+        ):
+            if host is not None:
+                mounts.append(DockerMount(host, container, read_only=read_only))
+        return tuple(mounts)
 
     @staticmethod
     def _image_exists(tag: str) -> bool:

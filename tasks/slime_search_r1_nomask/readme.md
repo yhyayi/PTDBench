@@ -131,13 +131,35 @@ The historical final baseline is `0.145`; the healthy protocol is about
 
 ## Environment requirement
 
-- Base image: `slimerl/slime:latest`
+- Conda environment: `slime-v0.3.1` (`environment: conda: slime-v0.3.1`), the
+  stack `slimerl/slime:latest` shipped at slime 0.3.1 — torch 2.11, CUDA 13.0,
+  sglang 0.5.15. There is no per-task Dockerfile any more.
+- `environment/prepare.sh` installs `faiss-gpu-cuvs` into `$PTDBENCH_PREPARED`
+  (not into the shared environment, which four tasks must agree on) and
+  exports it via `PYTHONPATH`. The `-cuvs` build is the CUDA 13 one, which is
+  what this environment is; plain `faiss-gpu` is the CUDA 12 build.
+- `environment/prepare.sh` then stages the five assets a rerun needs into
+  `$PTDBENCH_WORKSPACE`: the `Qwen2.5-3B` checkpoint and its `torch_dist`
+  conversion, the `e5-base-v2` query encoder, `nq_hotpotqa_train/{train,test}
+  .parquet` (`ptdbench_dataset --recipe search_r1_nq_hotpotqa`) and
+  `wiki-18/{e5_Flat.index,wiki-18.jsonl}` (`--recipe wiki18_e5`). Roughly 90 GB,
+  cached under `$PTDBENCH_DATASETS`/`$PTDBENCH_MODELS` and hardlinked per run.
+  The body of the file is byte-identical to `slime_search_r1`'s.
+- `metadata.yaml`'s `environment.env` deliberately omits `HF_HUB_OFFLINE` /
+  `TRANSFORMERS_OFFLINE`: the framework sets them per stage
+  (`ptdbench/runtimes/base.py:215-237`), whereas a task-level copy would also
+  apply to `prepare` and disable the downloads above.
 - Use the Docker agent backend.
-- The image does **not** download the Qwen2.5-3B checkpoint, the
-  `nq_hotpotqa_train` Parquet data, or the ~130 GB wiki-18 FAISS retrieval
-  index. Issue diagnosis uses the frozen historical snapshot. Solution
-  reruns still need those host-side assets already present under
-  `/workspace` and a local retrieval server on `:8000`.
+- Issue diagnosis uses the frozen historical snapshot only. A solution rerun
+  additionally needs the retrieval server on `:8000`. `prepare.sh` cannot hold
+  it — the prepare stage is a container created and removed around the script
+  (`ptdbench/runtimes/providers/docker.py::close_sandbox`) — so
+  `run_qwen2.5_3B.sh` starts it itself when the port has no listener, and waits
+  for readiness. `prepare.sh` pays the slow half of that start in advance by
+  warming the corpus's `datasets` arrow cache under
+  `$PTDBENCH_WORKSPACE/.hf_datasets_cache` (exported through `prepared/env` as
+  `HF_DATASETS_CACHE`; the persistent copy lives in `$PTDBENCH_DATASETS`).
+  A cold start still reads the 60 GiB index into GPU memory and takes minutes.
 - Model weights and historical training checkpoints are not dataset assets.
 
 The workspace code and the Search-R1 recipe are distributed under Apache-2.0.

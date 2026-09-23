@@ -9,7 +9,16 @@ from pathlib import Path
 from ptdbench.agents.base import AgentExecutionContext, AgentRunner
 from ptdbench.agents.installed.codex import CodexAgentRunner
 from ptdbench.cli import build_parser
-from ptdbench.core.types import AgentSpec, CommandResult, EvaluationConfig
+from ptdbench.core.types import (
+    DATASETS_DIR,
+    MODELS_DIR,
+    PREPARED_DIR,
+    PTDBENCH_ENVIRONMENT_DIR,
+    AgentSpec,
+    CommandResult,
+    EnvironmentPlan,
+    EvaluationConfig,
+)
 from ptdbench.evaluation.evaluator import TaskEvaluator
 from ptdbench.runtimes import (
     CommandSpec,
@@ -46,6 +55,10 @@ class RecordingRuntime(SandboxRuntime):
             "results": "/results",
             "oracle": "/task/oracle",
             "verifier": "/task/verifier",
+            "environment": PTDBENCH_ENVIRONMENT_DIR,
+            "prepared": PREPARED_DIR,
+            "models": MODELS_DIR,
+            "datasets": DATASETS_DIR,
         }[name]
 
     def run(self, request, spec, *, artifact=None):
@@ -211,13 +224,31 @@ class SandboxLifecycleTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            for name in ("task", "visible", "workspace", "results", "oracle", "verifier"):
+            for name in (
+                "task",
+                "visible",
+                "workspace",
+                "results",
+                "oracle",
+                "verifier",
+                "environment",
+                "prepared",
+            ):
                 (root / name).mkdir()
             runtime = VerifierRuntime()
             evaluator = TaskEvaluator("local")
             evaluator.runtime = runtime
             evaluator._run_verifier(
-                type("Package", (), {"task_id": "task"})(),
+                type(
+                    "Package",
+                    (),
+                    {
+                        "task_id": "task",
+                        "environment": EnvironmentPlan(),
+                        # _environment_mount 读的是 paths.environment。
+                        "paths": type("Paths", (), {"environment": root / "environment"})(),
+                    },
+                )(),
                 type(
                     "Evaluation",
                     (),
@@ -235,6 +266,9 @@ class SandboxLifecycleTests(unittest.TestCase):
                         "visible_task": root / "visible",
                         "workspace": root / "workspace",
                         "results": root / "results",
+                        "prepared": root / "prepared",
+                        "models": root / "models",
+                        "datasets": root / "datasets",
                     },
                 )(),
                 EvaluationConfig(
@@ -411,8 +445,11 @@ class SandboxLifecycleTests(unittest.TestCase):
 
     def test_docker_stream_process_writes_live_stage_logs(self):
         with tempfile.TemporaryDirectory() as temp_dir:
+            # `sh -c`, not `sh -lc`: a login shell sources the host's profile, and
+            # a cluster that prints a quota banner at login would show up here as
+            # extra stdout. What is under test is the streaming, not the shell.
             process = subprocess.Popen(
-                ["sh", "-lc", "echo setup-out; echo setup-error >&2"],
+                ["sh", "-c", "echo setup-out; echo setup-error >&2"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,

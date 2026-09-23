@@ -6,9 +6,12 @@ submission of broken post-train tasks, environment specs, and verifier logic.
 ## Core idea
 
 1. A task package provides a broken `workspace/` plus one or more evaluations.
-2. A specified model+agent follows the selected evaluation's instruction.
-3. The evaluator runs the selected `verifier/test.sh` against the workspace.
-4. The verifier writes structured results to `$PTDBENCH_RESULTS/result.json`.
+2. A prepare stage runs the task's `environment/prepare.sh` to fetch models and
+   datasets. It is the only stage with network access and the only one that
+   sees the shared download cache.
+3. A specified model+agent follows the selected evaluation's instruction.
+4. The evaluator runs the selected `verifier/test.sh` against the workspace.
+5. The verifier writes structured results to `$PTDBENCH_RESULTS/result.json`.
 
 ## Task layout
 
@@ -18,7 +21,9 @@ task/
 ├── metadata.yaml
 ├── workspace/
 ├── environment/
-│   └── Dockerfile
+│   ├── requirements.txt # new form: the conda environment's full closure
+│   ├── prepare.sh       # new form: fetch models/datasets before the run
+│   └── Dockerfile      # legacy form
 └── evaluations/
     ├── issue/
     │   ├── instruction.md
@@ -77,8 +82,12 @@ ptdbench/
 Agent-visible for the selected evaluation:
 
 - its `instruction.md`, exposed as `/task/instruction.md`
-- a writable copy of `workspace/`
-- the Docker image built from `environment/Dockerfile`
+- a writable copy of `workspace/`, including whatever `prepare.sh` fetched into it
+- the environment: either the shared image's conda environment selected by
+  `environment.conda`, or for legacy tasks the image built from
+  `environment/Dockerfile`
+- the task's own `environment/` directory, read-only at `/ptdbench/environment`
+- the prepare stage's output, read-only at `/ptdbench/prepared`
 
 Verifier-only:
 
@@ -93,8 +102,10 @@ Evaluator metadata:
 
 - `metadata.yaml`
 
-The Docker evaluator runs agent and verifier in separate container
-invocations. The agent stage does not mount hidden oracle or verifier files.
+The Docker evaluator runs prepare, agent and verifier in separate container
+invocations. The agent stage does not mount hidden oracle or verifier files, and
+neither does the prepare stage: it executes a script the task package ships, so
+there is no reason to let it read the answer.
 
 ## Runtime abstraction
 
@@ -102,14 +113,16 @@ PTDBench separates the task contract from the execution platform. The current
 runtime implementations are:
 
 - `local`: runs commands on the host and is intended only for development;
-- `docker`: builds `environment/Dockerfile` and runs agent/verifier in separate
-  containers.
+- `docker`: runs prepare/agent/verifier in separate containers. Tasks declaring
+  `environment.conda` use the shared prebuilt image; legacy tasks declaring
+  `environment.dockerfile` are still built per task.
 
-The environment image is built once and can be reused by both stages. The two
-stages still use different containers: the agent gets a writable workspace and
-public instruction, while the verifier gets a read-only workspace plus the
-selected hidden evaluation. Reusing one image does not mean sharing one
-container, which is important for keeping hidden grading files inaccessible.
+The environment image is prepared once and reused by all three stages. The
+stages still use different containers: prepare gets the network and the download
+cache, the agent gets a writable workspace and public instruction, while the
+verifier gets a read-only workspace plus the selected hidden evaluation. Reusing
+one image does not mean sharing one container, which is important for keeping
+hidden grading files inaccessible.
 
 The platform boundary is `ptdbench.runtimes.base.SandboxRuntime`. A future runtime
 such as Harbor or a remote cloud sandbox should implement this interface for
@@ -290,7 +303,9 @@ To add a new agent, put its runner under `ptdbench/agents/installed/`, register
 it with the factory, and keep `evaluator.py` untouched. Its `run` method should
 only construct a `CommandSpec` and call the supplied `SandboxRuntime`.
 
-The Docker backend builds from `environment/Dockerfile`, mounts the editable
+The Docker backend resolves the image from the task's `environment` block
+(shared image for `conda` tasks, a per-task build for legacy `dockerfile`
+tasks), mounts the editable
 workspace at `/workspace`, exposes public task text at `/task`, and writes
 results to `/results`. The verifier sees its selected evaluation at `/task`;
 `PTDBENCH_ORACLE` and `PTDBENCH_VERIFIER` resolve the evaluation-specific

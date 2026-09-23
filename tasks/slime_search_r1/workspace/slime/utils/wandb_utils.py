@@ -4,6 +4,11 @@ from copy import deepcopy
 
 import wandb
 
+# wandb dropped the `wandb.util` re-export in 0.29; `wandb.sdk.lib.runid` is the
+# canonical home and has been importable from far older releases, so this works
+# against both the image's wandb and anything predating the removal.
+from wandb.sdk.lib.runid import generate_id
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,7 +48,7 @@ def init_wandb_primary(args):
     # Prepare wandb init parameters
     # add random 6 length string with characters
     if args.wandb_random_suffix:
-        group = args.wandb_group + "_" + wandb.util.generate_id()
+        group = args.wandb_group + "_" + generate_id()
         run_name = f"{group}-RANK_{args.rank}"
     else:
         group = args.wandb_group

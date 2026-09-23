@@ -13,3 +13,17 @@ evidence_metrics:
 - historical eval/nq_test at step 99 is 0.3753 (about 37.5%), up from 0.046 (4.6%) at step 0; train response_len at step 100 is about 39 with 0% truncate
 fix:
   must: []
+solution_metric:
+  key: eval/nq_test
+  final_step: 99
+  historical_final_baseline: 0.37533333333333335
+  required_final_score: 0.28
+  note: >-
+    Machine grading reads only the new experiment logs. score_mode is best:
+    the bar is "the run actually trained". 0.28 is the same bar the injected
+    twin slime_search_r1_nomask uses -- same recipe, same metric, same
+    100-step horizon -- so the threshold is not a tell for which side of the
+    pair a task is on. It fails an untrained step 0 (historical 0.046) and the
+    nomask failure mode (peak 0.1527), and passes an unmodified run (historical
+    peak 0.3763, step 99 at 0.3753). Note this level is not scheduled for tasks
+    with no injected defect -- see readme.md.

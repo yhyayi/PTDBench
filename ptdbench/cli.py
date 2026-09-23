@@ -11,6 +11,7 @@ from .core.harbor_types import HarborEvaluationConfig
 from .core.types import AgentSpec, EvaluationConfig
 from .evaluation.evaluator import TaskEvaluator
 from .evaluation.harbor_evaluator import HarborEvaluator
+from .tasks import SchemaError
 
 
 _ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -147,6 +148,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Hugging Face mirror base URL applied to environment Dockerfiles",
     )
     e.add_argument("--image-tag-prefix", default="ptdbench")
+    e.add_argument(
+        "--models-dir",
+        default=os.environ.get("PTDBENCH_MODELS_DIR"),
+        help=(
+            "host directory shared by every run as the model download cache; "
+            "mounted writable into the prepare stage and read-only into the "
+            "agent and verifier stages, so a model fetched by one task is not "
+            "fetched again by the next (default: <repo>/models) "
+            "[env: PTDBENCH_MODELS_DIR]"
+        ),
+    )
+    e.add_argument(
+        "--datasets-dir",
+        default=os.environ.get("PTDBENCH_DATASETS_DIR"),
+        help=(
+            "same as --models-dir, for datasets (default: <repo>/datasets) "
+            "[env: PTDBENCH_DATASETS_DIR]"
+        ),
+    )
     e.add_argument("--timeout-s", type=int, default=None)
     e.add_argument("--keep-artifacts", action="store_true")
     e.add_argument("--work-dir", default=None, help="parent directory for PTDBench run artifacts")
@@ -179,6 +199,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="environment_mode written to the generated Harbor task",
     )
     h.add_argument("--judge-model", default=None, help="model used by PTDBench verifiers")
+    h.add_argument(
+        "--image",
+        default=None,
+        help=(
+            "base image for migrated (conda) tasks; defaults to $PTDBENCH_IMAGE_TAG."
+        ),
+    )
     h.add_argument(
         "--debian-mirror",
         default=None,
@@ -218,7 +245,15 @@ def main(argv=None) -> int:
 
     if args.command == "validate":
         evaluator = TaskEvaluator()
-        report = evaluator.validate(args.task_root, strict=not args.lenient)
+        try:
+            report = evaluator.validate(args.task_root, strict=not args.lenient)
+        except SchemaError as exc:
+            # 结构性错误（YAML 解析失败、environment 字段非法）本来会直接抛栈，但
+            # validate 的存在意义就是把问题讲清楚，所以也按 report 的形状输出。
+            report = {
+                "ok": False,
+                "issues": [{"severity": "error", "path": args.task_root, "message": str(exc)}],
+            }
         print(json.dumps(report, indent=2, ensure_ascii=False))
         return 0 if report.get("ok", False) else 1
 
@@ -291,6 +326,10 @@ def main(argv=None) -> int:
                 debian_mirror=args.debian_mirror,
                 huggingface_mirror=args.huggingface_mirror,
                 verifier_env=verifier_env,
+                models_dir=None if args.models_dir is None else Path(args.models_dir),
+                datasets_dir=(
+                    None if args.datasets_dir is None else Path(args.datasets_dir)
+                ),
             ),
         )
         payload = result.to_dict()
@@ -312,6 +351,7 @@ def main(argv=None) -> int:
                 verifier_network=args.verifier_network,
                 debian_mirror=args.debian_mirror,
                 temp_dir=args.harbor_temp_dir,
+                image=args.image,
                 harbor_command=harbor_command,
                 harbor_args=tuple(harbor_args),
             ),

@@ -93,11 +93,111 @@ CKPT_ARGS=(
    --save-interval 10
 )
 
-# --- require the local dense retrieval server -------------------------------
+# --- the local dense retrieval server ---------------------------------------
+# generate_with_search.py posts every search turn to
+# http://127.0.0.1:8000/retrieve, so the rollout cannot start without it.
+#
+# Started here rather than left to the caller, because none of the three paths
+# that run this script are able to start it themselves:
+#
+#   * the harness's prepare stage is a container created and removed around
+#     prepare.sh (evaluation/evaluator.py::_run_prepare, and
+#     runtimes/providers/docker.py::close_sandbox is a `docker rm -f`), so a
+#     server backgrounded there does not outlive the stage -- and prepare is
+#     waited on in the foreground, so starting it there without detaching just
+#     hangs until the stage timeout;
+#   * on the harbor path prepare can be a build-time RUN layer, which has no
+#     GPU at all;
+#   * the solution-level instruction forbids the agent from using `&`, nohup,
+#     tmux, screen or any other detach mechanism.
+#
+# A child of this script is none of those things: the script itself still runs
+# in the foreground and still owns the exit status. It also has to happen before
+# `ray start` below, so that sglang sizes its engines against the memory the
+# faiss shards already hold (see the SGLANG_ENABLE_TP_MEMORY_INBALANCE_CHECK
+# note above).
+#
+# An already-listening server is reused rather than restarted: loading the 60GiB
+# index takes minutes, which is the same reason kill_python_except_retriever at
+# the top of this file spares it across reruns.
 RETRIEVAL_PORT=${RETRIEVAL_PORT:-8000}
-if ! (exec 3<>"/dev/tcp/127.0.0.1/${RETRIEVAL_PORT}") 2>/dev/null; then
-   echo "[retrieval] no server on :${RETRIEVAL_PORT}. Start it first: examples/search-r1/start_retriever.sh" >&2
-   exit 1
+RETRIEVAL_LOG=${RETRIEVAL_LOG:-$SLIME_DIR/retrieval_server.log}
+# 30 minutes. A *cold* start also has to turn the 14GB corpus into datasets'
+# arrow cache, which is the slow half; environment/prepare.sh warms that cache
+# so the usual start is a few minutes. The guard has to cover the cold case
+# anyway -- nothing guarantees prepare ran.
+RETRIEVAL_STARTUP_TIMEOUT=${RETRIEVAL_STARTUP_TIMEOUT:-1800}
+
+# The port opens only after retrieval_server.py has built the retriever (the
+# index load and the corpus load both happen before uvicorn.run), so "listening"
+# really does mean "ready" -- no separate health request needed.
+retrieval_listening() { (exec 3<>"/dev/tcp/127.0.0.1/${RETRIEVAL_PORT}") 2>/dev/null; }
+
+# Matches the start script too, not just the server: for the first few seconds
+# after launch the process is still the `bash start_retriver.sh` wrapper and has
+# not exec'd python yet, and treating that as "already dead" would abort a start
+# that is fine.
+retrieval_alive() {
+   pgrep -f 'local_dense_retriever/retrieval_server.py' >/dev/null 2>&1 \
+      || pgrep -f 'search-r1/start_retriver.sh' >/dev/null 2>&1
+}
+
+if retrieval_listening; then
+   echo "[retrieval] reusing the server already listening on :${RETRIEVAL_PORT}"
+else
+   echo "[retrieval] starting the local dense retriever (log: $RETRIEVAL_LOG)"
+   # Note the spelling: the file is start_retriver.sh, without the second 'e'.
+   # It also carries no shebang, so it has to be handed to bash explicitly.
+   #
+   # DATA_DIR / MODEL_DIR are passed through rather than left to default to
+   # $PWD: the server must read the same wiki-18 and e5-base-v2 this run was
+   # told about, even when the caller's working directory is not $SLIME_DIR.
+   #
+   # setsid puts it in its own process group. A *rerun* of this script starts by
+   # walking process groups with pkill/ray stop, and keeping the retriever out of
+   # this shell's group is what makes kill_python_except_retriever's exemption
+   # actually hold.
+   #
+   # The redirections sit on the *subshell*, not on the setsid command inside it.
+   # This is not cosmetic. With `... setsid bash ... >"$LOG" 2>&1 &` the
+   # backgrounded AND-list runs in an intermediate subshell that still holds this
+   # script's own stdout and stderr, and that subshell outlives the script -- so
+   # the retriever, which is meant to survive for the *next* rerun, keeps the
+   # write end of this script's stdout pipe open. Whoever is reading that pipe
+   # (`| tee .../train.log` under docker/debug-env.sh, the harness's own capture
+   # in the agent stage) then never sees EOF, and a finished training run looks
+   # like a hung one. Redirecting the subshell leaves no descendant holding it.
+   (
+      cd "$SLIME_DIR" \
+         && DATA_DIR="$DATA_DIR" MODEL_DIR="$MODEL_DIR" \
+            setsid bash examples/search-r1/start_retriver.sh &
+   ) >"$RETRIEVAL_LOG" 2>&1 </dev/null
+
+   # The wait loop is untraced on purpose: at one probe every 5s a cold start
+   # would otherwise put thousands of `set -x` lines into the graded train log.
+   # Progress is reported once a minute instead.
+   set +x
+   retrieval_waited=0
+   until retrieval_listening; do
+      if ! retrieval_alive; then
+         echo "[retrieval] the server exited before it started listening." >&2
+         echo "[retrieval] last 40 lines of $RETRIEVAL_LOG:" >&2
+         tail -n 40 "$RETRIEVAL_LOG" >&2 || true
+         exit 1
+      fi
+      if [ "$retrieval_waited" -ge "$RETRIEVAL_STARTUP_TIMEOUT" ]; then
+         echo "[retrieval] still no listener on :${RETRIEVAL_PORT} after ${RETRIEVAL_STARTUP_TIMEOUT}s." >&2
+         echo "[retrieval] last 40 lines of $RETRIEVAL_LOG:" >&2
+         tail -n 40 "$RETRIEVAL_LOG" >&2 || true
+         exit 1
+      fi
+      sleep 5
+      retrieval_waited=$((retrieval_waited + 5))
+      if [ $((retrieval_waited % 60)) -eq 0 ]; then
+         echo "[retrieval] loading the index; ${retrieval_waited}s elapsed"
+      fi
+   done
+   set -x
 fi
 echo "[retrieval] server up on :${RETRIEVAL_PORT}"
 

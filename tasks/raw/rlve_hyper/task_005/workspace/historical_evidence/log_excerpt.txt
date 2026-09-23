@@ -1,9 +1,0 @@
-step=0 score=-1.000000000 truncated_ratio=0.734375
-step=19 score=-1.000000000 truncated_ratio=0.7421875
-step=39 score=-0.966254773 truncated_ratio=0.84375
-step=59 score=-0.976491446 truncated_ratio=0.78125
-step=79 score=-0.931522464 truncated_ratio=0.75
-step=99 score=-0.878882554 truncated_ratio=0.7265625
-step=119 score=-0.874061497 truncated_ratio=0.7265625
-step=139 score=-0.794620327 truncated_ratio=0.6953125
-step=159 score=-0.790758294 truncated_ratio=0.7265625

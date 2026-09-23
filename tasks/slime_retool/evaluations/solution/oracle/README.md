@@ -68,5 +68,8 @@ about 6394 tokens with a 5.1% truncate ratio.
 - Moderate length growth and a 22% eval truncate ratio at step 99. These are
   not a collapse and are not caused by a length bonus.
 
-Machine grading remains defined by the evaluation's `verifier/gold.yaml`.
-The solution verifier does not rerun training.
+Machine grading at the solution level is deterministic and metric-only: the
+verifier reconstructs `eval/aime` from the logs the agent's own run wrote under
+`$PTDBENCH_RESULTS/experiment_logs` and compares it to a fixed threshold. It
+does not read `gold.yaml`, which is reviewer-facing documentation. See
+`../verifier/README.md` for the threshold and its calibration.

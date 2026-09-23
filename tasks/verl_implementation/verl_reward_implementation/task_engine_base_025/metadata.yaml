@@ -11,8 +11,12 @@ dataset:
 training:
   framework: verl
   algo: grpo
+  script: examples/grpo_trainer/run_qwen2_5_0.5b_instruct_fsdp.sh
 environment:
-  dockerfile: environment/Dockerfile
+  conda: verl
+  env:
+    CUDA_VISIBLE_DEVICES: "0,1"
+    NVIDIA_VISIBLE_DEVICES: "0,1"
 outcome:
   failure_type: implementation_bug
   failure_reason: Rewritten BaseEngine, BaseEngineCtx, and EngineRegistry methods collapse GSM8K validation accuracy to zero with no reward rise versus a 47.8% baseline

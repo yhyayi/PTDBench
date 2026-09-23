@@ -1,5 +1,0 @@
-from Gym.environments.prefix_product_mod_distinct_permutation import PrefixProductMODDistinctPermutation_Environment
-
-identifier2environment = {
-    "PrefixProductMODDistinctPermutation": PrefixProductMODDistinctPermutation_Environment,
-}

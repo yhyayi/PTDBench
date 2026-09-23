@@ -1,0 +1,57 @@
+Restore `megatron.core.distributed.custom_fsdp` as an alias for the relocated
+Megatron-FSDP package.
+
+Taken from the Megatron-LM working tree inside slimerl/slime:v0.5.0rc0-cu126,
+which carries 9 modified files on top of the commit in ../../sources.txt
+(48406695c). Recover the full set with:
+
+    docker run --rm --entrypoint bash slimerl/slime:v0.5.0rc0-cu126 \
+        -lc 'git -C /root/Megatron-LM diff'
+
+Only 3 of those 9 files are taken here; see 0002 and 0003 for the other two and
+docker/envs/README.md for why the remaining six are left out.
+
+Why we need this one. mbridge imports the symbol at module scope --
+
+    mbridge/core/util.py:248
+        from megatron.core.distributed.custom_fsdp import (
+            FullyShardedDataParallel as custom_FSDP,
+        )
+
+-- and that line is reached by `from mbridge import AutoBridge`, which is the
+first statement of slime's tools/convert_hf_to_torch_dist.py. That converter is
+what produces the --ref-load checkpoint every rlve_hyper task passes to
+megatron, so without this alias the task cannot even be prepared:
+
+    ModuleNotFoundError: No module named 'megatron.core.distributed.custom_fsdp'
+
+At 48406695c the module has been moved to
+megatron/core/distributed/fsdp/src/megatron_fsdp/ and the class renamed
+MegatronFSDP, so nothing under the old name exists. The hunk below re-publishes
+the new module under the old dotted path in sys.modules and re-exports the class
+under its old name. It adds no behaviour: every symbol it binds already exists,
+and nothing that does not import `custom_fsdp` can observe the difference.
+
+`find_spec` guards the whole block, so if a future pin moves the package again
+this degrades to doing nothing rather than failing at import -- the same shape
+as the upstream image.
+diff --git a/megatron/core/distributed/__init__.py b/megatron/core/distributed/__init__.py
+index fe26e8b4..4451f277 100644
+--- a/megatron/core/distributed/__init__.py
++++ b/megatron/core/distributed/__init__.py
+@@ -11,3 +11,15 @@ from .finalize_model_grads import finalize_model_grads
+ from .fsdp.mcore_fsdp_adapter import FullyShardedDataParallel
+ from .torch_fully_sharded_data_parallel import TorchFullyShardedDataParallel
+ from .torch_fully_sharded_data_parallel_config import TorchFullyShardedDataParallelConfig
++
++# Backward compatibility patch for FSDP module reorganization
++import sys
++import importlib.util
++
++spec = importlib.util.find_spec('megatron.core.distributed.fsdp.src.megatron_fsdp')
++if spec:
++    custom_fsdp = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(custom_fsdp)
++    sys.modules['megatron.core.distributed.custom_fsdp'] = custom_fsdp
++    if hasattr(custom_fsdp, 'MegatronFSDP'):
++        custom_fsdp.FullyShardedDataParallel = custom_fsdp.MegatronFSDP

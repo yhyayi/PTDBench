@@ -11,8 +11,12 @@ dataset:
 training:
   framework: verl
   algo: grpo
+  script: examples/grpo_trainer/run_llama3_2_1b_instruct_dapo_math_fsdp.sh
 environment:
-  dockerfile: environment/Dockerfile
+  conda: verl
+  env:
+    CUDA_VISIBLE_DEVICES: "0,1"
+    NVIDIA_VISIBLE_DEVICES: "0,1"
 outcome:
   failure_type: implementation_bug
   failure_reason: A rewritten apply_monkey_patch no longer installs the baseline flash-attention hook, cutting val-core 43% below control with 70.5% zero-advantage steps

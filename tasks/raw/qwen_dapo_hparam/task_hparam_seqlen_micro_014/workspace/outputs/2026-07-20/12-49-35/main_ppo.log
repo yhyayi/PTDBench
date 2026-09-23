@@ -1,2 +1,0 @@
-[2026-07-20 12:49:38,481][megatron.core.distributed.fsdp.src.megatron_fsdp.param_and_grad_buffer][INFO] - Detected Megatron Core, using Megatron-FSDP with Megatron.
-[2026-07-20 12:49:38,484][megatron.core.distributed.fsdp.src.megatron_fsdp.megatron_fsdp][INFO] - Detected Megatron Core, using Megatron-FSDP with Megatron.

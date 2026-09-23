@@ -11,6 +11,7 @@ dataset:
 training:
   framework: verl
   algo: grpo
+  script: examples/grpo_trainer/run_qwen2_5_1.5b_instruct_taco_fsdp.sh
 environment:
   dockerfile: environment/Dockerfile
 outcome:

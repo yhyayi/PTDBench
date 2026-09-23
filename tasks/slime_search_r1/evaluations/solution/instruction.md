@@ -11,45 +11,35 @@ Use held-out evaluation evidence together with rollout, truncation, runtime,
 optimization, and training signals. Training reward alone does not establish
 held-out health.
 
-Do not launch a full training run, use the network, or fabricate log metrics.
-The dataset, held-out set, model, training-step budget, and evaluation interval
-are fixed. At this evaluation level, a solution is a concrete proposed
-remediation in the structured submission; no training rerun is required. If the
-run is healthy, there is nothing to fix.
+If you find a defect, fix it in the staged workspace at `/workspace`. Then run
+the experiment as a foreground process and wait until it returns. Do not use
+the network. Do not use `nohup`, `&`, `tmux`, `screen`, or any detach
+mechanism. The dataset, held-out set, model, training-step budget, and
+evaluation interval are fixed.
 
-## Deliverable
-
-Write exactly one UTF-8 JSON file to:
+The launch script is:
 
 ```text
-$PTDBENCH_RESULTS/submission.json
+examples/search-r1/run_qwen2.5_3B.sh
 ```
 
-It must satisfy this shape. Replace every angle-bracket placeholder; for a
-healthy run, use empty `root_cause` and `fix` arrays.
+The effective run must use:
 
-```json
-{
-  "verdict": "<healthy or unhealthy>",
-  "root_cause": [
-    {
-      "name": "<concrete parameter, symbol, file, or contract at fault>",
-      "where": "<workspace path or location>",
-      "observed": "<observed value or behavior>",
-      "expected": "<expected value or behavior>"
-    }
-  ],
-  "evidence": ["<specific workspace evidence supporting the verdict>"],
-  "fix": [
-    {
-      "target": "<what to change>",
-      "change": "<actionable change and value or direction>"
-    }
-  ]
-}
-```
+- HF checkpoint `/workspace/Qwen2.5-3B`
+- Megatron torch_dist reference `/workspace/Qwen2.5-3B_torch_dist`
+- train data `/workspace/nq_hotpotqa_train/train.parquet`
+- validation data `/workspace/nq_hotpotqa_train/test.parquet`
+- `--num-rollout 100`
+- `--eval-interval 10`
+- local retrieval server `http://127.0.0.1:8000/retrieve`
+- `LOG_DIR=$PTDBENCH_RESULTS/experiment_logs`
+- `WANDB_MODE=offline`
+- `WANDB_DIR=$PTDBENCH_RESULTS/experiment_logs`
 
-For an unhealthy run, put the most likely cause first and address it with a
-concrete fix (correct target and direction). Broad categories without a
-concrete attribution are insufficient. For a healthy run, use empty
-`root_cause` and `fix` arrays. Do not write prose outside `submission.json`.
+Create `$PTDBENCH_RESULTS/experiment_logs` first. Write the training and
+evaluation log into that directory. Offline W&B data must be created below
+`$PTDBENCH_RESULTS/experiment_logs/wandb`. If the launch script requires a W&B
+API key even in offline mode, provide a harmless local placeholder. The run is
+scored only from files under `$PTDBENCH_RESULTS/experiment_logs`; logs written
+anywhere else are ignored. Do not copy, edit, or fabricate log metrics.
+Otherwise the run is scored 0.

@@ -1,6 +1,0 @@
-step=0 key=val-core/math_dapo/acc/mean@1 score=0.042481833
-step=20 key=val-core/math_dapo/acc/mean@1 score=0.050866406
-step=40 key=val-core/math_dapo/acc/mean@1 score=0.057015092
-step=60 key=val-core/math_dapo/acc/mean@1 score=0.050307434
-step=80 key=val-core/math_dapo/acc/mean@1 score=0.052543320
-step=100 key=val-core/math_dapo/acc/mean@1 score=0.055897149

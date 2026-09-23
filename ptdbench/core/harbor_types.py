@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 from urllib.parse import urlsplit
 
-from .types import CommandResult, EvaluationPaths, EvaluationResult, TaskPackage
+from .types import (
+    DEFAULT_IMAGE,
+    DEFAULT_IMAGE_ENV,
+    CommandResult,
+    EvaluationPaths,
+    EvaluationResult,
+    TaskPackage,
+)
 
 
 def harbor_task_name(task_id: str, evaluation_level: str) -> str:
@@ -26,6 +34,8 @@ class HarborEvaluationConfig:
     verifier_network: str = "public"
     debian_mirror: Optional[str] = None
     temp_dir: Optional[Path] = None
+    # 迁移后的任务以统一镜像为 base；与 EvaluationConfig 用同一个环境变量。
+    image: Optional[str] = None
     harbor_command: Sequence[str] = field(default_factory=lambda: ("harbor",))
     harbor_args: Sequence[str] = field(default_factory=tuple)
 
@@ -67,6 +77,10 @@ class HarborEvaluationConfig:
 
         if self.temp_dir is not None:
             object.__setattr__(self, "temp_dir", Path(self.temp_dir).expanduser())
+        if self.image is None:
+            object.__setattr__(
+                self, "image", os.environ.get(DEFAULT_IMAGE_ENV) or DEFAULT_IMAGE
+            )
         object.__setattr__(self, "harbor_command", tuple(self.harbor_command))
         object.__setattr__(self, "harbor_args", tuple(self.harbor_args))
 

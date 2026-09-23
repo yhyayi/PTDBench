@@ -35,8 +35,8 @@ collapse.
 
 The agent cannot read oracle or verifier paths. `issue` grading compares
 `$PTDBENCH_RESULTS/agent_answer.md` to hidden `oracle.md` with an LLM
-judge. `solution` grading reads `$PTDBENCH_RESULTS/submission.json` against
-`verifier/gold.yaml`.
+judge. `solution` grading reconstructs `eval/aime` from the logs the agent's
+own run wrote under `$PTDBENCH_RESULTS/experiment_logs`.
 
 ## Source and preserved context
 
@@ -75,8 +75,9 @@ through train step 100, config, summary; no `.wandb` binary history).
 - train response length at step 100 is about 6394 tokens with a 5.1% truncate
   ratio
 
-The preserved source metric is `eval/aime`. The frozen workspace remains the
-evidence package; a full training rerun is outside verifier scope.
+The preserved source metric is `eval/aime`. The frozen workspace is the
+evidence package the agent diagnoses from; it is also the calibration source
+for the solution-level threshold (see below).
 
 ## Why the recipe is healthy
 
@@ -132,21 +133,55 @@ defects.
 `issue` grades `$PTDBENCH_RESULTS/agent_answer.md` against hidden
 `oracle.md`. The judge scores verdict, root-cause, and evidence agreement
 (weights 0.2 / 0.6 / 0.2). Pass is a weighted score of at least `0.8`.
+Diagnosis is from the frozen snapshot only — the instruction forbids launching
+training, exactly as in the bug-injected tasks.
 
-`solution` grades `$PTDBENCH_RESULTS/submission.json` against
-`verifier/gold.yaml`. Because the gold verdict is `healthy`, once the issue
-stage is `correct` the solution stage is `n/a` and the combined score is
-`1.0`; no remediation is required.
+`solution` is deterministic and metric-only, in the same shape as
+`rlve_hyper/*` and `slime_retool_length_hack`: fix what you found, run the
+experiment for real, and the verifier reconstructs `eval/aime` from the logs
+under `$PTDBENCH_RESULTS/experiment_logs`. Nothing about the protocol tells
+the agent whether this run is healthy — that is the point. The bar is
+`-0.55` on the best eval point, calibrated so an untrained step 0 (`-0.5913`)
+fails and every trained point in the historical trace passes; see
+`evaluations/solution/verifier/README.md`.
 
-The verifier does not launch training or require network access.
+**Scheduling note for maintainers.** This task has no injected defect, so its
+solution level asks for a fix that does not exist. That is resolved outside
+the task package: tasks with no injected defect are scheduled at the `issue`
+level only. The solution level is kept in the bug-injected shape so that the
+task package itself carries no tell.
 
 ## Environment requirement
 
-Use the Docker agent backend. `environment/Dockerfile` builds from the public
-`slimerl/slime` image so the verifier's Python is available. It intentionally
-does **not** download the Qwen3-4B checkpoint, the DAPO-Math-17k / ReTool-SFT
-data, or run the sandbox: diagnosis uses the frozen historical snapshot, and
-those assets are neither committed to the repository nor practically
-packageable.
+The task runs on the unified PTDBench image, in the `slime-v0.3.1` conda
+environment (`environment: conda: slime-v0.3.1`) — torch 2.11 / CUDA 13.0 /
+sglang 0.5.15, the stack `slimerl/slime:latest` shipped at slime 0.3.1. It is
+*not* the `slime-rc0` environment the `rlve_hyper` tasks use: the ReTool recipe
+imports `sglang.srt.constants.GPU_MEMORY_TYPE_CUDA_GRAPH`, which sglang 0.5.0rc0
+does not define. See `docker/envs/README.md`.
+
+`environment/prepare.sh` delivers the four assets the ReTool recipe needs:
+DAPO-Math-17k jsonl, AIME-2024 jsonl, the SFT'd HF checkpoint (all three
+pinned by commit sha and checksummed), and the torch_dist conversion of that
+checkpoint. The conversion has no upstream repo, so prepare builds it on the
+spot with `WORLD_SIZE=1` and `--rotary-base 5000000`; if no CUDA device is
+visible — which is the case on the harbor backend, where prepare is a
+build-time layer — it is skipped and the launch script's own
+`if [ ! -d "$DIST_MODEL_DIR" ]` guard does it during the agent stage instead.
+
+Two things to know before attempting a real run:
+
+- The recipe needs **8 GPUs** (`ray start --num-gpus 8`,
+  `--actor-num-gpus-per-node 8`). `metadata.yaml` declares them through
+  `NVIDIA_VISIBLE_DEVICES`, which the docker runtime turns into `--gpus`.
+  On the harbor backend that translation does not exist — the generated
+  `task.toml` has no `gpus` field and harbor's local docker environment
+  reports no GPU capability — so `environment/docker-compose.yaml` carries the
+  device reservation and `shm_size` instead. Harbor merges it onto its own
+  `main` service; the adapter copies `environment/` verbatim, so no adapter
+  change is involved. That file is inert on the native docker path.
+- A full 100-rollout run on Qwen3-4B at 16k context is a long job. The
+  harness has one `--timeout-s` shared by all three stages, so it has to
+  cover prepare's ~16GB download plus the training run.
 
 The workspace code and the ReTool recipe are distributed under Apache-2.0.

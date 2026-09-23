@@ -1,7 +1,0 @@
-{
-  "failure_class": "historical_run_unavailable",
-  "historical_eval_points": 0,
-  "baseline_status": "manual_reference",
-  "heldout_environment_count": 39,
-  "authoritative_baseline_archive": "20260724T091718Z"
-}

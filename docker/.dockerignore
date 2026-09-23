@@ -1,0 +1,23 @@
+# The build context is docker/ itself. The image needs the environment registry
+# and three small scripts; everything else here runs on the host.
+build.sh
+debug-env.sh
+smoke.sh
+warm-cache.sh
+collect_envs.py
+fetch-cuda-wheels.sh
+fetch-git-mirrors.sh
+__pycache__/
+envs/README.md
+
+# wheels/ and gitmirror/ are deliberately NOT excluded: each env-* stage COPYs
+# its own subdirectory out of this context. Leaving them in costs nothing
+# measurable -- BuildKit transfers only the files a COPY actually references,
+# not the whole tree (measured: 21 kB and ~1.3 s for a context with 3.2 GB of
+# wheels sitting in it), and each COPY hashes only the subtree it names.
+#
+# _store is the exception, and the only thing here that would be shipped for
+# nothing. fetch-git-mirrors.sh clones into it once and hardlinks into each
+# gitmirror/<env>, so it is a full duplicate of what the stages already get, and
+# no COPY names it.
+gitmirror/_store/**

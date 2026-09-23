@@ -23,6 +23,10 @@ from ..core.harbor_types import (
     harbor_task_name,
 )
 from ..core.types import (
+    DATASETS_DIR,
+    MODELS_DIR,
+    PREPARED_DIR,
+    PTDBENCH_ENVIRONMENT_DIR,
     CommandResult,
     EvaluationPaths,
     EvaluationResult,
@@ -99,26 +103,119 @@ class HarborTaskMaterializer:
         config: HarborEvaluationConfig,
     ) -> None:
         environment_dir = task_dir / "environment"
-        copy_tree(package.paths.environment, environment_dir)
+        if package.paths.environment.is_dir():
+            copy_tree(package.paths.environment, environment_dir)
+        else:
+            ensure_dir(environment_dir)
 
         build_context = ensure_dir(environment_dir / ".ptdbench")
         copy_tree(package.paths.workspace, build_context / "workspace")
         public_dir = ensure_dir(build_context / "public")
         shutil.copy2(evaluation.instruction_md, public_dir / "instruction.md")
 
-        source_dockerfile = package.paths.environment / self._dockerfile(package)
-        dockerfile = source_dockerfile.read_text(encoding="utf-8").rstrip()
-        dockerfile += self._debian_mirror_layer(config.debian_mirror)
-        dockerfile += """
+        if package.environment.is_legacy:
+            dockerfile = (
+                self._legacy_base(package, config)
+                + self._workspace_layer()
+                + self._public_layer()
+            )
+        else:
+            dockerfile = self._conda_base(package, evaluation, config, build_context)
 
-# PTDBench Harbor adapter: workspace 和公开 instruction 会进入 agent 镜像；
-# oracle/verifier 只会在 agent 结束后由 Harbor 上传到 /tests。
+        write_text(environment_dir / "Dockerfile", dockerfile)
+        self._allow_adapter_context(environment_dir / ".dockerignore")
+
+    def _legacy_base(
+        self, package: TaskPackage, config: HarborEvaluationConfig
+    ) -> str:
+        source_dockerfile = package.paths.environment / self._dockerfile(package)
+        base = source_dockerfile.read_text(encoding="utf-8").rstrip()
+        return base + self._debian_mirror_layer(config.debian_mirror)
+
+    def _conda_base(
+        self,
+        package: TaskPackage,
+        evaluation: EvaluationPaths,
+        config: HarborEvaluationConfig,
+        build_context: Path,
+    ) -> str:
+        """迁移后的任务没有自己的 Dockerfile，这里现生成一个。
+
+        docker 那条路把 prepare.sh 跑在一个独立的、唯一联网的容器里；Harbor 的
+        task.toml（schema 1.4）既不挂宿主目录也没有 pre-agent 阶段，所以这里把同一个
+        prepare.sh 烘成一个 `RUN` 层——构建期是 Harbor 这条路上唯一还有网络、还能往
+        镜像里写东西的时刻。脚本本身一个字都不用改，这正是 prepare.sh 取代 assets.yaml
+        换来的：一份声明，两条路都能执行。
+        """
+        plan = package.environment
+        base = f"FROM {config.image}\n"
+        base += self._debian_mirror_layer(config.debian_mirror)
+        # workspace 先进去：prepare.sh 会往 $PTDBENCH_WORKSPACE 里下权重，反过来的话
+        # 这一层会把下好的东西盖掉。
+        base += self._workspace_layer()
+
+        script = self._prepare_script(package)
+        if script is not None:
+            copy_tree(package.paths.environment, build_context / "environment")
+            base += f"""
+
+# PTDBench Harbor adapter: 构建期执行任务的 prepare.sh（下模型、下数据集、写 env）。
+COPY .ptdbench/environment/ {PTDBENCH_ENVIRONMENT_DIR}/
+RUN mkdir -p {PREPARED_DIR} {MODELS_DIR} {DATASETS_DIR} \\
+ && PTDBENCH_STAGE=prepare \\
+    PTDBENCH_TASK_ID={shlex.quote(package.task_id)} \\
+    PTDBENCH_EVALUATION_LEVEL={shlex.quote(evaluation.level)} \\
+    PTDBENCH_CONDA_ENV={shlex.quote(plan.conda or "")} \\
+    PTDBENCH_WORKSPACE=/workspace \\
+    PTDBENCH_ENVIRONMENT={PTDBENCH_ENVIRONMENT_DIR} \\
+    PTDBENCH_PREPARED={PREPARED_DIR} \\
+    PTDBENCH_MODELS={MODELS_DIR} \\
+    PTDBENCH_DATASETS={DATASETS_DIR} \\
+    bash {shlex.quote(script)} \\
+ && rm -rf {MODELS_DIR} {DATASETS_DIR}
+"""
+            # 两个缓存根是"为了不重下"，不是产物。留在镜像里等于把每个模型存两份，
+            # 而 Harbor 那边每个任务一个镜像，这笔账翻倍得很快。删掉它们也意味着
+            # 任务脚本不能依赖这两个路径——交付走 prepare.sh 的 --dest。
+        return base + self._public_layer()
+
+    @staticmethod
+    def _prepare_script(package: TaskPackage) -> Optional[str]:
+        """prepare.sh 在镜像里的路径，任务没有这个脚本就返回 None。"""
+        prepare = package.environment.prepare
+        if prepare is None:
+            return None
+        if not prepare.is_file():
+            raise SchemaError(
+                f"metadata.environment.prepare not found: {prepare}"
+            )
+        try:
+            relative = prepare.resolve().relative_to(package.paths.environment.resolve())
+        except ValueError as exc:
+            raise SchemaError(
+                f"task {package.task_id!r}: metadata.environment.prepare must stay "
+                f"under {package.paths.environment}; only that directory is copied "
+                f"into the image"
+            ) from exc
+        return f"{PTDBENCH_ENVIRONMENT_DIR}/{relative.as_posix()}"
+
+    @staticmethod
+    def _workspace_layer() -> str:
+        return """
+
+# PTDBench Harbor adapter: workspace 进入 agent 镜像。
 COPY --chmod=0777 .ptdbench/workspace/ /workspace/
+"""
+
+    @staticmethod
+    def _public_layer() -> str:
+        return """
+
+# PTDBench Harbor adapter: 只有公开 instruction 进镜像；
+# oracle/verifier 只会在 agent 结束后由 Harbor 上传到 /tests。
 COPY --chmod=0444 .ptdbench/public/ /ptdbench/
 WORKDIR /workspace
 """
-        write_text(environment_dir / "Dockerfile", dockerfile)
-        self._allow_adapter_context(environment_dir / ".dockerignore")
 
     @staticmethod
     def _debian_mirror_layer(mirror: Optional[str]) -> str:
@@ -284,6 +381,34 @@ exit "$verifier_status"
         if config.judge_model:
             verifier_env["PTDBENCH_JUDGE_MODEL"] = config.judge_model
 
+        agent_env = {
+            "PTDBENCH_TASK_ID": package.task_id,
+            "PTDBENCH_EVALUATION_LEVEL": evaluation.level,
+            "PTDBENCH_WORKSPACE": "/workspace",
+            "PTDBENCH_RESULTS": "/logs/artifacts",
+            "PTDBENCH_VISIBLE_TASK": "/ptdbench",
+            "PTDBENCH_TASK_ROOT": "/ptdbench",
+            "PTDBENCH_STAGE": "agent",
+        }
+        # 迁移后的任务要靠这个变量选栈；raw 任务留空，activate 脚本会原地返回。
+        conda_env = package.environment.conda
+        if conda_env:
+            agent_env["PTDBENCH_CONDA_ENV"] = conda_env
+            verifier_env["PTDBENCH_CONDA_ENV"] = conda_env
+            # prepare.sh 在构建期写的 env 文件就在镜像里的这个路径下；两个 stage
+            # 都要指过去，否则它导出的变量在评测时一个也不会生效。
+            agent_env["PTDBENCH_PREPARED"] = PREPARED_DIR
+            verifier_env["PTDBENCH_PREPARED"] = PREPARED_DIR
+            agent_env["PTDBENCH_ENVIRONMENT"] = PTDBENCH_ENVIRONMENT_DIR
+            verifier_env["PTDBENCH_ENVIRONMENT"] = PTDBENCH_ENVIRONMENT_DIR
+
+        # 任务声明的 env（CUDA_VISIBLE_DEVICES 之类）两个 stage 都要给，否则迁移到
+        # 统一镜像之后这批逐任务不同的变量会静默消失。PTDBENCH_* 进不来，
+        # EnvironmentPlan 已经挡过一道。
+        for key, value in package.environment.env.items():
+            agent_env[key] = value
+            verifier_env[key] = value
+
         task_toml = f'''schema_version = "1.4"
 
 artifacts = ["/workspace"]
@@ -307,13 +432,7 @@ network_mode = {self._toml_string(config.verifier_network)}
 workdir = "/workspace"
 
 [environment.env]
-PTDBENCH_TASK_ID = {self._toml_string(package.task_id)}
-PTDBENCH_EVALUATION_LEVEL = {self._toml_string(evaluation.level)}
-PTDBENCH_WORKSPACE = "/workspace"
-PTDBENCH_RESULTS = "/logs/artifacts"
-PTDBENCH_VISIBLE_TASK = "/ptdbench"
-PTDBENCH_TASK_ROOT = "/ptdbench"
-PTDBENCH_STAGE = "agent"
+{self._toml_env(agent_env)}
 
 [verifier.env]
 {self._toml_env(verifier_env)}

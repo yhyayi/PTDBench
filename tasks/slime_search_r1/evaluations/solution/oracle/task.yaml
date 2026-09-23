@@ -20,6 +20,10 @@ note: >-
   in-tree examples/search-r1 recipe (multi-turn retrieval-augmented GRPO). No
   defect is injected. Frozen historical evidence covers train step 100 / last
   eval step 99 (eval_interval 10). Expected root_cause and fix are empty.
+  Solution grading is metric-only after a rerun: best eval/nq_test must be at
+  least 0.28 (historical peak 0.3763, step 99 at 0.3753). Since there is
+  nothing to repair, a faithful rerun of the staged recipe clears that bar;
+  the bar exists to catch an agent that invents a defect and breaks it.
 key_files:
 - examples/search-r1/run_qwen2.5_3B.sh
 - examples/search-r1/generate_with_search.py
@@ -27,7 +31,14 @@ key_files:
 - examples/search-r1/local_search_server.py
 - outputs/metrics.json
 - outputs/historical_eval_trace.log
-external_assets_not_packaged:
-- Qwen2.5-3B HF + torch_dist checkpoints
-- Search-R1 nq_hotpotqa_train / test parquet
-- wiki-18 e5 FAISS index + corpus (~130GB) for the local dense retriever
+external_assets_not_in_git:
+- Qwen2.5-3B HF checkpoint, delivered by environment/prepare.sh; its torch_dist
+  reference is converted there too when the prepare stage finds a GPU with at
+  least 12GiB free, and by the launch script's own guard otherwise
+- the intfloat/e5-base-v2 query encoder the retrieval server loads, delivered by
+  environment/prepare.sh
+- Search-R1 nq_hotpotqa_train train/test parquet, rebuilt from pinned upstream
+  jsonl by environment/prepare.sh (ptdbench_dataset --recipe search_r1_nq_hotpotqa)
+- wiki-18 e5 FAISS index + corpus (~79GB assembled) for the local dense
+  retriever, delivered by environment/prepare.sh (--recipe wiki18_e5); starting
+  the retriever itself is still part of the rerun

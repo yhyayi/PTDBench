@@ -14,3 +14,19 @@ evidence_metrics:
 - historical eval/aime at step 99 is -0.4966 (about 25.2% acc), up from -0.591 (20.4%) at step 0; train response_len at step 100 is about 6394 with 5.1% truncate
 fix:
   must: []
+solution_metric:
+  key: eval/aime
+  final_step: 99
+  historical_final_baseline: -0.4965625
+  required_final_score: -0.55
+  required_final_score_max: 1.0
+  note: >-
+    eval/aime is the math_dapo score channel in [-1, 1], graded in the same
+    space the frozen trace was logged in -- this recipe's reward_func is
+    unmodified, so no --eval-reward-key is needed to read it. Machine grading
+    reads only the new experiment logs. score_mode is best: the bar is "the
+    run actually trained", and single eval points on 30 AIME problems are
+    noisy. -0.55 fails an untrained step 0 (historical -0.5913) and passes
+    every trained point in the historical trace (worst is step 19 at -0.5375,
+    0.037 of margin). Note this level is not scheduled for tasks with no
+    injected defect -- see readme.md.

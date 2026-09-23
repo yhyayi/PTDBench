@@ -1,0 +1,21 @@
+# Source trees this env installs editable, because a task script names the
+# directory by absolute path and no amount of PYTHONPATH can redirect it.
+#
+# Format:  <dir-name> <git-url> <commit>
+#
+# Each is cloned to /opt/conda/envs/slime-rc0/src/<dir-name> -- inside the env
+# prefix, so it travels with the env through the path-identical COPY -- and
+# installed with `pip install -e`. ptdbench-activate.sh symlinks it to the
+# absolute path the scripts expect (/root/<dir-name>).
+#
+# Why this is safe while moving compiled packages is not: these are pure Python
+# trees resolved through PYTHONPATH at import time. Nothing about their build
+# environment is baked into a file on disk. Compiled artifacts are the opposite,
+# which is what sank the previous design.
+#
+# Megatron-LM: slime's launch scripts assign (not append)
+#   export PYTHONPATH=/workspace:/root/Megatron-LM
+# and repeat it inside the Ray runtime_env JSON, where an outer export cannot
+# reach it. tasks/rlve_hyper/*/workspace/scripts/training/*/rlve.sh is the live
+# example. Commit is the one slimerl/slime:v0.5.0rc0-cu126 was built from.
+Megatron-LM https://github.com/NVIDIA/Megatron-LM.git 48406695c4efcf1026a7ed70bb390793918dd97b

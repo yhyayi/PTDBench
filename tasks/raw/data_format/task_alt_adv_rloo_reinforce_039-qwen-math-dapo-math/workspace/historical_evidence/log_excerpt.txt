@@ -1,6 +1,0 @@
-step=0 key=val-core/math_dapo/acc/mean@1 score=0.000000000
-step=20 key=val-core/math_dapo/acc/mean@1 score=0.000000000
-step=40 key=val-core/math_dapo/acc/mean@1 score=0.000000000
-step=60 key=val-core/math_dapo/acc/mean@1 score=0.000000000
-step=80 key=val-core/math_dapo/acc/mean@1 score=0.000000000
-step=100 key=val-core/math_dapo/acc/mean@1 score=0.000000000

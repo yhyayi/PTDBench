@@ -42,11 +42,17 @@ class LocalRuntime(SandboxRuntime):
             "results": request.host_results,
             "oracle": oracle,
             "verifier": verifier,
+            # 本机模式没有挂载，逻辑路径就是宿主机路径。三个可选目录只有在调用方
+            # 真的给了的时候才存在——缺了要报 unknown path，而不是返回一个 None。
+            "environment": request.host_environment,
+            "prepared": request.host_prepared,
+            "models": request.host_models,
+            "datasets": request.host_datasets,
         }
-        try:
-            return str(paths[name].resolve())
-        except KeyError as exc:
-            raise ValueError(f"unknown sandbox path: {name}") from exc
+        selected = paths.get(name)
+        if selected is None:
+            raise ValueError(f"unknown sandbox path: {name}")
+        return str(selected.resolve())
 
     def run(
         self,

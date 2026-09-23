@@ -1,5 +1,7 @@
 # Adapted from https://github.com/OpenRLHF/OpenRLHF/blob/10c733694ed9fbb78a0a2ff6a05efc7401584d46/openrlhf/trainer/ray/utils.py#L1
 import os
+import sys
+from pathlib import Path
 
 import ray
 import torch
@@ -40,6 +42,81 @@ RAY_DEFAULT_ENV_VARS = {
 
 def add_default_ray_env_vars(env_vars: dict[str, str] | None = None) -> dict[str, str]:
     return RAY_DEFAULT_ENV_VARS | (env_vars or {})
+
+
+def memory_saver_loader_env() -> dict[str, str]:
+    """Conda/pip stand-in for the official image's /usr/local/cuda/lib64.
+
+    Official slime:latest puts system CUDA on LD_LIBRARY_PATH via image ENV.
+    This stack keeps libcudart under site-packages/nvidia/*/lib. SGLang's
+    configure_subprocess() only sets LD_PRELOAD; the preload .so still needs
+    these dirs in the scheduler process or it will not load.
+    """
+    nvidia = (
+        Path(sys.prefix)
+        / "lib"
+        / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        / "site-packages"
+        / "nvidia"
+    )
+    extras = [str(p) for p in (*nvidia.glob("*/lib"), *nvidia.glob("*/lib64"))]
+    extras.append(str(Path(sys.prefix) / "lib"))
+    merged: list[str] = []
+    for part in (*os.environ.get("LD_LIBRARY_PATH", "").split(":"), *extras):
+        if part and part not in merged:
+            merged.append(part)
+    return {"LD_LIBRARY_PATH": ":".join(merged)}
+
+
+def _preload_dynlib() -> Path:
+    import torch_memory_saver
+
+    parent = Path(torch_memory_saver.__file__).resolve().parent.parent
+    pkg = Path(torch_memory_saver.__file__).resolve().parent
+    for candidate in (
+        *(
+            parent / name
+            for name in (
+                "torch_memory_saver_hook_mode_preload_cu13.abi3.so",
+                "torch_memory_saver_hook_mode_preload_cu12.abi3.so",
+                "torch_memory_saver_hook_mode_preload.abi3.so",
+            )
+        ),
+        *parent.glob("torch_memory_saver_hook_mode_preload*.so"),
+        *pkg.glob("torch_memory_saver_hook_mode_preload*.so"),
+    ):
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        "Cannot find torch_memory_saver preload hook. "
+        "Install zhuzilin/torch_memory_saver@8d30c59 (the slime:latest pin)."
+    )
+
+
+def memory_saver_preload_env(*, enable_from_start: bool = False) -> dict[str, str]:
+    """LD_PRELOAD + loader path for Megatron train actors.
+
+    Official slime sets this pair only when offload_train. Do not use it for
+    SGLang engines: configure_subprocess() prepends LD_PRELOAD, and a second
+    copy makes get_path_binary() see two entries and reject preload mode.
+    """
+    env = memory_saver_loader_env()
+    env["LD_PRELOAD"] = str(_preload_dynlib())
+    if enable_from_start:
+        env["TMS_INIT_ENABLE"] = "1"
+        env["TMS_INIT_ENABLE_CPU_BACKUP"] = "1"
+    return env
+
+
+# Nothing here pins torch_memory_saver.hook_mode, deliberately. The zhuzilin
+# pin already defaults to "preload"; the only thing that ever moved it off
+# that default was Megatron's megatron/core/inference/contexts/dynamic_context.py
+# assigning "torch" at import time, and that is now patched out at build time --
+# see docker/envs/slime-v0.3.1/patches/Megatron-LM/0001-tms-hook-mode.patch.
+#
+# It has to be fixed there and not here. hook_mode is a process-global set
+# during an import, so whatever the parent does is both undone by that import
+# and not inherited across the scheduler's spawn anyway.
 
 
 def ray_noset_visible_devices(env_vars=os.environ):

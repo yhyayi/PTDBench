@@ -16,7 +16,13 @@ from ptdbench.core.harbor_types import (
     HarborTaskUnit,
     PreparedHarborTask,
 )
-from ptdbench.core.types import CommandResult
+from ptdbench.core.types import (
+    DATASETS_DIR,
+    MODELS_DIR,
+    PREPARED_DIR,
+    PTDBENCH_ENVIRONMENT_DIR,
+    CommandResult,
+)
 from ptdbench.evaluation.harbor_evaluator import (
     HarborAdapterError,
     HarborEvaluator,
@@ -672,6 +678,167 @@ class HarborResultMapperTests(unittest.TestCase):
                 ),
                 HarborEvaluationConfig(),
             )
+
+
+class HarborCondaTaskTests(unittest.TestCase):
+    """迁移后的任务在 Harbor 下没有自己的 Dockerfile，适配器要现生成一个。"""
+
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp_dir.name)
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+
+    def _conda_task(self, environment_block: str, *, prepare: str | None = None) -> Path:
+        """把 example 任务改成 conda 形态：删掉 Dockerfile，换掉 environment 段。"""
+        task = self.root / "conda_task"
+        shutil.copytree(SWE_TASK, task)
+        (task / "environment" / "Dockerfile").unlink()
+        metadata = (task / "metadata.yaml").read_text(encoding="utf-8")
+        metadata = metadata.replace(
+            "environment:\n  dockerfile: environment/Dockerfile\n",
+            environment_block,
+        )
+        (task / "metadata.yaml").write_text(metadata, encoding="utf-8")
+        if prepare is not None:
+            (task / "environment" / "prepare.sh").write_text(prepare, encoding="utf-8")
+        return task
+
+    def _materialize(self, task: Path, **kwargs) -> Path:
+        package = load_task_package(task)
+        unit = make_unit(package, "solution")
+        prepared = HarborTaskMaterializer().materialize(
+            [unit],
+            self.root / "out",
+            HarborEvaluationConfig(evaluation_level="solution", **kwargs),
+        )
+        return prepared.task_dir(unit)
+
+    def test_dockerfile_is_generated_from_the_unified_image(self):
+        task = self._conda_task("environment:\n  conda: verl\n")
+        task_dir = self._materialize(task, image="ptdbench/env:test")
+        dockerfile = (task_dir / "environment" / "Dockerfile").read_text(encoding="utf-8")
+
+        self.assertIn("FROM ptdbench/env:test", dockerfile)
+        self.assertIn("COPY --chmod=0777 .ptdbench/workspace/ /workspace/", dockerfile)
+        self.assertIn("WORKDIR /workspace", dockerfile)
+
+    def test_legacy_task_keeps_its_own_base_image(self):
+        # raw 任务有自己的 Dockerfile，不该被改写成统一镜像。
+        package = load_task_package(SWE_TASK)
+        unit = make_unit(package, "solution")
+        prepared = HarborTaskMaterializer().materialize(
+            [unit], self.root / "legacy", HarborEvaluationConfig()
+        )
+        dockerfile = (
+            prepared.task_dir(unit) / "environment" / "Dockerfile"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("FROM ptdbench/env", dockerfile)
+
+    def test_conda_env_reaches_both_stages(self):
+        task = self._conda_task("environment:\n  conda: slime-v0.3.1\n")
+        task_dir = self._materialize(task)
+        toml = (task_dir / "task.toml").read_text(encoding="utf-8")
+        agent_block, verifier_block = toml.split("[verifier.env]")
+
+        self.assertIn('PTDBENCH_CONDA_ENV = "slime-v0.3.1"', agent_block)
+        self.assertIn('PTDBENCH_CONDA_ENV = "slime-v0.3.1"', verifier_block)
+
+    def test_both_stages_are_told_where_prepare_left_its_output(self):
+        # prepare.sh 在构建期就跑完了；两个 stage 只有靠这个变量才找得到它写的东西。
+        task = self._conda_task("environment:\n  conda: verl\n")
+        toml = (self._materialize(task) / "task.toml").read_text(encoding="utf-8")
+        agent_block, verifier_block = toml.split("[verifier.env]")
+        for block in (agent_block, verifier_block):
+            self.assertIn(f'PTDBENCH_PREPARED = "{PREPARED_DIR}"', block)
+            self.assertIn(f'PTDBENCH_ENVIRONMENT = "{PTDBENCH_ENVIRONMENT_DIR}"', block)
+
+    def test_no_workspace_source_variable_reaches_harbor(self):
+        # 这个变量已经随 image 模式一起删掉了；再出现说明有地方回退了旧接线。
+        task = self._conda_task("environment:\n  conda: verl\n")
+        toml = (self._materialize(task) / "task.toml").read_text(encoding="utf-8")
+        self.assertNotIn("PTDBENCH_WORKSPACE_SOURCE", toml)
+
+    def test_legacy_task_still_has_no_conda_variable(self):
+        package = load_task_package(SWE_TASK)
+        unit = make_unit(package, "solution")
+        prepared = HarborTaskMaterializer().materialize(
+            [unit], self.root / "legacy2", HarborEvaluationConfig()
+        )
+        toml = (prepared.task_dir(unit) / "task.toml").read_text(encoding="utf-8")
+        self.assertNotIn("PTDBENCH_CONDA_ENV", toml)
+
+    def test_prepare_is_baked_as_a_build_layer(self):
+        # Harbor 的 task.toml 没有 pre-agent 阶段，构建期是这条路上唯一还有网络、
+        # 还能往镜像里写东西的时刻。同一份 prepare.sh，一个字都不用改。
+        task = self._conda_task(
+            "environment:\n  conda: verl\n",
+            prepare="#!/usr/bin/env bash\necho fetching\n",
+        )
+        task_dir = self._materialize(task)
+        dockerfile = (task_dir / "environment" / "Dockerfile").read_text(encoding="utf-8")
+
+        self.assertIn(f"bash {PTDBENCH_ENVIRONMENT_DIR}/prepare.sh", dockerfile)
+        self.assertIn("PTDBENCH_STAGE=prepare", dockerfile)
+        self.assertIn("PTDBENCH_CONDA_ENV=verl", dockerfile)
+        self.assertEqual(
+            (
+                task_dir / "environment" / ".ptdbench" / "environment" / "prepare.sh"
+            ).read_text(encoding="utf-8"),
+            "#!/usr/bin/env bash\necho fetching\n",
+        )
+
+    def test_workspace_is_copied_in_before_prepare_runs(self):
+        # 反过来的话，COPY workspace 会把 prepare.sh 下好的权重盖掉。
+        task = self._conda_task(
+            "environment:\n  conda: verl\n",
+            prepare="#!/usr/bin/env bash\n",
+        )
+        dockerfile = (
+            self._materialize(task) / "environment" / "Dockerfile"
+        ).read_text(encoding="utf-8")
+        self.assertLess(
+            dockerfile.index("COPY --chmod=0777 .ptdbench/workspace/"),
+            dockerfile.index("bash /ptdbench/environment/prepare.sh"),
+        )
+
+    def test_the_download_cache_does_not_ship_in_the_image(self):
+        # cache 是"为了不重下"，不是产物。Harbor 那边每个任务一个镜像，留着等于
+        # 把每个模型存两份，这笔账翻倍得很快。
+        task = self._conda_task(
+            "environment:\n  conda: verl\n",
+            prepare="#!/usr/bin/env bash\n",
+        )
+        dockerfile = (
+            self._materialize(task) / "environment" / "Dockerfile"
+        ).read_text(encoding="utf-8")
+        self.assertIn(f"rm -rf {MODELS_DIR} {DATASETS_DIR}", dockerfile)
+
+    def test_no_prepare_script_means_no_prepare_layer(self):
+        task = self._conda_task("environment:\n  conda: verl\n")
+        dockerfile = (
+            self._materialize(task) / "environment" / "Dockerfile"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("PTDBENCH_STAGE=prepare", dockerfile)
+
+    def test_missing_prepare_file_is_reported_with_its_path(self):
+        task = self._conda_task(
+            "environment:\n  conda: verl\n  prepare: environment/fetch.sh\n"
+        )
+        with self.assertRaises(Exception) as ctx:
+            self._materialize(task)
+        self.assertIn("fetch.sh", str(ctx.exception))
+
+    def test_prepare_outside_the_environment_directory_is_rejected(self):
+        # 只有 environment/ 被 COPY 进镜像；声明一个在外面的路径会变成构建期的
+        # "文件不存在"，报错点离原因很远。
+        task = self._conda_task("environment:\n  conda: verl\n  prepare: fetch.sh\n")
+        (task / "fetch.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+        with self.assertRaises(Exception) as ctx:
+            self._materialize(task)
+        self.assertIn("must stay", str(ctx.exception))
 
 
 if __name__ == "__main__":

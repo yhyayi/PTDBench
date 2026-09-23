@@ -23,7 +23,14 @@ def load_judge_module():
     if spec is None or spec.loader is None:
         raise RuntimeError(f"cannot load {JUDGE_PATH}")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # 别把 __pycache__ 写进 task 目录：task 包会被整个 COPY 进镜像，而且下一次
+    # test_issue_package_has_only_the_minimal_files 会被这个 .pyc 判成多余文件。
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = previous
     return module
 
 
@@ -46,7 +53,7 @@ class QwenIssueVerifierTests(unittest.TestCase):
         files = {
             str(path.relative_to(ISSUE))
             for path in ISSUE.rglob("*")
-            if path.is_file()
+            if path.is_file() and "__pycache__" not in path.parts
         }
         self.assertEqual(
             files,

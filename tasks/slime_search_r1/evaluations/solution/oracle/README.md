@@ -57,5 +57,8 @@ step 100 is about 39 tokens with a 0% truncate ratio.
 - Falling response length and near-zero truncation by step 99. These are
   expected as the policy learns to emit short search/answer turns.
 
-Machine grading remains defined by the evaluation's `verifier/gold.yaml`.
-The solution verifier does not rerun training.
+Machine grading at the solution level is deterministic and metric-only: the
+verifier reconstructs `eval/nq_test` from the logs the agent's own run wrote
+under `$PTDBENCH_RESULTS/experiment_logs` and compares it to a fixed threshold.
+It does not read `gold.yaml`, which is reviewer-facing documentation. See
+`../verifier/README.md` for the threshold and its calibration.

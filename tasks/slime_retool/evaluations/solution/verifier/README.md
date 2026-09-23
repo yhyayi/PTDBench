@@ -1,27 +1,30 @@
-# Solution verifier
+# Metric-only solution verifier
 
-This self-contained verifier grades `$PTDBENCH_RESULTS/submission.json` against
-`gold.yaml`. It applies the same issue gate, rule-first diagnosis, LLM fallback
-prompts, and combined-score formula as the shared PTDBench grading primitives.
+`test.sh` is the single entry point. It does not use `submission.json`, an LLM,
+rules, or rubrics. It strips ANSI escapes and reconstructs `eval/aime` from
+`$PTDBENCH_RESULTS/experiment_logs`, including offline W&B files under
+`$PTDBENCH_RESULTS/experiment_logs/wandb`.
 
-The gold verdict for this task is `healthy`. When the issue stage is `correct`
-(submission `verdict` is `healthy`), the solution stage is `n/a` and the
-combined score is `1.0`: no remediation is required for a healthy run. The
-`fix.must` list is empty and `judge_solution.md` is not exercised for this
-task.
+`eval/aime` is read in the math_dapo **score** space, the range `[-1, 1]` the
+frozen historical trace was logged in. This recipe's `reward_func` is
+unmodified, so the score channel is already the exact-match signal and no
+`--eval-reward-key` is needed to get at it — unlike `slime_retool_length_hack`,
+where the score channel carries an injected length bonus and the instruction
+has to ask for `acc`. Grading in the same space the history was logged in is
+what makes the threshold below directly comparable to it.
 
-The output is written to `$PTDBENCH_RESULTS/result.json` and
-`$PTDBENCH_RESULTS/metrics.json`. Statuses are `correct`, `partial`, `wrong`,
-or `unavailable`.
+`score_mode` is `best`: the verifier takes the highest finite `eval/aime` over
+the run rather than the value at step 99. The bar here is "the run actually
+trained", and a single eval point over 30 AIME problems is noisy enough that
+the last one is a poor proxy for that.
 
-The default issue gate requires `correct`. `test.sh --solution-on-partial`
-matches the evaluation grader's optional relaxed gate.
+That value must be at least `-0.55` and at most `1.0`. Pass is score `1`; all
+failures are score `0`. The threshold is calibrated against the 11 points in
+`workspace/outputs/metrics.json`: an untrained step 0 sits at `-0.5913` and
+fails, while every trained point in the historical trace passes — the thinnest
+margin is step 19 at `-0.5375`, 0.037 clear of the bar. The historical step-99
+value is `-0.4966`, about 25.2% accuracy.
 
-The verifier does not rerun training. Frozen historical evidence through
-train step 100 lives in `workspace/outputs/` and
-`evaluations/solution/oracle/historical_evidence_manifest.json`.
-
-LLM fallback uses `PTDBENCH_JUDGE_PROVIDER`, `PTDBENCH_JUDGE_MODEL`,
-`PTDBENCH_JUDGE_BASE_URL`, and the environment-variable name in
-`PTDBENCH_JUDGE_API_KEY_ENV`. Set `PTDBENCH_NO_JUDGE=1` for deterministic
-parity tests.
+The verifier writes `experiment_metrics.json`, `metrics.json`, and
+`result.json`. `test.sh` runs `tests/grade_submission.py`, which reads
+`resources/grader_spec.json`.

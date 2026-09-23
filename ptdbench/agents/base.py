@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 
 from ..core.types import AgentSpec, CommandResult
-from ..runtimes import EnvironmentArtifact, SandboxInstance, SandboxRequest, SandboxRuntime
+from ..runtimes import (
+    EnvironmentArtifact,
+    SandboxInstance,
+    SandboxRequest,
+    SandboxRuntime,
+)
 from ..utils.filesystem import write_text
 
 
@@ -25,6 +30,19 @@ class AgentExecutionContext:
     evaluation_level: str = "solution"
     log_level: str = "quiet"
     debian_mirror: Optional[str] = None
+    # 统一镜像相关：要激活哪套 conda 环境。
+    conda_env: Optional[str] = None
+    # 任务的 environment/ 目录和 prepare 阶段的产物目录，都以只读挂给 agent。
+    # agent 看得到 requirements.txt 和 prepare.sh 是有意的：它要改的是训练代码，
+    # 而"环境里装了什么"是它做判断的前提，不是答案的一部分。
+    environment_dir: Optional[Path] = None
+    prepared_dir: Optional[Path] = None
+    # 两个下载缓存根，只读挂给 agent。看得到是为了排查时对得上账——交付路径仍然是
+    # prepare 用 --dest 写进 workspace 的那一份，任务脚本不该直接引用这两个目录。
+    models_dir: Optional[Path] = None
+    datasets_dir: Optional[Path] = None
+    # metadata.environment.env：逐任务不同的变量（如 CUDA_VISIBLE_DEVICES）。
+    task_env: Dict[str, str] = field(default_factory=dict)
 
     def sandbox_request(
         self,
@@ -47,6 +65,12 @@ class AgentExecutionContext:
             network=network,
             timeout_s=self.timeout_s,
             workdir=workdir,
+            conda_env=self.conda_env,
+            host_environment=self.environment_dir,
+            host_prepared=self.prepared_dir,
+            host_models=self.models_dir,
+            host_datasets=self.datasets_dir,
+            task_env=self.task_env,
         )
 
 

@@ -1,0 +1,41 @@
+# Source trees this env installs editable, because a task script names the
+# directory by absolute path and no amount of PYTHONPATH can redirect it.
+#
+# Format:  <dir-name> <git-url> <commit>
+#
+# Each is cloned to /opt/conda/envs/slime-v0.3.1/src/<dir-name> -- inside the
+# env prefix, so it travels with the env through the path-identical COPY -- and
+# installed with `pip install -e`. ptdbench-activate.sh symlinks it to the
+# absolute path the scripts expect (/root/<dir-name>).
+#
+# A commit alone does not reproduce the upstream image: slimerl/slime:latest
+# patches its Megatron clone in its own Dockerfile. Anything in
+# patches/<dir-name>/*.patch here is applied after the checkout and before the
+# editable install -- see docker/envs/README.md, "Patching a source tree".
+#
+# Why this is safe while moving compiled packages is not: these are pure Python
+# trees resolved through PYTHONPATH at import time. Nothing about their build
+# environment is baked into a file on disk. Compiled artifacts are the opposite,
+# which is what sank the previous design.
+#
+# Megatron-LM: slime's launch scripts assign (not append)
+#   export PYTHONPATH=/workspace:/root/Megatron-LM
+# and repeat it inside the Ray runtime_env JSON, where an outer export cannot
+# reach it. tasks/slime_retool/workspace/examples/retool/retool_qwen3_4b_rl.sh
+# and tasks/slime_search_r1*/workspace/examples/search-r1/*.sh are the live
+# examples.
+#
+# The commit: the wandb runs recorded against slimerl/slime:latest report
+# megatron-core 0.16.0rc0, and upstream never tagged core_v0.16.0rc0 -- the
+# first tag on that line is core_v0.16.0. This is that tag.
+#
+# It is not what the image has. Asking the image directly:
+#   docker run --rm --entrypoint git slimerl/slime:latest -C /root/Megatron-LM rev-parse HEAD
+#   1dcf0dafa884ad52ffb243625717a3471643e087
+# so the two differ, and the tag is a reconstruction rather than the real ref.
+# Kept anyway: it is the tag the recorded version string names, the patch in
+# patches/Megatron-LM/ applies cleanly to it, and moving the pin would
+# invalidate the recorded closure for a delta no task has been shown to touch.
+# If a build of this environment ever disagrees with a recorded run, 1dcf0da
+# is the first thing to try.
+Megatron-LM https://github.com/NVIDIA/Megatron-LM.git 3bec9aa97dda898d16ff5a89bac0ed2b6682b172
