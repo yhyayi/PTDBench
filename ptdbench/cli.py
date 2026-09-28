@@ -5,12 +5,14 @@ import json
 import os
 import re
 import shlex
+import subprocess
 from pathlib import Path
 
 from .core.harbor_types import HarborEvaluationConfig
-from .core.types import AgentSpec, EvaluationConfig
+from .core.types import AgentSpec, EnvironmentImage, EvaluationConfig, known_images
 from .evaluation.evaluator import TaskEvaluator
-from .evaluation.harbor_evaluator import HarborEvaluator
+from .evaluation.harbor_evaluator import HarborEvaluator, HarborShell
+from .runtimes.providers.docker import DockerRuntime
 from .tasks import SchemaError
 
 
@@ -145,9 +147,8 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument(
         "--huggingface-mirror",
         default=None,
-        help="Hugging Face mirror base URL applied to environment Dockerfiles",
+        help="Hugging Face mirror base URL, passed to the prepare stage as HF_ENDPOINT",
     )
-    e.add_argument("--image-tag-prefix", default="ptdbench")
     e.add_argument(
         "--models-dir",
         default=os.environ.get("PTDBENCH_MODELS_DIR"),
@@ -172,9 +173,39 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--work-dir", default=None, help="parent directory for PTDBench run artifacts")
     e.add_argument("--json", action="store_true", help="print JSON only")
 
+    b = sub.add_parser(
+        "build-images",
+        help="build the environment images under docker/images/ ahead of time",
+        description=(
+            "Build each environment image from docker/images/<name>.Dockerfile, "
+            "tagged as declared by its `# ptdbench-image:` header. "
+            "`evaluate` builds a missing image on demand; this command lets a "
+            "machine pay that cost up front. Images that already exist are "
+            "skipped unless --rebuild is given."
+        ),
+        allow_abbrev=False,
+    )
+    b.add_argument(
+        "names",
+        nargs="*",
+        metavar="NAME",
+        help="environment names (default: every docker/images/*.Dockerfile)",
+    )
+    b.add_argument(
+        "--rebuild",
+        action="store_true",
+        help=(
+            "rebuild even if the image exists; needed after editing a Dockerfile "
+            "or the tooling under docker/, since the tag does not change"
+        ),
+    )
+
     h = sub.add_parser(
         "harbor-evaluate",
-        help="materialize one or more PTDBench tasks and run Harbor",
+        help=(
+            "run each PTDBench task's prepare.sh, then evaluate it with Harbor "
+            "on the prebuilt environment image"
+        ),
         allow_abbrev=False,
         epilog="All other arguments are forwarded unchanged to `harbor run`.",
     )
@@ -192,24 +223,28 @@ def build_parser() -> argparse.ArgumentParser:
         default="solution",
         help="task evaluation to run",
     )
-    h.add_argument(
-        "--verifier-mode",
-        choices=["shared", "separate"],
-        default="separate",
-        help="environment_mode written to the generated Harbor task",
-    )
     h.add_argument("--judge-model", default=None, help="model used by PTDBench verifiers")
     h.add_argument(
-        "--image",
+        "--huggingface-mirror",
         default=None,
+        help="Hugging Face mirror base URL, passed to the prepare stage as HF_ENDPOINT",
+    )
+    h.add_argument(
+        "--models-dir",
+        default=os.environ.get("PTDBENCH_MODELS_DIR"),
         help=(
-            "base image for migrated (conda) tasks; defaults to $PTDBENCH_IMAGE_TAG."
+            "host model download cache; writable in prepare, mounted read-only "
+            "into the Harbor container (default: <repo>/models) "
+            "[env: PTDBENCH_MODELS_DIR]"
         ),
     )
     h.add_argument(
-        "--debian-mirror",
-        default=None,
-        help="Debian mirror base URL written to the materialized environment",
+        "--datasets-dir",
+        default=os.environ.get("PTDBENCH_DATASETS_DIR"),
+        help=(
+            "same as --models-dir, for datasets (default: <repo>/datasets) "
+            "[env: PTDBENCH_DATASETS_DIR]"
+        ),
     )
     h.add_argument(
         "--agent-network",
@@ -234,6 +269,83 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="parent directory for temporary materialized Harbor tasks",
     )
+
+    s = sub.add_parser(
+        "harbor-shell",
+        help=(
+            "run a task's prepare.sh, then drop into an interactive shell inside "
+            "the prebuilt environment image — same container as harbor-evaluate's "
+            "agent phase, but no agent is started"
+        ),
+        allow_abbrev=False,
+    )
+    s.add_argument(
+        "task_root",
+        help="task directory (must contain metadata.yaml)",
+    )
+    s.add_argument(
+        "--evaluation-level",
+        choices=["issue", "solution"],
+        default="solution",
+        help="evaluation level whose environment variables and workspace are used",
+    )
+    s.add_argument(
+        "--huggingface-mirror",
+        default=None,
+        help="Hugging Face mirror base URL, passed to the prepare stage as HF_ENDPOINT",
+    )
+    s.add_argument(
+        "--models-dir",
+        default=os.environ.get("PTDBENCH_MODELS_DIR"),
+        help=(
+            "host model download cache; mounted read-only into the container "
+            "(default: <repo>/models) [env: PTDBENCH_MODELS_DIR]"
+        ),
+    )
+    s.add_argument(
+        "--datasets-dir",
+        default=os.environ.get("PTDBENCH_DATASETS_DIR"),
+        help=(
+            "same as --models-dir, for datasets (default: <repo>/datasets) "
+            "[env: PTDBENCH_DATASETS_DIR]"
+        ),
+    )
+    s.add_argument(
+        "--workspace-dir",
+        type=Path,
+        default=None,
+        help=(
+            "directory where the staged workspace and state file are stored "
+            "across runs; defaults to outputs/harbor-shell/<task-id>"
+        ),
+    )
+    s.add_argument(
+        "--force-prepare",
+        action="store_true",
+        help="re-run prepare.sh even if a staged workspace already exists",
+    )
+    s.add_argument(
+        "--shell",
+        default="bash",
+        dest="shell_cmd",
+        help="shell to start inside the container (default: bash)",
+    )
+    s.add_argument(
+        "--gpus",
+        default=None,
+        help=(
+            "value passed to docker run --gpus; auto-detected from "
+            "environment/docker-compose.yaml when absent"
+        ),
+    )
+    s.add_argument(
+        "--shm-size",
+        default=None,
+        help=(
+            "value passed to docker run --shm-size; auto-detected from "
+            "environment/docker-compose.yaml when absent"
+        ),
+    )
     return ap
 
 
@@ -256,6 +368,27 @@ def main(argv=None) -> int:
             }
         print(json.dumps(report, indent=2, ensure_ascii=False))
         return 0 if report.get("ok", False) else 1
+
+    if args.command == "build-images":
+        known = known_images()
+        if not known:
+            raise SystemExit("no docker/images/*.Dockerfile found")
+        names = args.names or sorted(known)
+        unknown = [name for name in names if name not in known]
+        if unknown:
+            raise SystemExit(
+                f"unknown environment(s): {', '.join(unknown)}; "
+                f"expected one of {', '.join(sorted(known))}"
+            )
+        runtime = DockerRuntime()
+        for name in dict.fromkeys(names):
+            image = EnvironmentImage(name)
+            try:
+                runtime.ensure_environment(image, rebuild=args.rebuild)
+            except subprocess.CalledProcessError as exc:
+                raise SystemExit(f"building {image.tag} failed (exit {exc.returncode})")
+            print(image.tag)
+        return 0
 
     if args.command == "evaluate":
         evaluator = TaskEvaluator(backend=args.backend)
@@ -317,7 +450,6 @@ def main(argv=None) -> int:
                 verifier_cmd=args.verifier_cmd,
                 backend=args.backend,
                 verifier_network=args.verifier_network,
-                image_tag_prefix=args.image_tag_prefix,
                 timeout_s=args.timeout_s,
                 keep_artifacts=args.keep_artifacts,
                 work_dir=None if args.work_dir is None else Path(args.work_dir),
@@ -346,12 +478,14 @@ def main(argv=None) -> int:
             HarborEvaluationConfig(
                 evaluation_level=args.evaluation_level,
                 judge_model=args.judge_model,
-                verifier_mode=args.verifier_mode,
                 agent_network=args.agent_network,
                 verifier_network=args.verifier_network,
-                debian_mirror=args.debian_mirror,
                 temp_dir=args.harbor_temp_dir,
-                image=args.image,
+                huggingface_mirror=args.huggingface_mirror,
+                models_dir=None if args.models_dir is None else Path(args.models_dir),
+                datasets_dir=(
+                    None if args.datasets_dir is None else Path(args.datasets_dir)
+                ),
                 harbor_command=harbor_command,
                 harbor_args=tuple(harbor_args),
             ),
@@ -363,6 +497,36 @@ def main(argv=None) -> int:
         )
         print(json.dumps(result.to_dict(), indent=2, ensure_ascii=False))
         return 0 if result.passed else 1
+
+    if args.command == "harbor-shell":
+        from .evaluation.harbor_evaluator import HarborShell
+
+        task_roots = expand_task_roots([args.task_root])
+        if len(task_roots) != 1:
+            raise SystemExit("harbor-shell accepts exactly one task directory")
+        task_root = task_roots[0]
+        workspace_dir = (
+            Path(args.workspace_dir)
+            if args.workspace_dir is not None
+            else Path("outputs") / "harbor-shell" / task_root.name
+        )
+        HarborShell().shell(
+            task_root,
+            HarborEvaluationConfig(
+                evaluation_level=args.evaluation_level,
+                huggingface_mirror=args.huggingface_mirror,
+                models_dir=None if args.models_dir is None else Path(args.models_dir),
+                datasets_dir=(
+                    None if args.datasets_dir is None else Path(args.datasets_dir)
+                ),
+            ),
+            workspace_dir,
+            shell_cmd=args.shell_cmd,
+            force_prepare=args.force_prepare,
+            gpus=args.gpus,
+            shm_size=args.shm_size,
+        )
+        return 0  # unreachable: shell() calls os.execvp
 
     return 2
 

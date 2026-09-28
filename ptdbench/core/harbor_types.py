@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
-from urllib.parse import urlsplit
 
 from .types import (
-    DEFAULT_IMAGE,
-    DEFAULT_IMAGE_ENV,
+    DEFAULT_DATASETS_DIR,
+    DEFAULT_MODELS_DIR,
     CommandResult,
     EvaluationPaths,
     EvaluationResult,
     TaskPackage,
+    _normalize_plain_url,
 )
 
 
@@ -25,25 +24,29 @@ def harbor_task_name(task_id: str, evaluation_level: str) -> str:
 
 @dataclass(frozen=True)
 class HarborEvaluationConfig:
-    """PTDBench 转换参数；Harbor 自身参数统一放在 harbor_args。"""
+    """PTDBench 转换参数；Harbor 自身参数统一放在 harbor_args。
+
+    Harbor 直接用预构建镜像（task.toml 的 `docker_image`），不再逐任务构建，
+    所以 verifier 固定与 agent 共用同一个容器（shared 模式）。prepare.sh 在
+    `harbor run` 之前由 PTDBench 在同一个镜像里跑完，产物以只读挂载交给 Harbor。
+    """
 
     evaluation_level: str = "solution"
     judge_model: Optional[str] = None
-    verifier_mode: str = "separate"
     agent_network: str = "public"
     verifier_network: str = "public"
-    debian_mirror: Optional[str] = None
     temp_dir: Optional[Path] = None
-    # 迁移后的任务以统一镜像为 base；与 EvaluationConfig 用同一个环境变量。
-    image: Optional[str] = None
+    # prepare 阶段用的 HF 镜像站；只影响 prepare，agent / verifier 是离线的。
+    huggingface_mirror: Optional[str] = None
+    # 与 EvaluationConfig 同一套下载缓存，留空落到仓库根的 models/ 和 datasets/。
+    models_dir: Optional[Path] = None
+    datasets_dir: Optional[Path] = None
     harbor_command: Sequence[str] = field(default_factory=lambda: ("harbor",))
     harbor_args: Sequence[str] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         if self.evaluation_level not in {"issue", "solution"}:
             raise ValueError("evaluation_level must be 'issue' or 'solution'")
-        if self.verifier_mode not in {"shared", "separate"}:
-            raise ValueError("verifier_mode must be 'shared' or 'separate'")
         network_modes = {"no-network", "public", "allowlist"}
         if self.agent_network not in network_modes:
             raise ValueError(f"unsupported agent_network: {self.agent_network}")
@@ -59,28 +62,20 @@ class HarborEvaluationConfig:
             raise ValueError("harbor_args must contain non-empty strings")
         if isinstance(self.temp_dir, str) and not self.temp_dir.strip():
             raise ValueError("temp_dir must not be empty")
-        if self.debian_mirror is not None:
-            mirror = self.debian_mirror.rstrip("/")
-            parsed = urlsplit(mirror)
-            if (
-                parsed.scheme not in {"http", "https"}
-                or not parsed.netloc
-                or parsed.username is not None
-                or parsed.password is not None
-                or parsed.query
-                or parsed.fragment
-                or "|" in mirror
-                or any(char.isspace() for char in mirror)
-            ):
-                raise ValueError("debian_mirror must be a plain HTTP(S) base URL")
-            object.__setattr__(self, "debian_mirror", mirror)
+        if self.huggingface_mirror is not None:
+            object.__setattr__(
+                self, "huggingface_mirror", _normalize_plain_url(self.huggingface_mirror)
+            )
 
         if self.temp_dir is not None:
             object.__setattr__(self, "temp_dir", Path(self.temp_dir).expanduser())
-        if self.image is None:
-            object.__setattr__(
-                self, "image", os.environ.get(DEFAULT_IMAGE_ENV) or DEFAULT_IMAGE
-            )
+        for name, fallback in (
+            ("models_dir", DEFAULT_MODELS_DIR),
+            ("datasets_dir", DEFAULT_DATASETS_DIR),
+        ):
+            given = getattr(self, name)
+            resolved = (Path(given) if given is not None else fallback).expanduser().resolve()
+            object.__setattr__(self, name, resolved)
         object.__setattr__(self, "harbor_command", tuple(self.harbor_command))
         object.__setattr__(self, "harbor_args", tuple(self.harbor_args))
 
@@ -92,6 +87,12 @@ class HarborTaskUnit:
     package: TaskPackage
     evaluation: EvaluationPaths
     workspace_before_hash: str
+    # prepare 阶段跑完之后宿主机上的两个目录。workspace 是 prepare 写过的那份副本
+    # （权重可能就下在里面），物化时整份放进 environment/，由 Harbor 在容器启动后
+    # 上传到 /workspace；prepared 以只读挂到 /ptdbench/prepared。都为 None 表示还
+    # 没 staging，这时直接用任务自带的 workspace、不挂 prepared。
+    workspace: Optional[Path] = None
+    prepared: Optional[Path] = None
 
     @property
     def harbor_task_name(self) -> str:

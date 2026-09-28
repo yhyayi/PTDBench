@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # slime_retool —— 训练前要准备的东西。
 #
-# 跑在独立的 prepare 阶段容器里：root、已激活 `slime-v0.3.1` 环境、**唯一有网的
+# 跑在独立的 prepare 阶段容器里：root、`slime-v0.3.2` 镜像、**唯一有网的
 # 阶段**，而且 $PTDBENCH_WORKSPACE、$PTDBENCH_MODELS 和 $PTDBENCH_DATASETS 都可写。
 #
 # tasks/slime_retool_length_hack/environment/prepare.sh 是同一份：那个任务跑的是
@@ -86,8 +86,8 @@ DIST_MODEL_DIR="$PTDBENCH_WORKSPACE/font-info_qwen3-4b-sft_torch_dist"
 
 # 转换要 CUDA + NCCL（dist.init_process_group + torch.cuda.set_device）。
 # prepare 阶段按 metadata 的 NVIDIA_VISIBLE_DEVICES 拿得到卡，正常路径下条件是
-# 满足的；但 harbor 后端把 prepare 跑成 build-time 的 RUN 层，那里既没有任务
-# env 也没有 GPU。所以这里**跳过而不是报错**：训练脚本自己的
+# 满足的（harbor 后端也是在 `harbor run` 之前用同一套 docker prepare 阶段跑）；
+# 但机器上没卡、或者 docker 没配 GPU runtime 时就拿不到。所以这里**跳过而不是报错**：训练脚本自己的
 # `if [ ! -d "$DIST_MODEL_DIR" ]` 守卫会在 agent 阶段补做，那时 /workspace 仍然
 # 可写。少做一次是慢，做不成才是错。
 if python3 -c 'import torch, sys; sys.exit(0 if torch.cuda.is_available() else 1)' 2>/dev/null; then

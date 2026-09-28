@@ -5,9 +5,9 @@
 # recipe（examples/search-r1/run_qwen2.5_3B.sh），要的资产也完全一样。改这里要连
 # 那边一起改——容器环境或资产上的任何差别，都会让两边的运行不可比。
 #
-# 跑在独立的 prepare 阶段容器里：root、已激活 `slime-v0.3.1` 环境、**唯一有网的
+# 跑在独立的 prepare 阶段容器里：root、`slime-v0.3.2` 镜像、**唯一有网的
 # 阶段**，而且 $PTDBENCH_WORKSPACE、$PTDBENCH_MODELS 和 $PTDBENCH_DATASETS 都可写。
-# agent / verifier 阶段的断网由框架按阶段设（runtimes/base.py:215-237 的
+# agent / verifier 阶段的断网由框架按阶段设（runtimes/base.py 里 _network_policy_env 的
 # HF_HUB_OFFLINE / TRANSFORMERS_OFFLINE / HF_DATASETS_OFFLINE），任务的
 # metadata.environment.env 里**不要**再写一遍：那份 env 三个阶段一视同仁，会把
 # prepare 自己要用的网也关掉。
@@ -16,8 +16,8 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # faiss-gpu —— 只有 search-r1 这两个任务要
 # ---------------------------------------------------------------------------
-# 为什么不写进 environment/requirements.txt：那份清单是**整个 slime-v0.3.1 环境**
-# 的闭包，四个任务逐字节一致（docker/collect_envs.py 强制），加一个包等于改掉
+# 为什么不写进 docker/images/slime-v0.3.2.Dockerfile：那个镜像是**四个 slime 任务
+# 共用的**，加一个包等于改掉
 # slime_retool / slime_retool_length_hack 的运行环境。它们的 outcome 是按没有
 # faiss 的那套栈记下来的，不该被另一个任务的需求动到。
 #
@@ -31,7 +31,7 @@ set -euo pipefail
 # 为什么是 faiss-gpu-cuvs 而不是 faiss-gpu：faiss 1.15 的两个 GPU 轮子对应两套
 # CUDA 布局，而这个环境是 CUDA 13。faiss-gpu 走的是 CUDA 12 的 per-component
 # 布局，import 时按 `nvidia.cuda_runtime` / `nvidia.cublas` / `nvidia.curand` 三
-# 个 nvidia-*-cu12 模块找 .so；本环境一个都没有（requirements.txt 钉的是
+# 个 nvidia-*-cu12 模块找 .so；本环境一个都没有（原 slime-v0.3.1 环境钉的是
 # torch==2.11.0+cu130 和不带后缀的 nvidia-cuda-runtime==13.0.96 一系，装出来是
 # nvidia/cu13/lib/ 一个目录）。硬塞一套 cu12 轮子进来也不行：retrieval_server.py
 # 同一个进程里既 import faiss 又 import torch，两份 libcurand.so.10（cu12 的和
@@ -39,7 +39,7 @@ set -euo pipefail
 # CUDA 13 编的那一个，走 nvidia/cu13/lib/。
 #
 # 为什么 cuVS 一系钉在 26.6 而不是最新的 26.8：libcuvs-cu13 26.8 要
-# nvidia-nvjitlink>=13.3，本环境钉死在 13.0.88（requirements.txt:75），装上去
+# nvidia-nvjitlink>=13.3，原 slime-v0.3.1 环境钉死在 13.0.88，装上去
 # import 会死在 `undefined symbol: __nvJitLinkCreate_13_3`。26.6 的约束是
 # >=13.0，正好落在 faiss-gpu-cuvs 1.15.0 自己要的 >=26.06,<27 里。
 #
@@ -50,7 +50,7 @@ set -euo pipefail
 # nccl）不写，是因为环境里已经有了，多装一份就回到上面那个撞车问题。
 #
 # 为什么装到 $PTDBENCH_PREPARED 而不是直接 pip 进 env：prepare 是**独立的一次性
-# 容器**（evaluator.py:376-388 建了就关），装进 /opt/conda 的东西出了这个容器就
+# 容器**（evaluator.py 的 _run_prepare 建了就关），装进镜像 site-packages 的东西出了这个容器就
 # 没了。$PTDBENCH_PREPARED 是唯一会被后两个阶段只读挂进去的目录。约 640MB。
 FAISS_SITE="$PTDBENCH_PREPARED/pysite"
 # 守卫认的是这一版的 dist-info，不是 `faiss/` 目录：认目录的话，一棵装了一半的、
@@ -89,7 +89,7 @@ fi
 # 都是 $PWD，容器里就是 /workspace），**一个字都不能改**：
 #
 #   * 改了名字，run_qwen2.5_3B.sh:74-77 的守卫命中不到，它会在 agent 阶段自己去
-#     `hf download`，而那个阶段是断网的（runtimes/base.py:215-237 按阶段打开
+#     `hf download`，而那个阶段是断网的（runtimes/base.py 的 _network_policy_env 按阶段打开
 #     HF_HUB_OFFLINE / TRANSFORMERS_OFFLINE / HF_DATASETS_OFFLINE），报错离原因很远。
 #   * 同样的道理对 run_qwen2.5_3B.sh:62 起手就跑的那次 prepare_data.sh 也成立：
 #     它靠 `-f train.parquet` / `-f e5_Flat.index` 跳过，下面这几步就是那个脚本的
@@ -312,7 +312,7 @@ else
 fi
 
 # 检索服务本身不在这里起：prepare 是一个建了就关的一次性容器
-# （evaluation/evaluator.py:376-388），进程活不到 agent 阶段；而且这个阶段是被前台
+# （evaluation/evaluator.py 的 _run_prepare），进程活不到 agent 阶段；而且这个阶段是被前台
 # 等返回的，不 detach 地起一个只会挂到超时。harbor 那条路上 prepare 还可能是
 # build-time 的 RUN 层，那里连 GPU 都没有。
 #

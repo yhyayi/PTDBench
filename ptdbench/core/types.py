@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
@@ -152,11 +150,6 @@ class StageArtifact:
     extra: Dict[str, Any] = field(default_factory=dict)
 
 
-# 统一镜像的 tag。与 docker/build.sh、docker/smoke.sh 用同一个环境变量，三处必须一致，
-# 否则评测会去找一个没人构建过的 tag。
-DEFAULT_IMAGE_ENV = "PTDBENCH_IMAGE_TAG"
-DEFAULT_IMAGE = "ptdbench/env:latest"
-
 # 容器里三个阶段共享的目录。prepare 阶段可写 prepared，agent / verifier 阶段只读。
 # 与 docker/ptdbench-activate.sh 和 docker/ptdbench_fetch.py 的默认值必须一致。
 PREPARED_DIR = "/ptdbench/prepared"
@@ -166,21 +159,26 @@ PREPARED_DIR = "/ptdbench/prepared"
 # prepare 阶段可写，agent / verifier 只读。
 MODELS_DIR = "/ptdbench/models"
 DATASETS_DIR = "/ptdbench/datasets"
-# 任务的 environment/ 目录挂进来的位置。三个阶段都只读——requirements.txt 和
-# prepare.sh 是环境说明，不是答案，但也没有哪个阶段有理由改仓库里的任务定义。
+# 任务的 environment/ 目录挂进来的位置。三个阶段都只读——prepare.sh 是环境说明，
+# 不是答案，但也没有哪个阶段有理由改仓库里的任务定义。
 PTDBENCH_ENVIRONMENT_DIR = "/ptdbench/environment"
 
-# task package 里两个约定文件名。写成常量是因为 loader、validator 和 evaluator
-# 都要用，而"默认值散落三处"正是 schema 漂移的起点。
-DEFAULT_REQUIREMENTS = "environment/requirements.txt"
+# task package 里的约定文件名。写成常量是因为 loader 和 evaluator 都要用，而
+# "默认值散落多处"正是 schema 漂移的起点。
 DEFAULT_PREPARE = "environment/prepare.sh"
 
-# 镜像里有哪些 conda 环境，唯一事实来源是 docker/envs/ 下的目录名——镜像就是照它
-# 构建的（docker/collect_envs.py 会保证 Dockerfile 里有对应的 env-<name> stage）。
-# 不在这里再抄一份常量：抄一份就会漂，而漂的结果是任务指定了一个镜像里没有的环境，
-# 直到评测跑起来才发现。
+# 有哪些环境，唯一事实来源是 docker/images/ 下的 <name>.Dockerfile——镜像就是照它
+# 构建的。不在这里再抄一份常量：抄一份就会漂，而漂的结果是任务指定了一个没有
+# Dockerfile 的环境，直到评测跑起来才发现。
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_ENVS_DIR = _REPO_ROOT / "docker" / "envs"
+DOCKER_DIR = _REPO_ROOT / "docker"
+IMAGES_DIR = DOCKER_DIR / "images"
+IMAGE_DOCKERFILE_SUFFIX = ".Dockerfile"
+# 镜像 tag 写在 Dockerfile 头部的 `# ptdbench-image: <tag>` 一行里，例如
+# ptdbench/verl:vllm0.17-torch2.10-cu129。tag 描述的是栈（框架、推理引擎、CUDA
+# 版本），多个任务共用；不从内容派生 hash。升级栈就改 tag，只改工具脚本则保持
+# tag 不变、显式跑 `ptdbench build-images --rebuild`。
+IMAGE_TAG_HEADER = "# ptdbench-image:"
 
 # 下载缓存在宿主机上的默认位置。跟仓库并排而不是藏在 run 目录里，是因为 run 目录
 # 跑完就删，而这两个目录的全部意义就是活得比 run 长——下一个 run、下一个任务都要
@@ -189,42 +187,86 @@ DEFAULT_MODELS_DIR = _REPO_ROOT / "models"
 DEFAULT_DATASETS_DIR = _REPO_ROOT / "datasets"
 
 
-def known_conda_envs() -> frozenset:
-    """镜像提供的 conda 环境名；拿不到注册表时返回空集合。
+def known_images() -> frozenset:
+    """docker/images/ 下有 Dockerfile 的环境名；拿不到目录时返回空集合。
 
     空集合表示"无法判断"，不是"一个都没有"。装成 wheel 之后 `docker/` 不一定跟着
-    走，那时候校验环境名这件事只能交给镜像自己——activate hook 找不到环境会明确报错。
+    走，那时候校验环境名这件事只能推迟到构建镜像那一步。
     """
-    if not _ENVS_DIR.is_dir():
+    if not IMAGES_DIR.is_dir():
         return frozenset()
     return frozenset(
-        item.name for item in _ENVS_DIR.iterdir() if item.is_dir() and not item.name.startswith(".")
+        item.name[: -len(IMAGE_DOCKERFILE_SUFFIX)]
+        for item in IMAGES_DIR.iterdir()
+        if item.is_file()
+        and item.name.endswith(IMAGE_DOCKERFILE_SUFFIX)
+        and not item.name.startswith(".")
     )
+
+
+@dataclass(frozen=True)
+class EnvironmentImage:
+    """一个环境对应的镜像：docker/images/<name>.Dockerfile，tag 由其头部声明。
+
+    构建上下文是整个 docker/ 目录，因为每个镜像都要 COPY 同一组工具脚本
+    （ptdbench-activate.sh、ptdbench_fetch.py 等），见 docker/.dockerignore。
+    docker 评测、build-images 和 Harbor 的 `docker_image` 都用同一个 tag。
+    """
+
+    name: str
+
+    @property
+    def tag(self) -> str:
+        """Dockerfile 头部 `# ptdbench-image: <tag>` 声明的 tag。
+
+        找不到就报错而不是回退到某个默认值：回退会让两个环境悄悄共用一个 tag，
+        后构建的那个覆盖先构建的。
+        """
+        try:
+            text = self.dockerfile.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise RuntimeError(
+                f"cannot read {self.dockerfile} to resolve the image tag of {self.name!r}"
+            ) from exc
+        for line in text.splitlines():
+            if line.startswith(IMAGE_TAG_HEADER):
+                tag = line[len(IMAGE_TAG_HEADER):].strip()
+                if tag:
+                    return tag
+        raise RuntimeError(
+            f"{self.dockerfile} has no '{IMAGE_TAG_HEADER} <tag>' header line"
+        )
+
+    @property
+    def dockerfile(self) -> Path:
+        return IMAGES_DIR / f"{self.name}{IMAGE_DOCKERFILE_SUFFIX}"
+
+    @property
+    def context(self) -> Path:
+        return DOCKER_DIR
 
 
 @dataclass(frozen=True)
 class EnvironmentPlan:
     """任务的 `environment` 段解析结果。
 
-    非 raw 任务指定一个 `conda` 环境名，并自带 `requirements`（该环境的完整闭包，
-    由 docker/collect_envs.py 校验一致）和 `prepare`（跑训练前要准备的东西：下模型、
-    下数据集、写环境变量）。raw 任务仍然走 `dockerfile` 那条 legacy 路径，两者互斥。
+    `image` 是环境名，对应 docker/images/<image>.Dockerfile，多个任务共用同一个镜像。
+    `prepare` 是跑训练前要准备的东西（下模型、下数据集、写环境变量），默认
+    environment/prepare.sh。`env` 是任务自己要导出的变量。
     """
 
-    conda: Optional[str] = None
-    requirements: Optional[Path] = None
+    image: Optional[str] = None
     prepare: Optional[Path] = None
     env: Dict[str, str] = field(default_factory=dict)
-    dockerfile: Optional[Path] = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "env", dict(self.env))
-        known = known_conda_envs()
-        if self.conda is not None and known and self.conda not in known:
+        known = known_images()
+        if self.image is not None and known and self.image not in known:
             raise ValueError(
-                f"environment.conda must be one of {', '.join(sorted(known))}, "
-                f"got {self.conda!r}; add docker/envs/{self.conda}/ and a matching "
-                f"stage in docker/Dockerfile if the task really needs a new one"
+                f"environment.image must be one of {', '.join(sorted(known))}, "
+                f"got {self.image!r}; add docker/images/{self.image}"
+                f"{IMAGE_DOCKERFILE_SUFFIX} if the task really needs a new one"
             )
         for key, value in self.env.items():
             if not key or not isinstance(key, str):
@@ -235,7 +277,7 @@ class EnvironmentPlan:
                 raise ValueError(
                     f"environment.env[{key}] must be a string; quote it in YAML"
                 )
-        # PTDBENCH_* 是 harness 自己的通道（stage / conda env / task_id 等）。
+        # PTDBENCH_* 是 harness 自己的通道（stage / task_id / 挂载路径等）。
         # 让任务覆盖它们，等于让任务改写评测框架对自己的判断。
         reserved = sorted(key for key in self.env if key.startswith("PTDBENCH_"))
         if reserved:
@@ -245,8 +287,8 @@ class EnvironmentPlan:
             )
 
     @property
-    def is_legacy(self) -> bool:
-        return self.conda is None and self.dockerfile is not None
+    def environment_image(self) -> Optional[EnvironmentImage]:
+        return None if self.image is None else EnvironmentImage(self.image)
 
 
 @dataclass(frozen=True)
@@ -260,7 +302,6 @@ class EvaluationConfig:
     verifier_network: str = "bridge"
     timeout_s: Optional[int] = None
     keep_artifacts: bool = False
-    image_tag_prefix: str = "ptdbench"
     work_dir: Optional[Path] = None
     evaluation_level: str = "solution"
     log_level: str = "quiet"
@@ -272,8 +313,6 @@ class EvaluationConfig:
     # 一遍，重建镜像也不会。留空则用仓库根的 models/ 和 datasets/。
     models_dir: Optional[Path] = None
     datasets_dir: Optional[Path] = None
-    # 非 raw 任务用的统一镜像；留空则取 $PTDBENCH_IMAGE_TAG，再退到 ptdbench/env:latest。
-    image: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.debian_mirror is not None:
@@ -294,10 +333,6 @@ class EvaluationConfig:
             given = getattr(self, name)
             resolved = (Path(given) if given is not None else fallback).expanduser().resolve()
             object.__setattr__(self, name, resolved)
-        if self.image is None:
-            object.__setattr__(
-                self, "image", os.environ.get(DEFAULT_IMAGE_ENV) or DEFAULT_IMAGE
-            )
 
 
 @dataclass(frozen=True)

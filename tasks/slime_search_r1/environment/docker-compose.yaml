@@ -8,8 +8,10 @@
 # rejected. What harbor *does* honour is a task-authored compose override on
 # the `main` service, merged after its own build/prebuilt compose
 # (harbor/src/harbor/environments/docker/docker.py::_docker_compose_paths).
-# The harbor adapter copies environment/ verbatim into the generated task, so
-# this file lands where harbor looks for it without any adapter change.
+# The harbor adapter passes this file to `harbor run --extra-docker-compose`
+# (ptdbench/evaluation/harbor_evaluator.py::HarborRunner._compose_overlay_args);
+# it cannot go into the generated task's environment/, because harbor stops
+# uploading the workspace from there once a compose file is present.
 #
 # This file is inert on the native docker path -- nothing there reads compose.
 services:

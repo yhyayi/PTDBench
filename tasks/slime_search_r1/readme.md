@@ -146,9 +146,10 @@ task package itself carries no tell.
 
 ## Environment requirement
 
-The task runs on the unified PTDBench image, in the `slime-v0.3.1` conda
-environment (`environment: conda: slime-v0.3.1`). There is no per-task
-Dockerfile any more; `environment/prepare.sh` does that work instead.
+The task runs on the `slime-v0.3.2` PTDBench image
+(`environment: image: slime-v0.3.2`, built from
+`docker/images/slime-v0.3.2.Dockerfile`). There is no per-task Dockerfile;
+`environment/prepare.sh` does that work instead.
 
 `metadata.yaml`'s `environment.env` block is byte-for-byte the one
 `slime_search_r1_nomask` uses — the eight GPUs and the offline W&B settings.
@@ -159,7 +160,7 @@ unset: `run_qwen2.5_3B.sh` builds `--wandb-key ${WANDB_API_KEY}` unquoted, and
 an empty expansion silently shifts the argument list.
 
 It deliberately does **not** set `HF_HUB_OFFLINE` / `TRANSFORMERS_OFFLINE`.
-The framework sets those per stage (`ptdbench/runtimes/base.py:215-237`), so
+The framework sets those per stage (`_network_policy_env` in `ptdbench/runtimes/base.py`), so
 the agent and verifier stages are off the hub either way, while `prepare` —
 the one stage that is supposed to have network — keeps it. A task-level copy
 applies to all three stages and would silently disable every download in
@@ -167,18 +168,18 @@ applies to all three stages and would silently disable every download in
 
 `prepare.sh` installs one thing: `faiss-gpu-cuvs` (plus the four cuVS runtime
 wheels it dlopens), which only the two search-r1 tasks need. It goes into
-`$PTDBENCH_PREPARED` rather than into the environment, because the shared
-`slime-v0.3.1` closure has to stay byte-identical across all four tasks on it
-— adding a package there would change `slime_retool`'s runtime.
+`$PTDBENCH_PREPARED` rather than into the image, because the
+`slime-v0.3.2` image is shared by all four slime tasks — adding a package there
+would change `slime_retool`'s runtime.
 The GPU build is required, not the CPU one:
 `local_dense_retriever/retrieval_server.py:211-214` calls
 `faiss.index_cpu_to_all_gpus`, which `faiss-cpu` does not define.
 It is the `-cuvs` build rather than plain `faiss-gpu` because this environment
-is CUDA 13 (`torch==2.11.0+cu130`, unsuffixed `nvidia-*` wheels under
-`nvidia/cu13/`); `faiss-gpu` is the CUDA 12 build and looks for
-`nvidia-*-cu12` modules that are not here. The cuVS wheels are pinned to
-26.6 rather than 26.8 because 26.8 wants `nvidia-nvjitlink>=13.3` and the
-closure pins 13.0.88.
+is CUDA 13 (the former `slime-v0.3.1` environment had `torch==2.11.0+cu130`
+and unsuffixed `nvidia-*` wheels under `nvidia/cu13/`); `faiss-gpu` is the
+CUDA 12 build and looks for `nvidia-*-cu12` modules that are not here. The cuVS
+wheels are pinned to 26.6 rather than 26.8 because 26.8 wants
+`nvidia-nvjitlink>=13.3` and the former environment pinned 13.0.88.
 
 `prepare.sh` also stages every asset a real run needs, into
 `$PTDBENCH_WORKSPACE` (which is `$PWD` for the launch script, so the recipe's
@@ -196,9 +197,9 @@ Issue-level diagnosis needs none of them; a solution-level rerun needs all of
 them, which is why they are fetched rather than assumed. About 90 GB is cached
 under `$PTDBENCH_DATASETS` / `$PTDBENCH_MODELS` and hardlinked into each run's
 workspace, so the cost is paid once per host, not once per evaluation. Both
-recipes are deterministic and revision-pinned for the same reason the
-`requirements.txt` files must agree: the solution threshold was calibrated
-against these exact bytes.
+recipes are deterministic and revision-pinned for the same reason the image's
+`FROM` is pinned by digest: the solution threshold was calibrated against these
+exact bytes.
 
 The two `ptdbench_dataset` recipes are the pinned equivalent of the recipe's
 own `examples/search-r1/prepare_data.sh`, whose `-f` guards then make the

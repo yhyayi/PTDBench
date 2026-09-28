@@ -8,7 +8,7 @@ from ..core.types import (
     EvaluationPaths,
     TaskPaths,
     ValidationReport,
-    known_conda_envs,
+    known_images,
 )
 
 
@@ -17,7 +17,10 @@ def validate_task_paths(paths: TaskPaths, strict: bool = True) -> ValidationRepo
     report = ValidationReport()
     _expect_file(report, paths.metadata_yaml, "metadata.yaml")
     _expect_dir(report, paths.workspace, "workspace")
-    _expect_dir(report, paths.environment, "environment")
+    # environment/ 里只剩可选内容（prepare.sh 等），镜像本身由 metadata 的
+    # environment.image 指向 docker/images/，所以目录可以不存在，但存在就得是目录。
+    if paths.environment.exists() and not paths.environment.is_dir():
+        report.add("error", "environment", "expected a directory")
     if not paths.evaluations:
         report.add("error", "evaluations", "at least one evaluation is required")
     for evaluation in paths.evaluations.values():
@@ -150,8 +153,8 @@ def _validate_training(
 ) -> None:
     """校验 training 段里的启动脚本。
 
-    `script` 是"这个任务怎么跑起来"的唯一出处：debug-env.sh 的 `run` 读它，
-    instruction.md 里写给 agent 看的也是同一条路径。以前靠 glob 猜（examples 下
+    `script` 是"这个任务怎么跑起来"的唯一出处：任务卡上记的、instruction.md
+    里写给 agent 看的都是同一条路径。以前靠 glob 猜（examples 下
     的 *_rl.sh / run_*.sh），rlve 那种把脚本放在 scripts/training/ 下的任务就一个
     都猜不到，所以现在由任务自己声明。
 
@@ -171,7 +174,7 @@ def _validate_training(
                 "warning",
                 "metadata.training.script",
                 "missing: declare the launch script (relative to workspace/) so "
-                "that docker/debug-env.sh's `run` and the task card agree on it",
+                "that the task card records how the task is run",
             )
         if args not in (None, ""):
             report.add(
@@ -226,54 +229,44 @@ def _validate_training(
 
 
 def _validate_environment(report: ValidationReport, environment: Dict[str, Any]) -> None:
-    """校验 environment 段，两种形态二选一。
+    """校验 environment 段：`image` 必填，`prepare` / `env` 可选。
 
-    统一镜像的任务给 `conda`（再可选 `requirements` / `prepare` / `env`）；raw 任务
-    还没迁移，继续走 `dockerfile` 这条 legacy 路径。这里看不到任务是不是 raw，所以按
-    字段分支：有 `conda` 就按新形态校验，没有就按 legacy 要求 `dockerfile`。
+    `image` 是 docker/images/ 下的环境名，镜像照 docker/images/<image>.Dockerfile
+    构建。旧 schema 的 `conda` / `dockerfile` / `requirements` 直接报错而不是忽略：
+    忽略的话任务作者会以为它们还在起作用。
     """
-    conda = environment.get("conda")
-    dockerfile = environment.get("dockerfile")
-
-    if conda in (None, ""):
-        # legacy：保持原来的语义——字段缺省时按约定路径算数，只有显式写空才报错。
-        _expect_nonempty(
-            report,
-            environment.get("dockerfile", "environment/Dockerfile"),
-            "metadata.environment.dockerfile",
-        )
-        return
-
-    known = known_conda_envs()
-    if not isinstance(conda, str):
-        report.add("error", "metadata.environment.conda", f"expected a string, got {conda!r}")
-    elif known and conda not in known:
-        # 拿不到注册表（比如装成 wheel 之后没有 docker/）时不报错：那种情况下这里
-        # 只能瞎猜，真正的判据在镜像里，activate hook 找不到环境会明确说出来。
-        report.add(
-            "error",
-            "metadata.environment.conda",
-            f"must be one of {', '.join(sorted(known))}, got {conda!r}; "
-            f"a new environment needs a docker/envs/<name>/ directory and a "
-            f"matching stage in docker/Dockerfile",
-        )
-
-    if dockerfile not in (None, ""):
-        # 两个都写了的话，运行时只有一个会生效，而哪个生效不该由读者猜。
-        report.add(
-            "error",
-            "metadata.environment.dockerfile",
-            "cannot be combined with environment.conda; drop one",
-        )
-
-    for key in ("requirements", "prepare"):
-        value = environment.get(key)
-        if value not in (None, "") and not isinstance(value, str):
+    for legacy in ("conda", "dockerfile", "requirements"):
+        if legacy in environment:
             report.add(
                 "error",
-                f"metadata.environment.{key}",
-                "expected a path relative to the task root",
+                f"metadata.environment.{legacy}",
+                "no longer supported; name a docker/images/<name>.Dockerfile "
+                "with environment.image instead",
             )
+
+    image = environment.get("image")
+    known = known_images()
+    if image in (None, ""):
+        report.add("error", "metadata.environment.image", "missing required value")
+    elif not isinstance(image, str):
+        report.add("error", "metadata.environment.image", f"expected a string, got {image!r}")
+    elif known and image not in known:
+        # 拿不到 docker/images/（比如装成 wheel 之后）时不报错：那种情况下这里只能
+        # 瞎猜，真正的判据是构建镜像时找不找得到 Dockerfile。
+        report.add(
+            "error",
+            "metadata.environment.image",
+            f"must be one of {', '.join(sorted(known))}, got {image!r}; "
+            f"a new environment needs a docker/images/<name>.Dockerfile",
+        )
+
+    prepare = environment.get("prepare")
+    if prepare not in (None, "") and not isinstance(prepare, str):
+        report.add(
+            "error",
+            "metadata.environment.prepare",
+            "expected a path relative to the task root",
+        )
 
     env = environment.get("env")
     if env not in (None, ""):

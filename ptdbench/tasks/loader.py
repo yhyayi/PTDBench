@@ -5,7 +5,6 @@ from typing import Any, Dict, Optional
 
 from ..core.types import (
     DEFAULT_PREPARE,
-    DEFAULT_REQUIREMENTS,
     EnvironmentPlan,
     EvaluationPaths,
     TaskPackage,
@@ -102,23 +101,19 @@ def _evaluation_paths(level: str, root: Path, oracle: Path) -> EvaluationPaths:
 def load_environment_plan(paths: TaskPaths, metadata: Dict[str, Any]) -> EnvironmentPlan:
     """把 metadata 的 environment 段解析成 EnvironmentPlan。
 
-    新 schema 只有一个必填项：`conda`。`requirements` 和 `prepare` 有约定路径，
-    任务不写也能找到——这两个文件几乎每个任务都有，逼着每个 metadata.yaml 再抄一遍
+    只有一个必填项：`image`，即 docker/images/ 下的环境名。`prepare` 有约定路径，
+    任务不写也能找到——几乎每个任务都有 prepare.sh，逼着每个 metadata.yaml 再抄一遍
     路径只会增加抄错的机会。写了就以写的为准。
     """
     environment = metadata.get("environment")
     if not isinstance(environment, dict):
         environment = {}
 
-    conda = _optional_str(environment.get("conda"))
-    dockerfile = _optional_str(environment.get("dockerfile"))
+    image = _optional_str(environment.get("image"))
 
     # 约定路径只在文件真的存在时才落到 plan 上。让 plan 里带一个不存在的路径，
     # 等于把"任务没写 prepare.sh"和"任务写了但路径错了"混成同一种状态，而后者
     # 是必须报错的。validator 负责区分这两件事。
-    requirements_path = _resolve_optional_file(
-        paths, environment.get("requirements"), DEFAULT_REQUIREMENTS
-    )
     prepare_path = _resolve_optional_file(
         paths, environment.get("prepare"), DEFAULT_PREPARE
     )
@@ -135,11 +130,9 @@ def load_environment_plan(paths: TaskPaths, metadata: Dict[str, Any]) -> Environ
 
     try:
         return EnvironmentPlan(
-            conda=conda,
-            requirements=requirements_path,
+            image=image,
             prepare=prepare_path,
             env=env,
-            dockerfile=paths.root / dockerfile if dockerfile else None,
         )
     except ValueError as exc:
         raise SchemaError(f"{paths.metadata_yaml}: {exc}") from exc

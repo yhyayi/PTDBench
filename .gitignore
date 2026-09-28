@@ -9,30 +9,8 @@ __pycache__/
 models/
 datasets/
 
-# docker/probe.sh writes its reports here
-docker/probe-report/
-
-# Host-prefetched CUDA wheels (docker/fetch-cuda-wheels.sh). Multi-GB.
-# One subdirectory per conda environment; the top-level patterns stay so that a
-# leftover from the old flat layout is still ignored rather than showing up as
-# an untracked 2 GB file.
-docker/wheels/*.whl
-docker/wheels/*.part
-docker/wheels/*/*.whl
-docker/wheels/*/*.part
-
-# Host-prefetched git mirrors (docker/fetch-git-mirrors.sh). Bare clones plus
-# per-environment hardlink copies and their manifests -- all reproducible from
-# the pins in docker/envs/*/{requirements,sources}.txt.
-#
-# Ignored contents, tracked directories. The Dockerfile COPYs docker/wheels/<env>
-# and docker/gitmirror/<env> straight out of the build context, and COPY of a
-# directory that does not exist is a hard error -- "failed to compute cache key:
-# /gitmirror/verl: not found" -- whereas COPY of an empty one is fine. So each
-# environment's directory carries a committed .gitkeep and a fresh clone builds
-# with no prefetch step. Written the long way because git cannot re-include
-# anything under an excluded directory: exclude the entries, not the directory.
-docker/gitmirror/*
-!docker/gitmirror/*/
-docker/gitmirror/*/*
-!docker/gitmirror/*/.gitkeep
+# Download caches left over from the retired unified image (docker/wheels,
+# docker/gitmirror). Nothing reads them any more; once they are deleted from
+# disk these two lines can go too.
+docker/wheels/
+docker/gitmirror/

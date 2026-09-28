@@ -2,7 +2,7 @@
 name: package-task
 description: >-
   Packages a buggy training workspace into a PTDBench task with environment
-  (conda + prepare.sh), issue and solution evaluations, workspace,
+  (shared image + prepare.sh), issue and solution evaluations, workspace,
   metadata.yaml, and readme.md.
   Use when the user asks to package, build, or convert a workspace into the
   task format under tasks/, for any model, framework, or dataset.
@@ -12,9 +12,9 @@ description: >-
 
 把有问题的训练工作区收成 `tasks/<family>/<task_id>/`（新任务也可以直接放 `tasks/<task_id>/`）。适用所有模型、框架与数据集。不产生 `agent_trace.json`。
 
-环境走**统一镜像 + conda 环境**：任务不再自带 Dockerfile，`environment/` 只有 `requirements.txt`（该 conda 环境的完整闭包）和 `prepare.sh`（唯一联网阶段，下模型下数据）。
+环境走**共享环境镜像**：任务不自带 Dockerfile，`metadata.environment.image` 写 `docker/images/` 下某个 `<name>.Dockerfile` 的名字，`environment/` 只有 `prepare.sh`（唯一联网阶段，下模型下数据）。
 
-细节模板见 [reference.md](reference.md)。填好的输入示例见 [examples.md](examples.md)。仓库侧的权威说明是 `README.zh.md`（元数据 schema、prepare 阶段）、`docker/envs/README.md`（环境）和 `ptdbench/tasks/validator.py`（校验规则）。
+细节模板见 [reference.md](reference.md)。填好的输入示例见 [examples.md](examples.md)。仓库侧的权威说明是 `README.zh.md`（元数据 schema、prepare 阶段）、`docker/README.zh.md`（环境镜像）和 `ptdbench/tasks/validator.py`（校验规则）。
 
 ## 用户必填输入
 
@@ -26,8 +26,7 @@ description: >-
 - 启动脚本相对 `workspace/` 的路径、位置参数、必要环境变量
 - 容器内模型路径、训练集路径、验证集路径
 - 失败运行 logs 的路径；来源有 wandb 则保留
-- conda 环境名（`docker/envs/` 下的目录名，现有 `verl`、`slime-rc0`、`slime-v0.3.1`）
-- 该环境的 `requirements.txt` 来源（同一 conda 名下所有任务必须**逐字一致**）
+- 环境镜像名（`docker/images/` 下 `<name>.Dockerfile` 的 `<name>`，现有 `verl`、`slime-rc0`、`slime-v0.3.2`、`python3.11-slim`）
 - 任务要用的卡（写进 `metadata.environment.env` 的 `CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES`）
 - 每份资产：HF repo、40 位 commit sha revision、`--allow` 清单、需校验文件的 SHA-256 与字节数、`--dest` 落点；用内置配方时给 recipe 名与校验值
 - 评测集键、出现位置（文字 log、离线 wandb 或两者）、一条含该键与数字的 log 样例
@@ -42,7 +41,6 @@ description: >-
 ```text
 <task_id>/
 ├── environment/prepare.sh
-├── environment/requirements.txt
 ├── environment/docker-compose.yaml          # 需要多卡或大 shm 且要走 harbor 时才有
 ├── evaluations/issue/instruction.md
 ├── evaluations/issue/oracle.md
@@ -66,7 +64,7 @@ description: >-
 └── readme.md
 ```
 
-没有 `environment/Dockerfile`，也没有 `environment/hydrate-assets.sh`。只有 `tasks/reward_design/*` 那两个还没迁的 legacy 任务留着它们；新任务不要照抄。
+没有 `environment/Dockerfile`、`environment/requirements.txt`，也没有 `environment/hydrate-assets.sh`。`tasks/` 下已经没有任何任务留着它们（`tasks/reward_design/*` 那两个最后的 legacy 任务已于 2026-09-23 迁完）；新任务不要照抄。
 
 ## 流程
 
@@ -74,9 +72,9 @@ description: >-
 2. 原样复制 issue 的 `instruction.md`、`judge_prompt.md`、`judge.py`、`test.sh`，以及 solution 的 `verifier/test.sh`。来源见 [reference.md](reference.md)。复制后用 `cmp` 确认与来源一致，并保持 LF。
 3. 用过滤后的 diff 重写 `evaluations/issue/oracle.md`、`evaluations/solution/oracle/README.md`、`task.yaml`、`standard_answer.txt`。`metadata.yaml` 的 `failure_reason` 与 `readme.md` 的 Canonical failure reason 也按这份 diff 写成几句话，并写上用户给出的指标现象。用户若另写了失败原因，不作为根因依据。
 4. 用用户本次输入重写 `solution/instruction.md`、`grader_spec.json`、`resources/README.md`、`grade_submission.py`，并把失败运行的指标序列落成 `oracle/historical_evidence_manifest.json`。
-5. 组 workspace、`environment/{requirements.txt,prepare.sh}`、`metadata.yaml`、`readme.md`。
+5. 组 workspace、`environment/prepare.sh`、`metadata.yaml`、`readme.md`。
 6. 用用户给的 log 样例跑一次提取，确认能抽出所填的键与数字。抽不到就改 `grade_submission.py`，直到样例通过。
-7. 跑 `python3 -m ptdbench validate <task_dir>`，必须零 error。有 GPU 机器时再用 `PTDBENCH_TASK=<task_dir> ./docker/debug-env.sh up prepare` 验一遍 `prepare.sh`。
+7. 跑 `python3 -m ptdbench validate <task_dir>`，必须零 error。有 docker 和网络的机器上再用 `./docker/warm-cache.sh` 跑一遍 `prepare.sh`（它会按需构建镜像，并把全部任务的 prepare 各跑一次）。
 
 ## Issue 归因
 
@@ -118,9 +116,9 @@ Listed causes are all essential. Identifying only part of them must receive part
 
 ## Environment
 
-`requirements.txt` 是该 conda 环境的**完整闭包**，不是「额外再装的东西」。直接取同一 `conda` 名下已有任务的那一份，逐字一致；`python3 docker/collect_envs.py --check`（`docker/build.sh` 会跑）不一致就 fail。要改依赖就是开一个新环境（`docker/envs/<name>/` + `docker/Dockerfile` 里对应的 stage），不要取并集。
+`environment.image` 从 `docker/images/` 现有的镜像里挑，按框架与版本对上任务录制时的栈。镜像是多个任务共享的，内容就是它们的 ground truth 环境：不要为新任务改已有的 Dockerfile。现有镜像都不合适时，新加一个 `docker/images/<name>.Dockerfile`（`FROM` 钉 digest，末尾照抄其他 Dockerfile 的 PTDBench tooling 段），做法见 `docker/README.zh.md`。只缺一两个纯 Python 包的，在 `prepare.sh` 里 `pip install --target` 到 `$PTDBENCH_WORKSPACE` 下，再往 `$PTDBENCH_PREPARED/env` 写一行 `PYTHONPATH=...`（照 `tasks/reward_design/task_evaluator` 的做法；prepare 容器对镜像 site-packages 的改动带不到后两个阶段）。
 
-`prepare.sh` 跑在独立的 prepare 阶段容器里：root、已激活对应 conda 环境、**唯一有网的阶段**，`$PTDBENCH_WORKSPACE` 可写。用 `ptdbench_fetch_hf` / `ptdbench_fetch_url` / `ptdbench_dataset` 三个命令取资产，每一份都要 `--expect` 与 `--expect-size` 硬校验，HF revision 必须是 40 位 commit sha。`--dest` 写到 `$PTDBENCH_WORKSPACE/<启动脚本实际读的路径>`，不要让任务去引用 `$PTDBENCH_MODELS` / `$PTDBENCH_DATASETS`——那两个只是缓存，harbor 后端跑完 prepare 就删。
+`prepare.sh` 跑在独立的 prepare 阶段容器里：root、镜像自带的解释器、**唯一有网的阶段**，`$PTDBENCH_WORKSPACE` 可写。用 `ptdbench_fetch_hf` / `ptdbench_fetch_url` / `ptdbench_dataset` 三个命令取资产，每一份都要 `--expect` 与 `--expect-size` 硬校验，HF revision 必须是 40 位 commit sha。`--dest` 写到 `$PTDBENCH_WORKSPACE/<启动脚本实际读的路径>`，不要让任务去引用 `$PTDBENCH_MODELS` / `$PTDBENCH_DATASETS`——那两个只是缓存，harbor 后端跑完 prepare 就删。
 
 要用的卡写在 `metadata.environment.env` 里，值必须是带引号的字符串。不在 `prepare.sh` 里设 `CUDA_VISIBLE_DEVICES`，也不写 `PTDBENCH_*`。
 
@@ -132,18 +130,18 @@ Listed causes are all essential. Identifying only part of them must receive part
 
 字段结构见 [reference.md](reference.md)，可对照 `tasks/slime_retool` 与 `tasks/verl_implementation/llama_dapo_implementation/task_monkey_patch_011`。内容用本次输入与 diff 填写。
 
-`training.script` 写相对 `workspace/` 的启动脚本路径，需要位置参数时加 `script_args`（列表，一项一个参数，全部带引号）。`environment` 写 `conda` 与 `env`，**不写** `dockerfile`——两个都写会被 validator 拒掉。
+`training.script` 写相对 `workspace/` 的启动脚本路径，需要位置参数时加 `script_args`（列表，一项一个参数，全部带引号）。`environment` 写 `image` 与 `env`；旧的 `conda` / `requirements` / `dockerfile` 字段会被 validator 拒掉。
 
-`readme.md` 的 Environment requirement 节写明用哪个 conda 环境、为什么是它、`prepare.sh` 交付了哪几份资产、要几张卡。不要再写 External dataset asset 那种镜像下载表：资产大小与 SHA-256 只出现在 `prepare.sh`。
+`readme.md` 的 Environment requirement 节写明用哪个环境镜像、为什么是它、`prepare.sh` 交付了哪几份资产、要几张卡。不要再写 External dataset asset 那种镜像下载表：资产大小与 SHA-256 只出现在 `prepare.sh`。
 
 ## 完成前检查
 
-- 骨架齐全，且没有 `agent_trace.json`、没有 `environment/Dockerfile`、没有 `hydrate-assets.sh`
+- 骨架齐全，且没有 `agent_trace.json`、没有 `environment/Dockerfile`、没有 `requirements.txt`、没有 `hydrate-assets.sh`
 - issue 四档与 solution `test.sh` 与来源 `cmp` 一致
 - oracle 根因与过滤后的 diff 一致；多根因时含部分分那句；写了 `gold.yaml` 则与 `oracle.md` 一致
 - `grade_submission.py` 能从样例抽出用户给的键，且 spec 里的键它全都读
 - workspace 含启动脚本与 logs；有 wandb 来源时 workspace 内也有
 - `metadata.training.script` 指向的文件在 `workspace/` 里真的存在
-- `requirements.txt` 与同 conda 环境的其他任务逐字一致（`python3 docker/collect_envs.py --check`）
+- `metadata.environment.image` 是 `docker/images/` 下已有的名字
 - `prepare.sh` 里每份资产都有 `--expect` 与 `--expect-size`，HF revision 都是 40 位 sha
 - `python3 -m ptdbench validate <task_dir>` 零 error

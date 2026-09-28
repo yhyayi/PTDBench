@@ -32,8 +32,7 @@ failure_logs:
   - logs/llama3_2_1b_instruct_dapo_math_fsdp_20260720_005502.log
 include_wandb: true
 
-conda_env: verl
-requirements_from: tasks/verl_implementation/llama_dapo_implementation/task_monkey_patch_011
+image: verl
 gpus: "0,1"
 needs_compose: false
 
@@ -83,9 +82,6 @@ historical_eval_points:
 按上述 diff 写出的 `failure_reason` 会类似：`apply_monkey_patch 不再安装 flash-attention hook，val-core 最终约 0.0402`。具体措辞以过滤后的 diff 为准。
 
 `assets` 里每一条落成 `environment/prepare.sh` 的一次 `ptdbench_fetch_hf` / `ptdbench_dataset` / `ptdbench_fetch_url` 调用，`dest` 前面补 `$PTDBENCH_WORKSPACE/`。`why_this_path` 写成脚本里那条注释——路径错了要到训练中途才炸。
-
-`requirements_from` 指哪个已有任务，就从那里逐字复制 `environment/requirements.txt`，不要改动。
-
 ## 未写评分方式
 
 上面的示例到 `required_final_score` 为止，就是默认评分：分数全部看评测集键。按 `score_mode` 取该键的最高有限值（默认 `best`）或 `final_step` 那一点（`final`），达到 `required_final_score` 则 score 为 1，否则为 0。

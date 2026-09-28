@@ -151,10 +151,10 @@ reaches about 25% at the same horizon.
 
 ## Environment requirement
 
-The task runs on the unified PTDBench image, in the `slime-v0.3.1` conda
-environment (`environment: conda: slime-v0.3.1`) — the same environment as
-`slime_retool`, which is the same recipe. There is no per-task Dockerfile any
-more; `environment/prepare.sh` does that work instead.
+The task runs on the `slime-v0.3.2` PTDBench image
+(`environment: image: slime-v0.3.2`) — the same image as `slime_retool`, which
+is the same recipe. There is no per-task Dockerfile; `environment/prepare.sh`
+fetches the assets instead.
 
 `prepare.sh` fetches the same four assets as `slime_retool` — DAPO-Math-17k
 jsonl, AIME-2024 jsonl, the SFT'd HF checkpoint, and the torch_dist conversion

@@ -23,10 +23,14 @@ def ensure_dir(path: Path) -> Path:
 
 
 def copy_tree(src: Path, dst: Path, ignore: Optional[Iterable[str]] = None) -> Path:
-    """复制目录树；如果目标存在，先清理目标以保证结果确定。"""
+    """复制目录树；如果目标存在，先清理目标以保证结果确定。
+
+    以 symlinks=True 复制，保留符号链接原样（包括悬空链接），与
+    HarborTaskMaterializer._link_tree 的行为一致。
+    """
     if dst.exists():
         shutil.rmtree(dst)
-    shutil.copytree(src, dst, ignore=shutil.ignore_patterns(*(ignore or [])))
+    shutil.copytree(src, dst, symlinks=True, ignore=shutil.ignore_patterns(*(ignore or [])))
     return dst
 
 

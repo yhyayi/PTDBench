@@ -31,8 +31,8 @@ done
 
 if [[ "${#task_roots[@]}" -eq 0 ]]; then
   task_roots=(
-    tasks/raw/rlve_hyper/task_001
-    tasks/raw/rlve_hyper/task_002
+    tasks/rlve_hyper/task_001
+    tasks/rlve_hyper/task_008
   )
 fi
 
@@ -41,8 +41,6 @@ args=(
   "${task_roots[@]}"
   --evaluation-level "${PTDBENCH_EVALUATION_LEVEL:-solution}"
   --judge-model "${PTDBENCH_JUDGE_MODEL:-${PTDBENCH_MODEL:-gpt-5.5}}"
-  --debian-mirror "${PTDBENCH_DEBIAN_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn}"
-  --verifier-mode "${PTDBENCH_VERIFIER_MODE:-separate}"
   --agent-network "${PTDBENCH_AGENT_NETWORK:-public}"
   --verifier-network "${PTDBENCH_VERIFIER_NETWORK:-public}"
   --harbor-command "${PTDBENCH_HARBOR_COMMAND:-uv run --no-project --python python3 --with-editable ./harbor harbor}"

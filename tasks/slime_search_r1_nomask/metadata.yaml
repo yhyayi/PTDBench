@@ -13,7 +13,7 @@ training:
   algo: grpo
   script: examples/search-r1/run_qwen2.5_3B.sh
 environment:
-  conda: slime-v0.3.1
+  image: slime-v0.3.2
   env:
     # recipe 固定要 8 卡：ray start --num-gpus 8 + --actor-num-gpus-per-node 8，
     # 再按 --rollout-num-gpus-per-engine 2 切 sglang engine。
@@ -23,7 +23,7 @@ environment:
     # 任何差别都会让两边的重跑不可比。
     #
     # 这里**没有** HF_HUB_OFFLINE / TRANSFORMERS_OFFLINE：断网这件事由框架按阶段
-    # 来设（runtimes/base.py:215-237），agent 和 verifier 阶段本来就带着这两个变量，
+    # 来设（runtimes/base.py 的 _network_policy_env），agent 和 verifier 阶段本来就带着这两个变量，
     # 评测过程因此取不到 hub 上的东西（run_qwen2.5_3B.sh:72-76 的 `hf download`
     # 守卫会快速失败，而不是在无网的容器里干等）。写在这里则是三个阶段一视同仁，
     # 会把 prepare 自己下载权重和数据集的那条路也堵死。

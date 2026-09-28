@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import dataclasses
 import json
+import os
 import re
 import shlex
 import shutil
@@ -28,12 +30,19 @@ from ..core.types import (
     PREPARED_DIR,
     PTDBENCH_ENVIRONMENT_DIR,
     CommandResult,
+    EnvironmentImage,
+    EvaluationConfig,
     EvaluationPaths,
     EvaluationResult,
     TaskPackage,
 )
 from ..tasks import SchemaError, load_task_package
+from .evaluator import TaskEvaluator
 from ..utils.filesystem import copy_tree, ensure_dir, tree_digest, write_text
+
+
+# 镜像里 activate hook 的位置；见 docker/images/*.Dockerfile 的工具层。
+ACTIVATE_HOOK = "/etc/profile.d/ptdbench-activate.sh"
 
 
 class HarborAdapterError(RuntimeError):
@@ -85,9 +94,10 @@ class HarborTaskMaterializer:
         ensure_dir(task_dir)
 
         self._write_instruction(evaluation, task_dir)
-        self._write_environment(package, evaluation, task_dir, config)
-        self._write_tests(evaluation, task_dir, config)
-        self._write_task_config(package, evaluation, task_dir, config)
+        self._write_environment(unit, task_dir)
+        self._write_tests(evaluation, task_dir)
+        self._write_solution(evaluation, task_dir)
+        self._write_task_config(unit, task_dir, config)
         self._write_manifest(package, evaluation, task_dir, config)
 
     @staticmethod
@@ -95,182 +105,43 @@ class HarborTaskMaterializer:
         instruction = evaluation.instruction_md.read_text(encoding="utf-8")
         write_text(task_dir / "instruction.md", instruction)
 
-    def _write_environment(
-        self,
-        package: TaskPackage,
-        evaluation: EvaluationPaths,
-        task_dir: Path,
-        config: HarborEvaluationConfig,
-    ) -> None:
-        environment_dir = task_dir / "environment"
-        if package.paths.environment.is_dir():
-            copy_tree(package.paths.environment, environment_dir)
-        else:
-            ensure_dir(environment_dir)
+    def _write_environment(self, unit: HarborTaskUnit, task_dir: Path) -> None:
+        """environment/ 只放 workspace 的内容，不放 Dockerfile。
 
-        build_context = ensure_dir(environment_dir / ".ptdbench")
-        copy_tree(package.paths.workspace, build_context / "workspace")
-        public_dir = ensure_dir(build_context / "public")
-        shutil.copy2(evaluation.instruction_md, public_dir / "instruction.md")
+        task.toml 声明了 `docker_image`，Harbor 直接起预构建镜像；而 environment/
+        里没有 Dockerfile / docker-compose.yaml 时，Harbor 会在容器启动后把整个
+        目录上传到 workdir（/workspace）。这正好就是 agent 要改的那份副本。
 
-        if package.environment.is_legacy:
-            dockerfile = (
-                self._legacy_base(package, config)
-                + self._workspace_layer()
-                + self._public_layer()
-            )
-        else:
-            dockerfile = self._conda_base(package, evaluation, config, build_context)
-
-        write_text(environment_dir / "Dockerfile", dockerfile)
-        self._allow_adapter_context(environment_dir / ".dockerignore")
-
-    def _legacy_base(
-        self, package: TaskPackage, config: HarborEvaluationConfig
-    ) -> str:
-        source_dockerfile = package.paths.environment / self._dockerfile(package)
-        base = source_dockerfile.read_text(encoding="utf-8").rstrip()
-        return base + self._debian_mirror_layer(config.debian_mirror)
-
-    def _conda_base(
-        self,
-        package: TaskPackage,
-        evaluation: EvaluationPaths,
-        config: HarborEvaluationConfig,
-        build_context: Path,
-    ) -> str:
-        """迁移后的任务没有自己的 Dockerfile，这里现生成一个。
-
-        docker 那条路把 prepare.sh 跑在一个独立的、唯一联网的容器里；Harbor 的
-        task.toml（schema 1.4）既不挂宿主目录也没有 pre-agent 阶段，所以这里把同一个
-        prepare.sh 烘成一个 `RUN` 层——构建期是 Harbor 这条路上唯一还有网络、还能往
-        镜像里写东西的时刻。脚本本身一个字都不用改，这正是 prepare.sh 取代 assets.yaml
-        换来的：一份声明，两条路都能执行。
+        有 staging 就用 prepare 写过的那份（权重可能就下在里面）；硬链接复制，
+        几十 GB 的权重不会在磁盘上再占一份。
         """
-        plan = package.environment
-        base = f"FROM {config.image}\n"
-        base += self._debian_mirror_layer(config.debian_mirror)
-        # workspace 先进去：prepare.sh 会往 $PTDBENCH_WORKSPACE 里下权重，反过来的话
-        # 这一层会把下好的东西盖掉。
-        base += self._workspace_layer()
-
-        script = self._prepare_script(package)
-        if script is not None:
-            copy_tree(package.paths.environment, build_context / "environment")
-            base += f"""
-
-# PTDBench Harbor adapter: 构建期执行任务的 prepare.sh（下模型、下数据集、写 env）。
-COPY .ptdbench/environment/ {PTDBENCH_ENVIRONMENT_DIR}/
-RUN mkdir -p {PREPARED_DIR} {MODELS_DIR} {DATASETS_DIR} \\
- && PTDBENCH_STAGE=prepare \\
-    PTDBENCH_TASK_ID={shlex.quote(package.task_id)} \\
-    PTDBENCH_EVALUATION_LEVEL={shlex.quote(evaluation.level)} \\
-    PTDBENCH_CONDA_ENV={shlex.quote(plan.conda or "")} \\
-    PTDBENCH_WORKSPACE=/workspace \\
-    PTDBENCH_ENVIRONMENT={PTDBENCH_ENVIRONMENT_DIR} \\
-    PTDBENCH_PREPARED={PREPARED_DIR} \\
-    PTDBENCH_MODELS={MODELS_DIR} \\
-    PTDBENCH_DATASETS={DATASETS_DIR} \\
-    bash {shlex.quote(script)} \\
- && rm -rf {MODELS_DIR} {DATASETS_DIR}
-"""
-            # 两个缓存根是"为了不重下"，不是产物。留在镜像里等于把每个模型存两份，
-            # 而 Harbor 那边每个任务一个镜像，这笔账翻倍得很快。删掉它们也意味着
-            # 任务脚本不能依赖这两个路径——交付走 prepare.sh 的 --dest。
-        return base + self._public_layer()
+        source = unit.workspace or unit.package.paths.workspace
+        environment_dir = task_dir / "environment"
+        for name in ("Dockerfile", "docker-compose.yaml"):
+            if (source / name).exists():
+                # 放进 environment/ 就会被 Harbor 当成构建定义，而不是上传的文件。
+                raise HarborAdapterError(
+                    f"workspace of {unit.package.task_id!r} contains {name}; Harbor "
+                    "would build it instead of using the prebuilt image"
+                )
+        self._link_tree(source, environment_dir)
+        if not any(environment_dir.iterdir()):
+            # 空目录 Harbor 不会上传，/workspace 也就不存在；留一个占位文件。
+            write_text(environment_dir / ".ptdbench-workspace", "")
 
     @staticmethod
-    def _prepare_script(package: TaskPackage) -> Optional[str]:
-        """prepare.sh 在镜像里的路径，任务没有这个脚本就返回 None。"""
-        prepare = package.environment.prepare
-        if prepare is None:
-            return None
-        if not prepare.is_file():
-            raise SchemaError(
-                f"metadata.environment.prepare not found: {prepare}"
-            )
-        try:
-            relative = prepare.resolve().relative_to(package.paths.environment.resolve())
-        except ValueError as exc:
-            raise SchemaError(
-                f"task {package.task_id!r}: metadata.environment.prepare must stay "
-                f"under {package.paths.environment}; only that directory is copied "
-                f"into the image"
-            ) from exc
-        return f"{PTDBENCH_ENVIRONMENT_DIR}/{relative.as_posix()}"
+    def _link_tree(source: Path, destination: Path) -> None:
+        """尽量硬链接，跨文件系统时退回普通复制。"""
 
-    @staticmethod
-    def _workspace_layer() -> str:
-        return """
+        def link_or_copy(src: str, dst: str) -> None:
+            try:
+                os.link(src, dst)
+            except OSError:
+                shutil.copy2(src, dst)
 
-# PTDBench Harbor adapter: workspace 进入 agent 镜像。
-COPY --chmod=0777 .ptdbench/workspace/ /workspace/
-"""
+        shutil.copytree(source, destination, symlinks=True, copy_function=link_or_copy)
 
-    @staticmethod
-    def _public_layer() -> str:
-        return """
-
-# PTDBench Harbor adapter: 只有公开 instruction 进镜像；
-# oracle/verifier 只会在 agent 结束后由 Harbor 上传到 /tests。
-COPY --chmod=0444 .ptdbench/public/ /ptdbench/
-WORKDIR /workspace
-"""
-
-    @staticmethod
-    def _debian_mirror_layer(mirror: Optional[str]) -> str:
-        if mirror is None:
-            return ""
-        mirror_value = shlex.quote(mirror)
-        return f"""
-
-# PTDBench Harbor adapter: Harbor 会在容器启动后安装 agent 依赖，提前切换 Debian 源。
-RUN set -eu; \\
-    mirror={mirror_value}; \\
-    for sources in /etc/apt/sources.list /etc/apt/sources.list.d/debian.sources; do \\
-        [ -f "$sources" ] || continue; \\
-        sed -i \\
-            -e "s|http://deb.debian.org/debian-security|$mirror/debian-security|g" \\
-            -e "s|https://deb.debian.org/debian-security|$mirror/debian-security|g" \\
-            -e "s|http://security.debian.org/debian-security|$mirror/debian-security|g" \\
-            -e "s|https://security.debian.org/debian-security|$mirror/debian-security|g" \\
-            -e "s|http://deb.debian.org/debian|$mirror/debian|g" \\
-            -e "s|https://deb.debian.org/debian|$mirror/debian|g" \\
-            "$sources"; \\
-    done
-"""
-
-    @staticmethod
-    def _dockerfile(package: TaskPackage) -> Path:
-        environment = package.metadata.get("environment")
-        declared = environment.get("dockerfile") if isinstance(environment, dict) else None
-        value = str(declared or "environment/Dockerfile")
-        if value == "environment":
-            value = "Dockerfile"
-        elif value.startswith("environment/"):
-            value = value[len("environment/") :]
-        path = Path(value)
-        if path.is_absolute() or ".." in path.parts:
-            raise SchemaError(
-                "metadata.environment.dockerfile must stay under environment/: "
-                f"{value}"
-            )
-        if not (package.paths.environment / path).is_file():
-            raise SchemaError(f"Dockerfile not found: {package.paths.environment / path}")
-        return path
-
-    @staticmethod
-    def _allow_adapter_context(dockerignore: Path) -> None:
-        existing = dockerignore.read_text(encoding="utf-8") if dockerignore.exists() else ""
-        suffix = "\n!.ptdbench/\n!.ptdbench/**\n"
-        write_text(dockerignore, existing.rstrip() + suffix)
-
-    def _write_tests(
-        self,
-        evaluation: EvaluationPaths,
-        task_dir: Path,
-        config: HarborEvaluationConfig,
-    ) -> None:
+    def _write_tests(self, evaluation: EvaluationPaths, task_dir: Path) -> None:
         tests_dir = ensure_dir(task_dir / "tests")
         copy_tree(evaluation.verifier, tests_dir / "verifier")
         if evaluation.oracle.is_dir():
@@ -281,52 +152,30 @@ RUN set -eu; \\
         test_script = tests_dir / "test.sh"
         write_text(test_script, self._verifier_wrapper())
         test_script.chmod(0o755)
-        if config.verifier_mode == "separate":
-            self._write_separate_verifier_context(task_dir, tests_dir)
 
     @staticmethod
-    def _write_separate_verifier_context(
-        task_dir: Path,
-        tests_dir: Path,
-    ) -> None:
-        """Harbor separate verifier 从 tests/ 构建镜像，需复制原环境上下文。"""
-        environment_dir = task_dir / "environment"
-        for source in environment_dir.iterdir():
-            if source.name == "Dockerfile":
-                continue
-            target = tests_dir / source.name
-            if target.exists():
-                continue
-            if source.is_dir():
-                copy_tree(source, target)
-            else:
-                shutil.copy2(source, target)
+    def _write_solution(evaluation: EvaluationPaths, task_dir: Path) -> None:
+        """evaluations/<level>/solution/ 原样成为 Harbor 的 solution/。
 
-        base_dockerfile = (environment_dir / "Dockerfile").read_text(encoding="utf-8")
-        verifier_dockerfile = base_dockerfile.rstrip() + """
-
-# Harbor separate verifier context: tests are installed only in the verifier.
-COPY --chmod=0777 verifier/ /tests/verifier/
-COPY --chmod=0777 test.sh /tests/test.sh
-"""
-        oracle = tests_dir / "oracle"
-        if oracle.is_dir():
-            verifier_dockerfile += "COPY --chmod=0444 oracle/ /tests/oracle/\n"
-        else:
-            verifier_dockerfile += "COPY --chmod=0444 oracle.md /tests/oracle.md\n"
-        write_text(tests_dir / "Dockerfile", verifier_dockerfile)
-        dockerignore = tests_dir / ".dockerignore"
-        existing = dockerignore.read_text(encoding="utf-8") if dockerignore.exists() else ""
-        write_text(
-            dockerignore,
-            existing.rstrip()
-            + "\n!.ptdbench/\n!.ptdbench/**\n!verifier/\n!oracle/\n!oracle.md\n!test.sh\n",
-        )
+        只有 `harbor run -a oracle` 会把它上传到容器并执行 solve.sh，用来端到端
+        验证"镜像 + GPU + prepare 产物 + verifier"这条链路；普通 agent 看不到。
+        """
+        source = evaluation.root / "solution"
+        if not (source / "solve.sh").is_file():
+            return
+        copy_tree(source, task_dir / "solution")
+        (task_dir / "solution" / "solve.sh").chmod(0o755)
 
     @staticmethod
     def _verifier_wrapper() -> str:
         return r'''#!/usr/bin/env bash
 set +e
+
+# Harbor 用 `bash -c` 而不是登录 shell 执行命令，/etc/profile.d 不会自动生效；
+# prepare.sh 写进 $PTDBENCH_PREPARED/env 的变量要靠这一行导出。
+if [ -f /etc/profile.d/ptdbench-activate.sh ]; then
+  . /etc/profile.d/ptdbench-activate.sh
+fi
 
 bash "$PTDBENCH_VERIFIER/test.sh"
 verifier_status=$?
@@ -354,22 +203,76 @@ printf '%s\n' "$score" > /logs/verifier/reward.txt
 exit "$verifier_status"
 '''
 
+    @staticmethod
+    def _docker_image(package: TaskPackage) -> str:
+        if package.environment.image is None:
+            raise HarborAdapterError(
+                f"task {package.task_id!r} declares no environment.image; Harbor needs "
+                "a prebuilt image"
+            )
+        return EnvironmentImage(package.environment.image).tag
+
+    # 离线开关：与 SandboxRuntime._network_policy_env 对 agent / verifier 给的一致。
+    # 联网的只有 prepare，而它在 `harbor run` 之前就跑完了。
+    _OFFLINE_ENV = {
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "HF_DATASETS_OFFLINE": "1",
+        "WANDB_MODE": "offline",
+        "WANDB_API_KEY": "ptdbench-offline",
+        "WANDB_SILENT": "true",
+    }
+
+    # /workspace 收回来只用于留档和 workspace_after_hash；判分在 shared 容器里读的
+    # 是真实的 /workspace。权重和训练 checkpoint 动辄几十上百 GB，而带 exclude 的
+    # 下载是容器里一次 `tar czf`（Harbor 给它 120s），所以按后缀挡掉。
+    _WORKSPACE_ARTIFACT_EXCLUDE = (
+        "*.safetensors",
+        "*.bin",
+        "*.pt",
+        "*.pth",
+        "*.ckpt",
+        "*.distcp",
+        "*.gguf",
+        "__pycache__",
+    )
+
     def _write_task_config(
         self,
-        package: TaskPackage,
-        evaluation: EvaluationPaths,
+        unit: HarborTaskUnit,
         task_dir: Path,
         config: HarborEvaluationConfig,
     ) -> None:
+        package, evaluation = unit.package, unit.evaluation
         oracle_path = "/tests/oracle.md" if evaluation.oracle.is_file() else "/tests/oracle"
         task_name = harbor_task_name(package.task_id, evaluation.level)
         title = str(package.metadata.get("title") or package.task_id)
-        verifier_env = {
+        docker_image = self._docker_image(package)
+
+        # 两个 stage 共用的部分：挂载路径、离线开关，以及让 `bash -c` 也加载
+        # activate hook 的 BASH_ENV（Harbor 不起登录 shell）。
+        shared_env = {
             "PTDBENCH_TASK_ID": package.task_id,
             "PTDBENCH_EVALUATION_LEVEL": evaluation.level,
             "PTDBENCH_WORKSPACE": "/workspace",
             "PTDBENCH_RESULTS": "/logs/artifacts",
             "PTDBENCH_VISIBLE_TASK": "/ptdbench",
+            "PTDBENCH_PREPARED": PREPARED_DIR,
+            "PTDBENCH_MODELS": MODELS_DIR,
+            "PTDBENCH_DATASETS": DATASETS_DIR,
+            "PTDBENCH_ENVIRONMENT": (
+                PTDBENCH_ENVIRONMENT_DIR if package.paths.environment.is_dir() else ""
+            ),
+            "BASH_ENV": ACTIVATE_HOOK,
+            **self._OFFLINE_ENV,
+        }
+        agent_env = {
+            **shared_env,
+            "PTDBENCH_TASK_ROOT": "/ptdbench",
+            "PTDBENCH_STAGE": "agent",
+        }
+        verifier_env = {
+            **shared_env,
             "PTDBENCH_TASK_ROOT": "/tests",
             "PTDBENCH_ORACLE": oracle_path,
             "PTDBENCH_VERIFIER": "/tests/verifier",
@@ -381,37 +284,18 @@ exit "$verifier_status"
         if config.judge_model:
             verifier_env["PTDBENCH_JUDGE_MODEL"] = config.judge_model
 
-        agent_env = {
-            "PTDBENCH_TASK_ID": package.task_id,
-            "PTDBENCH_EVALUATION_LEVEL": evaluation.level,
-            "PTDBENCH_WORKSPACE": "/workspace",
-            "PTDBENCH_RESULTS": "/logs/artifacts",
-            "PTDBENCH_VISIBLE_TASK": "/ptdbench",
-            "PTDBENCH_TASK_ROOT": "/ptdbench",
-            "PTDBENCH_STAGE": "agent",
-        }
-        # 迁移后的任务要靠这个变量选栈；raw 任务留空，activate 脚本会原地返回。
-        conda_env = package.environment.conda
-        if conda_env:
-            agent_env["PTDBENCH_CONDA_ENV"] = conda_env
-            verifier_env["PTDBENCH_CONDA_ENV"] = conda_env
-            # prepare.sh 在构建期写的 env 文件就在镜像里的这个路径下；两个 stage
-            # 都要指过去，否则它导出的变量在评测时一个也不会生效。
-            agent_env["PTDBENCH_PREPARED"] = PREPARED_DIR
-            verifier_env["PTDBENCH_PREPARED"] = PREPARED_DIR
-            agent_env["PTDBENCH_ENVIRONMENT"] = PTDBENCH_ENVIRONMENT_DIR
-            verifier_env["PTDBENCH_ENVIRONMENT"] = PTDBENCH_ENVIRONMENT_DIR
-
-        # 任务声明的 env（CUDA_VISIBLE_DEVICES 之类）两个 stage 都要给，否则迁移到
-        # 统一镜像之后这批逐任务不同的变量会静默消失。PTDBENCH_* 进不来，
-        # EnvironmentPlan 已经挡过一道。
+        # 任务声明的 env（CUDA_VISIBLE_DEVICES 之类）两个 stage 都要给。PTDBENCH_*
+        # 进不来，EnvironmentPlan 已经挡过一道。
         for key, value in package.environment.env.items():
             agent_env[key] = value
             verifier_env[key] = value
 
+        artifact_exclude = ", ".join(
+            self._toml_string(pattern) for pattern in self._WORKSPACE_ARTIFACT_EXCLUDE
+        )
         task_toml = f'''schema_version = "1.4"
 
-artifacts = ["/workspace"]
+artifacts = [{{ source = "/workspace", exclude = [{artifact_exclude}] }}]
 
 [task]
 name = {self._toml_string(task_name)}
@@ -425,11 +309,13 @@ ptdbench_evaluation_level = {self._toml_string(evaluation.level)}
 network_mode = {self._toml_string(config.agent_network)}
 
 [verifier]
-environment_mode = {self._toml_string(config.verifier_mode)}
+environment_mode = "shared"
 network_mode = {self._toml_string(config.verifier_network)}
 
 [environment]
+docker_image = {self._toml_string(docker_image)}
 workdir = "/workspace"
+build_timeout_sec = {self._environment_start_timeout(task_dir / "environment")}
 
 [environment.env]
 {self._toml_env(agent_env)}
@@ -438,6 +324,26 @@ workdir = "/workspace"
 {self._toml_env(verifier_env)}
 '''
         write_text(task_dir / "task.toml", task_toml)
+
+    # Harbor 的默认值；预构建镜像不 build，这段时间几乎全花在上传 workspace 上。
+    _ENVIRONMENT_START_BASE_SEC = 600
+    # `docker compose cp` 的保守吞吐：每 GB 给 60s。
+    _ENVIRONMENT_START_SEC_PER_GB = 60
+
+    @classmethod
+    def _environment_start_timeout(cls, environment_dir: Path) -> int:
+        """build_timeout_sec 在 Harbor 里罩住整个环境启动，包括 environment/ 上传。
+
+        prepare 把权重下进 workspace 的任务（slime_retool 约 16GB）按默认 600s
+        会在 agent 开始前就超时，所以按实际上传量放宽。
+        """
+        size = sum(
+            path.stat().st_size
+            for path in environment_dir.rglob("*")
+            if path.is_file() and not path.is_symlink()
+        )
+        gigabytes = -(-size // (1 << 30))
+        return cls._ENVIRONMENT_START_BASE_SEC + cls._ENVIRONMENT_START_SEC_PER_GB * gigabytes
 
     @classmethod
     def _toml_env(cls, env: Dict[str, str]) -> str:
@@ -460,8 +366,8 @@ workdir = "/workspace"
             "adapter": "ptdbench-harbor",
             "task_id": package.task_id,
             "evaluation_level": evaluation.level,
-            "verifier_mode": config.verifier_mode,
-            "debian_mirror": config.debian_mirror,
+            "verifier_mode": "shared",
+            "docker_image": HarborTaskMaterializer._docker_image(package),
             "source_task": str(package.paths.root),
         }
         write_text(
@@ -474,20 +380,29 @@ class HarborRunner:
     """通过 CLI 启动 Harbor，避免与 Harbor 的 Python 版本和内部 API 耦合。"""
 
     _TASK_PATH_ARGS = {"-p", "--path"}
+    # 挂载由 PTDBench 按 prepare 产物决定，而 Harbor 的 --mounts 是整个 job 共用的，
+    # 所以每个 unit 单独一个 job；用户再传一份只会覆盖掉 prepared 的挂载。
+    _MOUNT_ARGS = {"--mounts", "--mounts-json"}
 
     def run(
         self,
         prepared: PreparedHarborTask,
         config: HarborEvaluationConfig,
+        job_name_suffix: Optional[str] = None,
     ) -> HarborRun:
         harbor_args = list(config.harbor_args)
         self._validate_harbor_args(harbor_args)
+        mounts = self._mounts(prepared, config)
 
         job_name = self._option_value(harbor_args, "--job-name")
         jobs_dir_value = self._option_value(harbor_args, "-o", "--jobs-dir")
         config_path = self._option_value(harbor_args, "-c", "--config")
         injected_args = []
         # 没有 job config 时补全结果位置；使用 config 时完全尊重 Harbor 的配置。
+        if job_name is not None and job_name_suffix:
+            # 批量时用户给的 job 名要按 unit 区分，否则第二个 job 会撞上第一个。
+            job_name = f"{job_name}-{job_name_suffix}"
+            harbor_args = self._replace_option(harbor_args, "--job-name", job_name)
         if config_path is None:
             if job_name is None:
                 job_name = self._job_name()
@@ -503,6 +418,9 @@ class HarborRunner:
             "--path",
             str(prepared.tasks_dir),
             *injected_args,
+            "--mounts-json",
+            json.dumps(mounts),
+            *self._compose_overlay_args(prepared),
             *harbor_args,
         ]
 
@@ -598,6 +516,76 @@ class HarborRunner:
                     f"{name} is managed by the PTDBench task materializer; "
                     "pass the PTDBench task as task_root"
                 )
+            if name in cls._MOUNT_ARGS:
+                raise ValueError(
+                    f"{name} is managed by PTDBench (prepared / models / datasets "
+                    "mounts); use --models-dir / --datasets-dir instead"
+                )
+
+    @staticmethod
+    def _mounts(
+        prepared: PreparedHarborTask,
+        config: HarborEvaluationConfig,
+    ) -> list[Dict[str, Any]]:
+        """prepare 产物、任务 environment/ 和两个下载缓存，全部只读。
+
+        与 docker 评测里 agent / verifier 看到的挂载一致；可写的只有 Harbor 上传
+        的 /workspace。
+        """
+        if len(prepared.units) != 1:
+            raise HarborAdapterError(
+                "Harbor mounts apply to the whole job; run one PTDBench task per job"
+            )
+        unit = prepared.units[0]
+        pairs = []
+        if unit.prepared is not None:
+            pairs.append((unit.prepared, PREPARED_DIR))
+        if unit.package.paths.environment.is_dir():
+            pairs.append((unit.package.paths.environment, PTDBENCH_ENVIRONMENT_DIR))
+        pairs.append((config.models_dir, MODELS_DIR))
+        pairs.append((config.datasets_dir, DATASETS_DIR))
+        return [
+            {
+                "type": "bind",
+                "source": str(Path(source).resolve()),
+                "target": target,
+                "read_only": True,
+            }
+            for source, target in pairs
+        ]
+
+    @staticmethod
+    def _compose_overlay_args(prepared: PreparedHarborTask) -> list[str]:
+        """任务的 environment/docker-compose.yaml 作为 compose overlay 交给 Harbor。
+
+        GPU 任务靠它拿到设备预留和 shm_size：Harbor 的 docker 环境声明不支持
+        GPU，task.toml 里写 `gpus` 会被拒，能生效的只有 `main` 服务上的 compose
+        覆盖。它不能放进生成 task 的 environment/——那里有 compose 文件时 Harbor
+        就不再上传 workspace——所以走 `--extra-docker-compose`，与 job 一一对应。
+        """
+        overlays = []
+        for unit in prepared.units:
+            compose = unit.package.paths.environment / "docker-compose.yaml"
+            if compose.is_file():
+                overlays.extend(["--extra-docker-compose", str(compose.resolve())])
+        return overlays
+
+    @staticmethod
+    def _replace_option(args: Sequence[str], name: str, value: str) -> list[str]:
+        result = []
+        skip = False
+        for index, arg in enumerate(args):
+            if skip:
+                skip = False
+                continue
+            if arg == name:
+                result.extend([name, value])
+                skip = True
+            elif arg.startswith(name + "="):
+                result.append(f"{name}={value}")
+            else:
+                result.append(arg)
+        return result
 
     @staticmethod
     def _option_value(args: Sequence[str], *names: str) -> Optional[str]:
@@ -869,7 +857,7 @@ class HarborResultMapper:
                 metrics[key] = value
         metrics["harbor_rewards"] = rewards
         metrics["harbor_verifier_mode"] = (
-            trial.get("verifier_environment_mode") or config.verifier_mode
+            trial.get("verifier_environment_mode") or "shared"
         )
         return metrics
 
@@ -923,6 +911,220 @@ class HarborResultMapper:
         )
 
 
+class HarborPreparer:
+    """在 `harbor run` 之前，用同一个镜像跑任务的 prepare.sh。
+
+    prepare 是唯一联网的阶段，下模型、下数据集、写 prepared/env。它不进 Harbor：
+    Harbor 的 agent / verifier 都是离线的，而且一个 job 里没有"先跑一段准备"的
+    位置。复用 TaskEvaluator 的 staging 和 prepare 逻辑，与 docker 评测完全一致。
+    """
+
+    def __init__(self, evaluator: Optional[TaskEvaluator] = None) -> None:
+        self._evaluator = evaluator
+
+    @property
+    def evaluator(self) -> TaskEvaluator:
+        if self._evaluator is None:
+            self._evaluator = TaskEvaluator("docker")
+        return self._evaluator
+
+    def prepare(
+        self,
+        unit: HarborTaskUnit,
+        work_dir: Path,
+        config: HarborEvaluationConfig,
+    ) -> HarborTaskUnit:
+        package = unit.package
+        image = package.environment.environment_image
+        if image is None:
+            raise HarborAdapterError(
+                f"task {package.task_id!r} declares no environment.image; Harbor needs "
+                "a prebuilt image"
+            )
+        evaluator = self.evaluator
+        eval_config = EvaluationConfig(
+            work_dir=work_dir,
+            evaluation_level=unit.evaluation.level,
+            huggingface_mirror=config.huggingface_mirror,
+            models_dir=config.models_dir,
+            datasets_dir=config.datasets_dir,
+            keep_artifacts=True,
+        )
+        run = evaluator._prepare_run(package, unit.evaluation, eval_config)
+        # 镜像按环境共享：已存在直接用，不存在才构建。Harbor 用的是同一个 tag。
+        artifact = evaluator.runtime.ensure_environment(image)
+        print(
+            f"[ptdbench] Preparing {package.task_id} in {artifact.reference or image.tag}",
+            file=sys.stderr,
+            flush=True,
+        )
+        result = evaluator._run_prepare(package, unit.evaluation, run, eval_config, artifact)
+        if result is not None and result.returncode != 0:
+            tail = "\n".join(result.stderr.strip().splitlines()[-20:])
+            raise HarborAdapterError(
+                f"task {package.task_id!r}: prepare failed with exit {result.returncode}"
+                + (f"\n{tail}" if tail else "")
+            )
+        return dataclasses.replace(unit, workspace=run.workspace, prepared=run.prepared)
+
+
+class HarborShell:
+    """prepare → docker run -it でインタラクティブシェルを起動する。
+
+    harbor-evaluate の agent フェーズと完全に同じ環境を用意しながら、Harbor と
+    agent を起動せずにインタラクティブシェルを渡す。HarborPreparer でステージング
+    し、HarborRunner._mounts() や HarborTaskMaterializer._write_task_config() と
+    同じマウント・env 構成を docker run に変換する。
+
+    workspace のステージング結果は state_file に記録され、次回起動時に
+    --force-prepare なしで再利用できる。16GB 超の prepare を毎回走らせないためのもの。
+    """
+
+    _STATE_FILE = "ptdbench-shell.json"
+
+    def __init__(self, preparer: Optional[HarborPreparer] = None) -> None:
+        self.preparer = preparer or HarborPreparer()
+
+    def shell(
+        self,
+        task_root: str | Path,
+        config: HarborEvaluationConfig,
+        workspace_dir: Path,
+        *,
+        shell_cmd: str = "bash",
+        force_prepare: bool = False,
+        gpus: Optional[str] = None,
+        shm_size: Optional[str] = None,
+        extra_docker_args: Sequence[str] = (),
+    ) -> None:
+        """prepare して docker run -it に exec する。os.execvp で置き換わるため戻らない。"""
+        package = load_task_package(Path(task_root))
+        if not package.report.ok:
+            raise SchemaError(f"task package failed validation: {package.paths.root}")
+        try:
+            evaluation = package.paths.evaluations[config.evaluation_level]
+        except KeyError:
+            available = ", ".join(package.paths.evaluations) or "none"
+            raise SchemaError(
+                f"evaluation level {config.evaluation_level!r} is unavailable; "
+                f"available levels: {available}"
+            )
+        unit = HarborTaskUnit(
+            package=package,
+            evaluation=evaluation,
+            workspace_before_hash="",
+        )
+
+        workspace_dir = workspace_dir.resolve()
+        state_path = workspace_dir / self._STATE_FILE
+
+        if not force_prepare and state_path.is_file():
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            unit = dataclasses.replace(
+                unit,
+                workspace=Path(state["workspace"]),
+                prepared=Path(state["prepared"]) if state.get("prepared") else None,
+            )
+            print(
+                f"[ptdbench] Reusing staged workspace at {unit.workspace}",
+                file=sys.stderr,
+                flush=True,
+            )
+        else:
+            ensure_dir(workspace_dir)
+            unit = self.preparer.prepare(unit, workspace_dir, config)
+            state_data: Dict[str, Any] = {
+                "task_id": package.task_id,
+                "workspace": str(unit.workspace),
+                "prepared": str(unit.prepared) if unit.prepared else None,
+            }
+            write_text(state_path, json.dumps(state_data, indent=2, ensure_ascii=False))
+
+        image = HarborTaskMaterializer._docker_image(package)
+        argv = self._build_docker_argv(
+            unit,
+            package,
+            config,
+            image,
+            shell_cmd,
+            gpus=gpus,
+            shm_size=shm_size,
+            extra_docker_args=extra_docker_args,
+        )
+        print(f"[ptdbench] Entering container: {shlex.join(argv)}", file=sys.stderr, flush=True)
+        os.execvp(argv[0], argv)
+
+    def _build_docker_argv(
+        self,
+        unit: HarborTaskUnit,
+        package: TaskPackage,
+        config: HarborEvaluationConfig,
+        image: str,
+        shell_cmd: str,
+        *,
+        gpus: Optional[str],
+        shm_size: Optional[str],
+        extra_docker_args: Sequence[str],
+    ) -> list[str]:
+        argv = ["docker", "run", "--rm", "-it"]
+
+        # GPU 予約と shm_size は docker-compose.yaml のオーバーレイから来る値を踏襲する。
+        # 明示的に引数を渡した場合のみその値を使い、なければオーバーレイの有無で判定する。
+        overlay = package.paths.environment / "docker-compose.yaml"
+        has_overlay = overlay.is_file()
+        effective_gpus = gpus if gpus is not None else ("all" if has_overlay else None)
+        effective_shm = shm_size if shm_size is not None else ("16g" if has_overlay else None)
+        if effective_gpus:
+            argv.extend(["--gpus", effective_gpus])
+        if effective_shm:
+            argv.extend(["--shm-size", effective_shm])
+
+        # workspace は書き込み可；その他はすべて読み取り専用 — harbor-evaluate と同じ方針。
+        assert unit.workspace is not None
+        argv.extend(["-v", f"{unit.workspace}:/workspace"])
+        if unit.prepared is not None and Path(unit.prepared).is_dir():
+            argv.extend(["-v", f"{unit.prepared}:{PREPARED_DIR}:ro"])
+        if package.paths.environment.is_dir():
+            argv.extend(
+                ["-v", f"{package.paths.environment.resolve()}:{PTDBENCH_ENVIRONMENT_DIR}:ro"]
+            )
+        argv.extend(["-v", f"{config.models_dir}:{MODELS_DIR}:ro"])
+        argv.extend(["-v", f"{config.datasets_dir}:{DATASETS_DIR}:ro"])
+
+        argv.extend(["-w", "/workspace"])
+
+        # _write_task_config() の agent_env と同じ構成。PTDBENCH_RESULTS は
+        # /workspace 配下の書き込み可能な場所にする（/logs/artifacts は存在しない）。
+        env: Dict[str, str] = {
+            "PTDBENCH_TASK_ID": package.task_id,
+            "PTDBENCH_EVALUATION_LEVEL": unit.evaluation.level,
+            "PTDBENCH_WORKSPACE": "/workspace",
+            "PTDBENCH_RESULTS": "/workspace/ptdbench-results",
+            "PTDBENCH_TASK_ROOT": "/workspace",
+            "PTDBENCH_STAGE": "agent",
+            "PTDBENCH_PREPARED": PREPARED_DIR,
+            "PTDBENCH_MODELS": MODELS_DIR,
+            "PTDBENCH_DATASETS": DATASETS_DIR,
+            "PTDBENCH_ENVIRONMENT": (
+                PTDBENCH_ENVIRONMENT_DIR if package.paths.environment.is_dir() else ""
+            ),
+            "BASH_ENV": ACTIVATE_HOOK,
+            **self._OFFLINE_ENV,
+            # task 宣言の env（CUDA_VISIBLE_DEVICES 等）で上書きする。
+            **package.environment.env,
+        }
+        for key, value in env.items():
+            argv.extend(["-e", f"{key}={value}"])
+
+        argv.extend(extra_docker_args)
+        argv.append(image)
+        argv.append(shell_cmd)
+        return argv
+
+    # harbor-evaluate の離線フラグと同一セット。
+    _OFFLINE_ENV = HarborTaskMaterializer._OFFLINE_ENV
+
+
 class HarborEvaluator:
     """PTDBench 的 Harbor 执行入口，与 TaskEvaluator 并行存在。"""
 
@@ -931,7 +1133,9 @@ class HarborEvaluator:
         materializer: Optional[HarborTaskMaterializer] = None,
         runner: Optional[HarborRunner] = None,
         result_mapper: Optional[HarborResultMapper] = None,
+        preparer: Optional[HarborPreparer] = None,
     ) -> None:
+        self.preparer = preparer or HarborPreparer()
         self.materializer = materializer or HarborTaskMaterializer()
         self.runner = runner or HarborRunner()
         self.result_mapper = result_mapper or HarborResultMapper()
@@ -948,24 +1152,51 @@ class HarborEvaluator:
         config: Optional[HarborEvaluationConfig] = None,
         strict: bool = True,
     ) -> HarborEvaluationReport:
-        """把一批 task 物化进同一个 Harbor job，并返回其中的所有 trial。"""
+        """逐个 task：prepare → 物化 → 一个 Harbor job，最后合并成一份报告。
+
+        每个 task 单独一个 job，是因为 Harbor 的挂载是 job 级的，而 prepared 目录
+        是逐任务的。某个 task 的 prepare 失败只让它缺席报告，不拖累其余的。
+        """
         config = config or HarborEvaluationConfig()
         units = [
             self._load_unit(task_root, config.evaluation_level, strict)
             for task_root in self._normalize_task_roots(task_roots)
         ]
-        root = self._make_run_dir(units, config.temp_dir)
+        # 同名 task 放进各自的 job 也会互相覆盖报告，先整批拦下。
+        self.materializer._reject_duplicate_task_names(units)
+        batch = len(units) > 1
+        reports: list[HarborEvaluationReport] = []
+        errors: list[str] = []
+        for unit in units:
+            try:
+                reports.append(self._evaluate_unit(unit, config, batch))
+            except HarborAdapterError as exc:
+                if not batch:
+                    raise
+                errors.append(f"{unit.package.task_id}: {exc}")
+                print(f"[ptdbench] {unit.package.task_id} skipped: {exc}", file=sys.stderr)
+        if not reports:
+            raise HarborAdapterError("; ".join(errors) or "no task was evaluated")
+        return self._merge_reports(units, reports, config)
+
+    def _evaluate_unit(
+        self,
+        unit: HarborTaskUnit,
+        config: HarborEvaluationConfig,
+        batch: bool,
+    ) -> HarborEvaluationReport:
+        root = self._make_run_dir([unit], config.temp_dir)
         try:
+            unit = self.preparer.prepare(unit, ensure_dir(root / "prep"), config)
             print(
-                "[ptdbench] Materializing "
-                + ", ".join(
-                    f"{unit.package.task_id}:{unit.evaluation.level}" for unit in units
-                ),
+                f"[ptdbench] Materializing {unit.package.task_id}:{unit.evaluation.level}",
                 file=sys.stderr,
                 flush=True,
             )
-            prepared = self.materializer.materialize(units, root, config)
-            run = self.runner.run(prepared, config)
+            prepared = self.materializer.materialize([unit], root / "harbor", config)
+            run = self.runner.run(
+                prepared, config, job_name_suffix=unit.dir_name if batch else None
+            )
             print(
                 f"[ptdbench] Reading Harbor results from {run.job_dir}",
                 file=sys.stderr,
@@ -973,8 +1204,25 @@ class HarborEvaluator:
             )
             return self.result_mapper.map(prepared, run, config)
         finally:
-            # Harbor job 保存在原生 --jobs-dir；这里只清理在线转换出的临时 task。
+            # Harbor job 保存在原生 --jobs-dir；这里只清理 prepare staging 和临时 task。
             shutil.rmtree(root, ignore_errors=True)
+
+    @staticmethod
+    def _merge_reports(
+        units: Sequence[HarborTaskUnit],
+        reports: Sequence[HarborEvaluationReport],
+        config: HarborEvaluationConfig,
+    ) -> HarborEvaluationReport:
+        if len(units) == 1:
+            return reports[0]
+        last = reports[-1]
+        return HarborEvaluationReport(
+            task_ids=[unit.package.task_id for unit in units],
+            evaluation_level=config.evaluation_level,
+            trials=[trial for report in reports for trial in report.trials],
+            report_dir=last.report_dir,
+            command=last.command,
+        )
 
     @staticmethod
     def _normalize_task_roots(
@@ -1038,9 +1286,11 @@ __all__ = [
     "HarborEvaluationConfig",
     "HarborEvaluationReport",
     "HarborEvaluator",
+    "HarborPreparer",
     "HarborResultMapper",
     "HarborRun",
     "HarborRunner",
+    "HarborShell",
     "HarborTaskMaterializer",
     "HarborTaskUnit",
     "PreparedHarborTask",

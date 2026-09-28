@@ -1,6 +1,0 @@
-# Source trees installed editable inside the env prefix. See
-# docker/envs/slime-rc0/sources.txt for the format and the rationale.
-#
-# verl has none: verlai/verl:vllm017.latest installs megatron-core as an
-# ordinary wheel into site-packages (no /root/Megatron-LM in that image), and
-# no verl task script names a source directory by absolute path.

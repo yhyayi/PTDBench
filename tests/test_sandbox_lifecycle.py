@@ -44,7 +44,7 @@ class RecordingRuntime(SandboxRuntime):
     def needs_environment_image(self) -> bool:
         return False
 
-    def build_environment(self, environment_dir, *, dockerfile="Dockerfile", tag_prefix="ptdbench"):
+    def ensure_environment(self, image, *, rebuild=False):
         return EnvironmentArtifact(self.name)
 
     def path(self, request, name):
@@ -505,32 +505,13 @@ class SandboxLifecycleTests(unittest.TestCase):
             r"^ptdbench-run-swe_slugfix-001-trial-issue-\d{8}-\d{6}-\d{6}-$",
         )
 
-    def test_debian_mirror_layer_is_inserted_after_from(self):
-        dockerfile = "ARG BASE=python:3.11-slim\nFROM ${BASE}\nRUN apt-get update\n"
-        materialized = TaskEvaluator._insert_debian_mirror_layer(
-            dockerfile,
-            "https://mirrors.tuna.tsinghua.edu.cn",
+    def test_huggingface_mirror_reaches_the_prepare_stage_as_hf_endpoint(self):
+        # 下载发生在 prepare 阶段，镜像源也就只能从这个阶段的环境变量进去。
+        env = TaskEvaluator._prepare_mirror_env(
+            EvaluationConfig(huggingface_mirror="https://hf-mirror.com")
         )
-
-        self.assertLess(
-            materialized.index("mirror=https://mirrors.tuna.tsinghua.edu.cn"),
-            materialized.index("RUN apt-get update"),
-        )
-        self.assertIn("deb.debian.org/debian", materialized)
-
-    def test_huggingface_mirror_rewrites_environment_dockerfile_urls(self):
-        dockerfile = (
-            "FROM python:3.11-slim\n"
-            "ARG DATASET_URL=https://huggingface.co/datasets/org/name/resolve/main/file.tar.gz\n"
-            "RUN curl \"$DATASET_URL\"\n"
-        )
-        materialized = TaskEvaluator._rewrite_huggingface_endpoint(
-            dockerfile,
-            "https://hf-mirror.com",
-        )
-
-        self.assertIn("https://hf-mirror.com/datasets/org/name/resolve/main/file.tar.gz", materialized)
-        self.assertNotIn("https://huggingface.co", materialized)
+        self.assertEqual(env, {"HF_ENDPOINT": "https://hf-mirror.com"})
+        self.assertEqual(TaskEvaluator._prepare_mirror_env(EvaluationConfig()), {})
 
     def test_codex_uses_outer_docker_sandbox(self):
         runner = CodexAgentRunner(

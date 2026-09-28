@@ -5,7 +5,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Dict, List, Mapping, Optional, Sequence
 
-from ..core.types import CommandResult
+from ..core.types import CommandResult, EnvironmentImage
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,7 @@ class SandboxRequest:
     evaluation_level: str = "solution"
     host_oracle: Optional[Path] = None
     host_verifier: Optional[Path] = None
-    # 任务的 environment/ 目录：requirements.txt 和 prepare.sh 在里面。三个阶段都
+    # 任务的 environment/ 目录：prepare.sh 在里面。三个阶段都
     # 以只读挂，因为三个阶段都可能要读它——prepare 要执行 prepare.sh，agent 要知道
     # 环境里有什么，verifier 判分时可能要对着同一份清单。只读是因为没有任何一个阶段
     # 有理由改仓库里的任务定义。
@@ -77,8 +77,6 @@ class SandboxRequest:
     env: Mapping[str, str] = field(default_factory=dict)
     network: str = "bridge"
     timeout_s: Optional[int] = None
-    # 统一镜像里要激活的那个 conda 环境；raw 任务走自己的 Dockerfile，留 None。
-    conda_env: Optional[str] = None
     # metadata.environment.env：任务自己声明的变量（如 CUDA_VISIBLE_DEVICES）。
     # 逐任务不同的变量只能从这里来。
     task_env: Mapping[str, str] = field(default_factory=dict)
@@ -109,24 +107,16 @@ class SandboxRuntime(ABC):
     @property
     @abstractmethod
     def needs_environment_image(self) -> bool:
-        """该平台是否需要通过 environment/Dockerfile 准备镜像。"""
+        """该平台是否需要按 metadata.environment.image 准备镜像。"""
 
     @abstractmethod
-    def build_environment(
-        self,
-        environment_dir: Path,
-        *,
-        dockerfile: str = "Dockerfile",
-        tag_prefix: str = "ptdbench",
+    def ensure_environment(
+        self, image: EnvironmentImage, *, rebuild: bool = False
     ) -> EnvironmentArtifact:
-        """准备环境并返回可以复用的 artifact。"""
+        """准备任务声明的环境镜像并返回可以复用的 artifact。
 
-    def prebuilt_environment(self, image: str) -> EnvironmentArtifact:
-        """复用一个已经构建好的镜像，不走 Dockerfile。
-
-        非 raw 任务统一用 `docker/build.sh` 产出的那个镜像，每个任务不再各建一份。
+        镜像按环境名共享：同一个环境的任务用同一个镜像，已存在就不再构建。
         """
-        raise NotImplementedError(f"{self.name} does not support prebuilt images")
 
     @abstractmethod
     def path(self, request: SandboxRequest, name: str) -> str:
@@ -190,9 +180,6 @@ class SandboxRuntime(ABC):
             "PTDBENCH_VERIFIER": verifier,
             "PTDBENCH_RESULTS": results,
             "PTDBENCH_STAGE": request.stage,
-            # 三个阶段都导出，由 docker/ptdbench-activate.sh 激活。raw 任务没有 conda
-            # 环境，留空字符串，activate 脚本会直接跳过。
-            "PTDBENCH_CONDA_ENV": request.conda_env or "",
             "PTDBENCH_ENVIRONMENT": (
                 self.path(request, "environment") if request.host_environment else ""
             ),

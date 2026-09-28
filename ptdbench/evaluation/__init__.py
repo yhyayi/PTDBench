@@ -11,6 +11,7 @@ from .evaluator import TaskEvaluator, PreparedRun
 from .harbor_evaluator import (
     HarborAdapterError,
     HarborEvaluator,
+    HarborPreparer,
     HarborResultMapper,
     HarborRunner,
     HarborTaskMaterializer,
@@ -21,6 +22,7 @@ __all__ = [
     "HarborEvaluationConfig",
     "HarborEvaluationReport",
     "HarborEvaluator",
+    "HarborPreparer",
     "HarborResultMapper",
     "HarborRun",
     "HarborRunner",

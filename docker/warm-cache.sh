@@ -31,14 +31,11 @@
 # the two cache roots survive, which is the whole point. A real evaluation
 # still runs prepare.sh; it just finds everything already downloaded.
 #
-# Legacy tasks (`environment.dockerfile`, no conda env) are skipped: they still
-# bake their assets into their own image and have no prepare.sh to run.
+# Tasks without a prepare.sh are skipped: they have nothing to download.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
-
-image_tag="${PTDBENCH_IMAGE_TAG:-ptdbench/env:latest}"
 
 usage() {
     cat >&2 <<'EOF'
@@ -49,10 +46,13 @@ usage: docker/warm-cache.sh [--models-dir DIR] [--datasets-dir DIR] [task-id ...
   --datasets-dir DIR  host directory for dataset downloads; created if missing
                       (default <repo>/datasets, or $PTDBENCH_DATASETS_DIR)
   [task-id]           warm only these tasks (directory names under tasks/);
-                      default is every task that declares environment.conda
+                      default is every task that has a prepare.sh
+
+Each task runs in its environment image (the tag in the `# ptdbench-image:` header
+of docker/images/<environment.image>.Dockerfile), built on first use exactly as
+`ptdbench build-images` would.
 
 env:
-  PTDBENCH_IMAGE_TAG   image to run (default ptdbench/env:latest)
   PTDBENCH_HF_ENDPOINT passed through as HF_ENDPOINT, for a mirror
 EOF
     exit 2
@@ -73,20 +73,15 @@ mkdir -p "$models_dir" "$datasets_dir"
 models_dir="$(cd "$models_dir" && pwd)"
 datasets_dir="$(cd "$datasets_dir" && pwd)"
 
-if ! docker image inspect "$image_tag" >/dev/null 2>&1; then
-    echo "error: image $image_tag not found; build it first with ./docker/build.sh" >&2
-    exit 1
-fi
-
-# The task list comes from the same reader the registry check uses, so "which
-# tasks are on the new schema" has one answer rather than a shell glob's
-# approximation of one. Output is `<task-dir>\t<conda-env>\t<prepare-script>`.
+# The task list comes from the same reader the evaluator uses, so "which task
+# runs in which image" has one answer rather than a shell glob's approximation
+# of one. Output is `<task-dir>\t<environment>\t<image-tag>\t<prepare-script>`.
 mapfile -t entries < <(python3 - "$@" <<'PY'
 import sys
 from pathlib import Path
 
 sys.path.insert(0, ".")
-from ptdbench.core.types import DEFAULT_PREPARE  # noqa: E402
+from ptdbench.core.types import DEFAULT_PREPARE, EnvironmentImage  # noqa: E402
 from ptdbench.utils.yaml import load_simple_yaml  # noqa: E402
 
 wanted = set(sys.argv[1:])
@@ -95,23 +90,27 @@ for metadata_path in sorted(Path("tasks").rglob("metadata.yaml")):
     if "raw" in metadata_path.relative_to("tasks").parts:
         continue
     environment = (load_simple_yaml(str(metadata_path)) or {}).get("environment")
-    if not isinstance(environment, dict) or not environment.get("conda"):
+    if not isinstance(environment, dict) or not environment.get("image"):
         continue
     task_dir = metadata_path.parent
     if wanted and task_dir.name not in wanted:
         continue
-    found.add(task_dir.name)
-    script = task_dir / str(environment.get("prepare") or DEFAULT_PREPARE)
+    declared = environment.get("prepare")
+    script = task_dir / str(declared or DEFAULT_PREPARE)
     if not script.is_file():
-        print(f"error: {task_dir}: {script} does not exist", file=sys.stderr)
-        raise SystemExit(1)
+        if declared:
+            print(f"error: {task_dir}: {script} does not exist", file=sys.stderr)
+            raise SystemExit(1)
+        continue
+    found.add(task_dir.name)
     # The container sees environment/ mounted at /ptdbench/environment, so what
     # it needs is the path relative to that directory, not the host path.
     relative = script.relative_to(task_dir / "environment")
-    print(f"{task_dir}\t{environment['conda']}\t{relative.as_posix()}")
+    image = EnvironmentImage(str(environment["image"]))
+    print(f"{task_dir}\t{image.name}\t{image.tag}\t{relative.as_posix()}")
 
 for name in sorted(wanted - found):
-    print(f"error: no task named {name!r} declares environment.conda", file=sys.stderr)
+    print(f"error: no task named {name!r} has a prepare.sh", file=sys.stderr)
 if wanted - found:
     raise SystemExit(1)
 PY
@@ -127,9 +126,19 @@ echo
 
 failed=()
 for entry in "${entries[@]}"; do
-    IFS=$'\t' read -r task_dir conda_env script <<<"$entry"
+    IFS=$'\t' read -r task_dir env_name image_tag script <<<"$entry"
     task_id="$(basename "$task_dir")"
-    echo "=== $task_id  (env: $conda_env)"
+    echo "=== $task_id  (image: $image_tag)"
+
+    # Same "build only if missing" rule as `ptdbench evaluate`.
+    if ! docker image inspect "$image_tag" >/dev/null 2>&1; then
+        if ! python3 -m ptdbench build-images "$env_name"; then
+            echo "--- $task_id FAILED (image build)" >&2
+            failed+=("$task_id")
+            echo
+            continue
+        fi
+    fi
 
     # Throwaway per task. prepare.sh writes weights into $PTDBENCH_WORKSPACE and
     # KEY=VALUE lines into $PTDBENCH_PREPARED/env; neither is what we are here
@@ -151,7 +160,6 @@ for entry in "${entries[@]}"; do
         -e PTDBENCH_STAGE=prepare
         -e "PTDBENCH_TASK_ID=$task_id"
         -e PTDBENCH_EVALUATION_LEVEL=solution
-        -e "PTDBENCH_CONDA_ENV=$conda_env"
         -e PTDBENCH_WORKSPACE=/workspace
         -e PTDBENCH_ENVIRONMENT=/ptdbench/environment
         -e PTDBENCH_PREPARED=/ptdbench/prepared

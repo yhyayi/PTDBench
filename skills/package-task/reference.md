@@ -44,15 +44,14 @@ git diff <buggy> <baseline>
 
 ### 环境与资产
 
-- conda 环境名：`docker/envs/` 下的目录名，目前 `verl`、`slime-rc0`、`slime-v0.3.1`
-- 该环境的 `requirements.txt` 来源任务（同名环境下必须逐字一致）
+- 环境镜像名：`docker/images/` 下 `<name>.Dockerfile` 的 `<name>`，目前 `verl`、`slime-rc0`、`slime-v0.3.2`、`python3.11-slim`
 - 要用的卡：`CUDA_VISIBLE_DEVICES` / `NVIDIA_VISIBLE_DEVICES`
 - 每份 HF 资产：repo、40 位 commit sha revision、`--type`（`model` 或 `dataset`）、`--allow` 清单、需校验文件的 SHA-256 与字节数、`--dest`
 - 用内置配方的数据集：recipe 名（`dapo_math_17k`、`gsm8k`、`search_r1_nq_hotpotqa`、`wiki18_e5`）、产物文件的 SHA-256 与字节数、`--dest`
 - 单个 URL 的资产：URL、SHA-256、字节数、是否 `--extract`
 - 是否需要 `docker-compose.yaml`（多卡或大 `/dev/shm`，且要走 harbor 后端）
 
-不收集基础镜像：统一镜像由 `docker/` 构建，任务不再自带 Dockerfile。
+不收集基础镜像：环境镜像由 `docker/images/*.Dockerfile` 定义，任务不自带 Dockerfile。
 
 ### 评分键（用户本次输入）
 
@@ -321,22 +320,13 @@ GLOBAL_JUDGE_POLICY:
 
 `resources/README.md` 说明入口是 `test.sh`，分数只来自 `$PTDBENCH_RESULTS/experiment_logs`，并列出与 spec 相同的键和门槛。`verifier/README.md` 再写一层：这个键读的是哪个空间（score 还是 accuracy）、`score_mode` 为什么这么选、门槛对着历史曲线的哪几个点校准、最薄的余量是多少。
 
-## environment/requirements.txt
+## 环境镜像
 
-该 conda 环境的**完整闭包**，第一行注明是哪个环境、对应哪个上游镜像：
+`metadata.environment.image` 写 `docker/images/` 下某个 `<name>.Dockerfile` 的 `<name>`，评测时用 `ptdbench/<name>:latest`，本地没有就先构建（也可以 `python3 -m ptdbench build-images <name>` 预构建）。
 
-```text
-# PTDBench conda env `<conda-name>`.
-#
-# <这个闭包是从哪来的：wandb 记录的 pip freeze、上游 requirements、还是镜像自带>
---extra-index-url https://download.pytorch.org/whl/cu129
-<pkg>==<version>
-...
-```
+镜像是多个任务共享的，内容就是它们共同的 ground truth 环境。不要为新任务改已有的 Dockerfile——那会同时改掉其他任务的环境。现有镜像都对不上时开一个新的 `docker/images/<name>.Dockerfile`：`FROM` 钉 digest，末尾照抄其他 Dockerfile 里 `# ---- PTDBench tooling ...` 之后的整段（测试会逐字比对），详见 `docker/README.zh.md`。
 
-同一 `conda` 名下的所有任务给出的这份文件必须**逐字一致**，`python3 docker/collect_envs.py --check`（`docker/build.sh` 会跑）不一致就 fail。直接从已有任务复制，不要取并集——加一个任务就会悄悄改掉另一个任务的环境，连带改掉它的 ground truth。真要换依赖就开新环境：加 `docker/envs/<name>/` 和 `docker/Dockerfile` 里对应的 `env-<name>` stage。
-
-不要把框架本身（verl / slime）写进去：它来自任务 workspace 里的 checkout。
+框架本身（verl / slime）不在镜像里算数：它来自任务 workspace 里的 checkout。
 
 ## environment/prepare.sh
 
@@ -344,7 +334,7 @@ GLOBAL_JUDGE_POLICY:
 #!/usr/bin/env bash
 # <task_id> —— 训练前要准备的东西。
 #
-# 跑在独立的 prepare 阶段容器里：root、已激活 `<conda-name>` 环境、**唯一有网的
+# 跑在独立的 prepare 阶段容器里：root、`<image-name>` 镜像、**唯一有网的
 # 阶段**，而且 $PTDBENCH_WORKSPACE、$PTDBENCH_MODELS 和 $PTDBENCH_DATASETS 都可写。
 set -euo pipefail
 
@@ -411,7 +401,7 @@ training:
   script_args:          # 只有启动脚本要位置参数时才写
     - '<arg>'
 environment:
-  conda: <verl|slime-rc0|slime-v0.3.1>
+  image: <verl|slime-rc0|slime-v0.3.2|python3.11-slim>
   env:
     CUDA_VISIBLE_DEVICES: "0,1"
     NVIDIA_VISIBLE_DEVICES: "0,1"
@@ -424,13 +414,13 @@ outcome:
 
 validator 会拒掉的写法：
 
-- `conda` 和 `dockerfile` 同时写
-- `conda` 不在 `docker/envs/` 里
+- 没写 `image`，或 `image` 在 `docker/images/` 下没有对应的 `<name>.Dockerfile`
+- 写了旧字段 `conda` / `requirements` / `dockerfile`
 - `script` 是绝对路径、含 `..`，或指向 `workspace/` 里不存在的文件
 - 有 `script_args` 但没有 `script`；`script_args` 不是列表；列表项不是字符串（YAML 里 `- 0` 是 int，要写 `- '0'`）
 - `env` 的值不是字符串（`CUDA_VISIBLE_DEVICES: 0` 会被拒），或设了 `PTDBENCH_*`
 
-声明了 `framework` 却没写 `script` 只给 warning，但任务卡和 `docker/debug-env.sh run` 都靠它，别省。
+声明了 `framework` 却没写 `script` 只给 warning，但任务卡靠它记录任务怎么跑，别省。
 
 ## readme.md 要有的节
 
@@ -447,9 +437,10 @@ validator 会拒掉的写法：
 ```markdown
 ## Environment requirement
 
-The task runs on the unified PTDBench image, in the `<conda-name>` conda
-environment (`environment: conda: <conda-name>`) — <这个 stack 的一句话描述>。
-<为什么不是另一个环境>。See `docker/envs/README.md`.
+The task runs on the `<image-name>` PTDBench image
+(`environment: image: <image-name>`, built from
+`docker/images/<image-name>.Dockerfile`) — <这个 stack 的一句话描述>。
+<为什么不是另一个环境>。See `docker/README.zh.md`.
 
 `environment/prepare.sh` delivers <几份资产，逐条一句话>，all pinned by commit
 sha and checksummed.

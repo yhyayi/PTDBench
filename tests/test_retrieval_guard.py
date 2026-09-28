@@ -196,7 +196,7 @@ class RetrievalGuardTest(unittest.TestCase):
 
         这是这段最容易写错、也最难看出来的地方。服务是**故意**要活过这个脚本的——
         下一次重跑复用它，省掉几分钟的索引载入。但如果后台那一层还持有脚本自己的
-        stdout，管道的写端就一直不关：读端（docker/debug-env.sh 的
+        stdout，管道的写端就一直不关：读端（手工调试时的
         `| tee .../train.log`，agent 阶段则是 harness 自己的 capture）永远等不到
         EOF，一次跑完的训练看起来就是卡住了。
 

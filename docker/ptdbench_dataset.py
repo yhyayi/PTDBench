@@ -28,8 +28,8 @@ whoever edited the recipe about whether the *output* changed. Editing the split
 rule without bumping it is the one mistake this cannot catch, which is why the
 constant sits next to the rule with a comment saying so.
 
-Like `ptdbench_fetch.py` this is deliberately standalone -- it runs under the
-task's conda environment, which has `datasets`/`pandas`/`pyarrow` but not the
+Like `ptdbench_fetch.py` this is deliberately standalone -- it runs in the
+task's environment image, which has `datasets`/`pandas`/`pyarrow` but not the
 harness.
 """
 

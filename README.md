@@ -20,10 +20,8 @@ task/
 ├── readme.md
 ├── metadata.yaml
 ├── workspace/
-├── environment/
-│   ├── requirements.txt # new form: the conda environment's full closure
-│   ├── prepare.sh       # new form: fetch models/datasets before the run
-│   └── Dockerfile      # legacy form
+├── environment/         # optional
+│   └── prepare.sh       # fetch models/datasets before the run
 └── evaluations/
     ├── issue/
     │   ├── instruction.md
@@ -83,9 +81,8 @@ Agent-visible for the selected evaluation:
 
 - its `instruction.md`, exposed as `/task/instruction.md`
 - a writable copy of `workspace/`, including whatever `prepare.sh` fetched into it
-- the environment: either the shared image's conda environment selected by
-  `environment.conda`, or for legacy tasks the image built from
-  `environment/Dockerfile`
+- the environment image named by `environment.image`
+  (`docker/images/<name>.Dockerfile`, tagged as its `# ptdbench-image:` header says)
 - the task's own `environment/` directory, read-only at `/ptdbench/environment`
 - the prepare stage's output, read-only at `/ptdbench/prepared`
 
@@ -113,9 +110,11 @@ PTDBench separates the task contract from the execution platform. The current
 runtime implementations are:
 
 - `local`: runs commands on the host and is intended only for development;
-- `docker`: runs prepare/agent/verifier in separate containers. Tasks declaring
-  `environment.conda` use the shared prebuilt image; legacy tasks declaring
-  `environment.dockerfile` are still built per task.
+- `docker`: runs prepare/agent/verifier in separate containers, all from the
+  image named by the task's `environment.image`. The image is built from
+  `docker/images/<name>.Dockerfile` the first time it is missing; run
+  `ptdbench build-images [NAME...] [--rebuild]` to build ahead of time or to
+  pick up an edited Dockerfile (the tag is fixed, so edits are not detected).
 
 The environment image is prepared once and reused by all three stages. The
 stages still use different containers: prepare gets the network and the download
@@ -177,19 +176,19 @@ If no `result.json` exists, the evaluator falls back to the verifier exit code.
 Validate a task:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench validate example/empty
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench validate tasks/slime_retool
 ```
 
 Run only the verifier on the staged workspace with the local backend:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/empty --backend local --keep-artifacts --json
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate tasks/slime_retool --backend local --keep-artifacts --json
 ```
 
 Put run artifacts under a known directory for debugging:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/empty \
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate tasks/slime_retool \
   --backend local \
   --work-dir ./runs \
   --keep-artifacts \
@@ -199,7 +198,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/empty \
 Run an agent command inside the Docker environment, then verify:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/empty \
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate tasks/slime_retool \
   --backend docker \
   --agent shell \
   --agent-command "your-agent-command" \
@@ -211,7 +210,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/empty \
 Run Codex as the agent:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/empty \
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate tasks/slime_retool \
   --evaluation-level solution \
   --backend docker \
   --agent codex \
@@ -270,20 +269,31 @@ PTDBENCH_EVALUATION_LEVEL=issue ./run.sh
 
 ### Harbor batch evaluation
 
-`harbor-evaluate` accepts one or more task directories. It also accepts a
-directory whose direct children are tasks; expansion is deliberately not
-recursive. PTDBench materializes all selected tasks as one temporary Harbor
-dataset and starts one Harbor job. Harbor's native `--n-concurrent` option
-controls trial concurrency:
+`harbor-evaluate` runs every task on its prebuilt environment image: the
+generated task.toml sets `docker_image` to the tag declared in
+`docker/images/<name>.Dockerfile`, so Harbor never builds a per-task image. For
+each task PTDBench first runs `environment/prepare.sh` in that image (online,
+same staging as `evaluate`), then starts one Harbor job with the prepared
+workspace uploaded to `/workspace` and the prepare output, the task's
+`environment/` and the model/dataset caches bind-mounted read-only. The verifier
+shares the agent's container. Agent and verifier are offline for HF/W&B.
+
+Harbor mounts are job-wide, so each task gets its own job; the per-task reports
+are merged. It accepts one or more task directories, or a directory whose direct
+children are tasks (not recursive):
 
 ```bash
 python3 -m ptdbench harbor-evaluate \
-  tasks/raw/rlve_hyper/task_001 \
-  tasks/raw/rlve_hyper/task_002 \
+  tasks/rlve_hyper/task_001 \
+  tasks/rlve_hyper/task_008 \
   --agent codex \
-  --model gpt-5.5 \
-  --n-concurrent 2
+  --model gpt-5.5
 ```
+
+GPUs: Harbor's docker environment has no GPU option, so GPU tasks need the
+Docker daemon's default runtime set to `nvidia` (or an equivalent compose
+override on the Harbor side). `--mounts`/`--mounts-json` are managed by
+PTDBench and rejected if forwarded.
 
 Keep every task path before forwarded Harbor options. The included batch
 script makes that boundary explicit: arguments before `--` are task paths and
@@ -291,7 +301,7 @@ arguments after it are passed to `harbor run`.
 
 ```bash
 ./run_harbor_multi.sh
-./run_harbor_multi.sh tasks/raw/rlve_hyper -- --n-attempts 2
+./run_harbor_multi.sh tasks/rlve_hyper -- --n-attempts 2
 ```
 
 Each trial keeps its singular `task_id`. A batch report uses `task_ids` and
@@ -303,9 +313,8 @@ To add a new agent, put its runner under `ptdbench/agents/installed/`, register
 it with the factory, and keep `evaluator.py` untouched. Its `run` method should
 only construct a `CommandSpec` and call the supplied `SandboxRuntime`.
 
-The Docker backend resolves the image from the task's `environment` block
-(shared image for `conda` tasks, a per-task build for legacy `dockerfile`
-tasks), mounts the editable
+The Docker backend resolves the image from the task's `environment.image`,
+mounts the editable
 workspace at `/workspace`, exposes public task text at `/task`, and writes
 results to `/results`. The verifier sees its selected evaluation at `/task`;
 `PTDBENCH_ORACLE` and `PTDBENCH_VERIFIER` resolve the evaluation-specific
@@ -338,25 +347,3 @@ export PTDBENCH_DOCKER_NO_PROXY=localhost,127.0.0.1,host.docker.internal
 The proxy settings apply to both agent and verifier containers. Without
 `PTDBENCH_DOCKER_PROXY`, PTDBench leaves the default Docker bridge network
 unchanged and does not require Clash.
-
-## Toy SWE Example
-
-A runnable code-repair task lives in `example/swe_slugfix/`.
-
-Validate the package:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench validate example/swe_slugfix
-```
-
-Run the example with a fixing agent command:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
-  --backend local \
-  --work-dir /private/tmp/ptdbench-swe-debug \
-  --keep-artifacts \
-  --json \
-  --agent shell \
-  --agent-command "<your repair command here>"
-```

@@ -16,8 +16,8 @@ rules:
   file reaches a training run nobody is watching.
 
 It is deliberately standalone -- no `ptdbench` import. It runs inside the
-evaluation image, under whichever conda environment the task declared, and that
-environment contains the task's stack, not the harness.
+evaluation image the task declared (docker/images/<name>.Dockerfile), and that
+image contains the task's stack, not the harness.
 
 Usage, as prepare.sh writes it:
 
@@ -138,11 +138,11 @@ def materialize(source: Path, dest: Path) -> None:
     path is the usual one and a 1 GB checkpoint costs inodes rather than
     gigabytes.
 
-    Not symlinks: on the harbor path the cache roots are build-time directories
-    that get `rm -rf`'d out of the finished image, so a symlink into them would
-    dangle at exactly the moment a training run tried to read a checkpoint.
-    `--dest` has to be real bytes the agent and verifier stages can read on
-    their own.
+    Not symlinks: the link target is a container path (/ptdbench/models/...),
+    and on the harbor path `--dest` is uploaded into Harbor's container as a
+    plain copy of the workspace, where a symlink would dangle or point at
+    whatever that container happens to mount there. `--dest` has to be real
+    bytes the agent and verifier stages can read on their own.
     """
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
@@ -185,7 +185,7 @@ def fetch_hf(args: argparse.Namespace) -> Path:
             raise FetchError(
                 f"huggingface_hub is required to fetch {args.repo!r}, and the active "
                 f"environment does not have it. Add it to the environment's "
-                f"requirements.txt, or pre-populate {cached}."
+                f"docker/images/*.Dockerfile, or pre-populate {cached}."
             ) from exc
         # cache_dir, not HF_HOME: huggingface_hub freezes HF_HOME into
         # constants.HF_HUB_CACHE at import time, so assigning to os.environ here

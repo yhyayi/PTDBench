@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
@@ -16,8 +16,8 @@ from ...core.types import (
     PREPARED_DIR,
     PTDBENCH_ENVIRONMENT_DIR,
     CommandResult,
+    EnvironmentImage,
 )
-from ...utils.filesystem import tree_digest
 from ..base import (
     CommandSpec,
     EnvironmentArtifact,
@@ -46,25 +46,6 @@ class DockerMount:
         return f"{self.host_path}:{self.container_path}{suffix}"
 
 
-@dataclass(frozen=True)
-class DockerImageSpec:
-    """Docker 镜像构建参数。"""
-
-    context_dir: Path
-    dockerfile: str = "Dockerfile"
-    build_args: Mapping[str, str] = field(default_factory=dict)
-    tag_prefix: str = "ptdbench"
-
-    @property
-    def digest(self) -> str:
-        return tree_digest(self.context_dir)
-
-    @property
-    def tag(self) -> str:
-        base = self.context_dir.name.replace("_", "-")
-        return f"{self.tag_prefix}-{base}-{self.digest[:12]}"
-
-
 @register_runtime("docker")
 class DockerRuntime(SandboxRuntime):
     """Docker provider，集中处理镜像、挂载和网络。"""
@@ -75,27 +56,36 @@ class DockerRuntime(SandboxRuntime):
     def needs_environment_image(self) -> bool:
         return True
 
-    def build_environment(
-        self,
-        environment_dir: Path,
-        *,
-        dockerfile: str = "Dockerfile",
-        tag_prefix: str = "ptdbench",
+    def ensure_environment(
+        self, image: EnvironmentImage, *, rebuild: bool = False
     ) -> EnvironmentArtifact:
-        image = DockerImageSpec(
-            context_dir=environment_dir,
-            dockerfile=dockerfile,
-            tag_prefix=tag_prefix,
-        )
-        return EnvironmentArtifact(backend=self.name, reference=self._build(image))
+        """镜像已存在就直接用，否则照 docker/images/<name>.Dockerfile 构建。
 
-    def prebuilt_environment(self, image: str) -> EnvironmentArtifact:
-        if not self._image_exists(image):
-            raise RuntimeError(
-                f"image {image!r} not found locally; build it first with "
-                "`bash docker/build.sh` (or set PTDBENCH_IMAGE_TAG to an existing tag)"
+        tag 是固定的，所以"已存在"不代表"和 Dockerfile 一致"：改了 Dockerfile 或
+        docker/ 下的工具脚本之后要 rebuild（`ptdbench build-images --rebuild`）。
+        rebuild 走 docker 的层缓存，没变的层不会重跑。
+        """
+        if rebuild or not self._image_exists(image.tag):
+            if not image.dockerfile.is_file():
+                raise RuntimeError(
+                    f"image {image.tag!r} not found locally and {image.dockerfile} "
+                    "does not exist to build it from"
+                )
+            # 构建日志是给人看的进度，不是命令结果；走 stderr，stdout 留给 CLI 的输出。
+            subprocess.run(
+                [
+                    "docker",
+                    "build",
+                    "-f",
+                    str(image.dockerfile),
+                    "-t",
+                    image.tag,
+                    str(image.context),
+                ],
+                stdout=sys.stderr,
+                check=True,
             )
-        return EnvironmentArtifact(backend=self.name, reference=image)
+        return EnvironmentArtifact(backend=self.name, reference=image.tag)
 
     def path(self, request: SandboxRequest, name: str) -> str:
         paths = {
@@ -372,8 +362,8 @@ class DockerRuntime(SandboxRuntime):
     def _gpu_args(request: SandboxRequest) -> list[str]:
         """把任务声明的 NVIDIA_VISIBLE_DEVICES 翻译成 docker 的 `--gpus`。
 
-        镜像侧一直是按 `--gpus` 写的——见 docker/ptdbench-activate.sh 里那句
-        "that is where --gpus puts libcuda.so.1"——缺的只是这一半。把变量 `-e`
+        镜像侧（CUDA 基础镜像）一直假设 libcuda.so.1 是 `--gpus` 注入的，缺的只是
+        这一半。把变量 `-e`
         进容器并不会让容器看见 GPU：宿主机的 default runtime 是 runc，只有
         `--gpus` 才会让 nvidia 的 hook 真正注入设备节点和 libcuda.so.1。
 
@@ -383,7 +373,13 @@ class DockerRuntime(SandboxRuntime):
 
         PTDBENCH_DOCKER_GPUS 是宿主机侧的覆盖，沿用 _proxy_env 的 opt-in 惯例：
         一台只有 2 张卡的机器不该因为任务卡片写着 8 张就跑不起来。
+
+        prepare は模型・データセットのダウンロードだけで GPU は不要。`docker create`
+        は --gpus を受け付けるが `docker start` 時に NVIDIA runtime hook が実際の
+        デバイスノードをバインドしようとして失敗する環境がある。
         """
+        if request.stage == "prepare":
+            return []
         spec = os.environ.get("PTDBENCH_DOCKER_GPUS", "").strip()
         if not spec:
             spec = str(request.task_env.get("NVIDIA_VISIBLE_DEVICES", "")).strip()

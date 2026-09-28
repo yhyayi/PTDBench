@@ -1,4 +1,4 @@
-"""统一镜像的运行时接线：三个阶段各挂什么、各拿到哪些环境变量。
+"""环境镜像的运行时接线：三个阶段各挂什么、各拿到哪些环境变量。
 
 这个文件盯的是访问控制，不是功能。三张挂载表的差别（谁可写、谁看得到 cache、
 谁看得到 oracle）就是"agent 不能给自己判分、verifier 不能读到被改过的数据"
@@ -126,8 +126,8 @@ class MountTableTests(unittest.TestCase):
             self.assertEqual(mount.host_path, ROOT / "environment", stage)
             self.assertTrue(mount.read_only, stage)
 
-    def test_legacy_task_mounts_no_environment(self) -> None:
-        # raw 任务的 environment/ 里只有一个 Dockerfile，构建时已经用过了。
+    def test_task_without_environment_dir_mounts_nothing(self) -> None:
+        # environment/ 是可选的；没有就不挂，而不是挂一个不存在的目录。
         request = make_request("agent", host_environment=None)
         self.assertNotIn(PTDBENCH_ENVIRONMENT_DIR, self._mounts(request))
 
@@ -149,8 +149,8 @@ class GpuWiringTests(unittest.TestCase):
 
     这条是"任务能不能真的跑训练"的全部实现。宿主机的 default runtime 是 runc，
     把 NVIDIA_VISIBLE_DEVICES `-e` 进容器不会让容器看见任何设备——只有 --gpus
-    会触发 nvidia 的 hook。镜像侧早就是按这个写的（ptdbench-activate.sh 里
-    "that is where --gpus puts libcuda.so.1"），这里补上缺的另一半。
+    会触发 nvidia 的 hook。镜像侧（CUDA 基础镜像）一直假设 libcuda.so.1 是
+    --gpus 注入的，这里补上缺的另一半。
     """
 
     def _args(self, **kwargs) -> list:
@@ -224,23 +224,12 @@ class StandardEnvTests(unittest.TestCase):
     def _env(self, stage: str = "agent", **kwargs) -> dict:
         return DockerRuntime().standard_env(make_request(stage, **kwargs))
 
-    def test_conda_env_is_exported(self) -> None:
-        # 用 slime-v0.3.1 而不是随便一个名字：注册表里唯一带点和连字符的环境名，
-        # 任何把它当版本号拆开的代码都会在这里露出来。
-        self.assertEqual(
-            self._env(conda_env="slime-v0.3.1")["PTDBENCH_CONDA_ENV"], "slime-v0.3.1"
-        )
-
-    def test_raw_task_exports_an_empty_conda_env(self) -> None:
-        # activate hook 靠空字符串判断"这个任务不激活任何环境"。
-        self.assertEqual(self._env()["PTDBENCH_CONDA_ENV"], "")
-
-    def test_every_stage_gets_the_environment_name(self) -> None:
-        # 导出不等于激活：activate 脚本自己按 PTDBENCH_STAGE 决定。
+    def test_every_stage_is_told_which_stage_it_is(self) -> None:
+        # activate hook 按 PTDBENCH_STAGE 决定每个阶段的差异。
         for stage in ("prepare", "agent", "verifier"):
-            env = self._env(stage, conda_env="verl")
-            self.assertEqual(env["PTDBENCH_CONDA_ENV"], "verl", stage)
+            env = self._env(stage)
             self.assertEqual(env["PTDBENCH_STAGE"], stage, stage)
+            self.assertNotIn("PTDBENCH_CONDA_ENV", env, stage)
 
     def test_prepare_and_agent_never_learn_where_the_oracle_is(self) -> None:
         for stage in ("prepare", "agent"):
@@ -310,7 +299,7 @@ class NetworkPolicyEnvTests(unittest.TestCase):
 class PrepareScriptTests(unittest.TestCase):
     """evaluator 怎么把 prepare.sh 翻译成容器里的一条路径。"""
 
-    def _package(self, root: Path, *, prepare: Path | None, conda: str | None = "verl"):
+    def _package(self, root: Path, *, prepare: Path | None, image: str | None = "verl"):
         from ptdbench.core.types import TaskPaths
 
         paths = TaskPaths(
@@ -328,7 +317,7 @@ class PrepareScriptTests(unittest.TestCase):
             paths=paths,
             metadata={},
             report=ValidationReport(),
-            environment=EnvironmentPlan(conda=conda, prepare=prepare),
+            environment=EnvironmentPlan(image=image, prepare=prepare),
         )
 
     def test_script_resolves_under_the_mounted_environment(self) -> None:

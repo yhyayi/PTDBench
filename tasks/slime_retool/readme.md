@@ -153,20 +153,22 @@ task package itself carries no tell.
 
 ## Environment requirement
 
-The task runs on the unified PTDBench image, in the `slime-v0.3.1` conda
-environment (`environment: conda: slime-v0.3.1`) — torch 2.11 / CUDA 13.0 /
-sglang 0.5.15, the stack `slimerl/slime:latest` shipped at slime 0.3.1. It is
-*not* the `slime-rc0` environment the `rlve_hyper` tasks use: the ReTool recipe
-imports `sglang.srt.constants.GPU_MEMORY_TYPE_CUDA_GRAPH`, which sglang 0.5.0rc0
-does not define. See `docker/envs/README.md`.
+The task runs on the `slime-v0.3.2` PTDBench image
+(`environment: image: slime-v0.3.2`, built from
+`docker/images/slime-v0.3.2.Dockerfile`) — the upstream
+`slimerl/slime:v0.3.2-cu130` image pinned by digest: CUDA 13.0, sglang
+0.5.15.post1. It is *not* the `slime-rc0` image the `rlve_hyper` tasks use: the
+ReTool recipe imports `sglang.srt.constants.GPU_MEMORY_TYPE_CUDA_GRAPH`, which
+sglang 0.5.0rc0 does not define. See `docker/README.zh.md`.
 
 `environment/prepare.sh` delivers the four assets the ReTool recipe needs:
 DAPO-Math-17k jsonl, AIME-2024 jsonl, the SFT'd HF checkpoint (all three
 pinned by commit sha and checksummed), and the torch_dist conversion of that
 checkpoint. The conversion has no upstream repo, so prepare builds it on the
-spot with `WORLD_SIZE=1` and `--rotary-base 5000000`; if no CUDA device is
-visible — which is the case on the harbor backend, where prepare is a
-build-time layer — it is skipped and the launch script's own
+spot with `WORLD_SIZE=1` and `--rotary-base 5000000`. Both backends run
+prepare through the docker runtime (the harbor backend does so before
+`harbor run`), so it gets `--gpus` from `NVIDIA_VISIBLE_DEVICES`; if no CUDA
+device is visible anyway, the conversion is skipped and the launch script's own
 `if [ ! -d "$DIST_MODEL_DIR" ]` guard does it during the agent stage instead.
 
 Two things to know before attempting a real run:
@@ -177,11 +179,15 @@ Two things to know before attempting a real run:
   On the harbor backend that translation does not exist — the generated
   `task.toml` has no `gpus` field and harbor's local docker environment
   reports no GPU capability — so `environment/docker-compose.yaml` carries the
-  device reservation and `shm_size` instead. Harbor merges it onto its own
-  `main` service; the adapter copies `environment/` verbatim, so no adapter
-  change is involved. That file is inert on the native docker path.
+  device reservation and `shm_size` instead. The adapter passes it to
+  `harbor run --extra-docker-compose`, which merges it onto harbor's `main`
+  service. That file is inert on the native docker path.
 - A full 100-rollout run on Qwen3-4B at 16k context is a long job. The
   harness has one `--timeout-s` shared by all three stages, so it has to
-  cover prepare's ~16GB download plus the training run.
+  cover prepare's ~16GB download plus the training run. On the harbor backend
+  the generated task sets no agent timeout (harbor's default is unlimited).
+- `evaluations/solution/solution/solve.sh` is the reference run for
+  `harbor run -a oracle`: it applies the instruction's budget (100 rollouts,
+  no checkpoint saves) and tees the log into `experiment_logs/`.
 
 The workspace code and the ReTool recipe are distributed under Apache-2.0.

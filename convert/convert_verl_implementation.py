@@ -477,7 +477,7 @@ def metadata_for(
             "script": config["launch"],
         },
         "environment": {
-            "venv": "verl",
+            "image": "verl",
             "assets": "environment/assets.yaml",
         },
         "outcome": {
@@ -761,8 +761,8 @@ def materialize_one(
 
     environment = target / "environment"
     environment.mkdir()
-    # 环境不再逐任务建镜像：统一镜像 + metadata.environment.venv
-    # 决定用哪套栈。这里只铺一个 assets.yaml 骨架，给 environment/
+    # 环境不再逐任务建镜像：metadata.environment.image 指向 docker/images/ 下的
+    # 某个 Dockerfile。这里只铺一个 assets.yaml 骨架，给 environment/
     # 留个存在的理由（git 不跟空目录），具体内容靠打包时人工填。
     (environment / "assets.yaml").write_text(
         "# 这个任务要用的模型 / 数据集。迁移时必须填：\n"

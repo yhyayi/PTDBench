@@ -17,7 +17,7 @@ training:
     - solution_rerun
     - _
 environment:
-  conda: slime-rc0
+  image: slime-rc0
   env:
     CUDA_VISIBLE_DEVICES: "0,1,2,3"
     NVIDIA_VISIBLE_DEVICES: "0,1,2,3"

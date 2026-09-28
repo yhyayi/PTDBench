@@ -1,6 +1,0 @@
-# Packages whose build needs more than `pip install <pin>`. See
-# docker/envs/slime-rc0/build-flags.txt for the format.
-#
-# verl no longer builds apex from git: the env follows the verl checkout's
-# workspace/requirements.txt, which does not list it. FSDP DAPO tasks do not
-# need the fused kernels.

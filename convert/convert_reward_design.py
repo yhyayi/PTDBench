@@ -64,8 +64,8 @@ TASK_IDS = (
 )
 METRIC_KEY = "eval/HELD-OUT_ENVIRONMENTS_128"
 # The launch script every reward-design workspace ships; recorded on the task
-# card as training.script so that `run` (docker/debug-env.sh) and the agent's
-# instruction name the same entry point.
+# card as training.script so that the task card and the agent's instruction
+# name the same entry point.
 LAUNCH_REL = "examples/grpo_trainer/run_qwen2_5_1.5b_instruct_taco_fsdp.sh"
 BEZ_TASK = "reward_bez_minimalist_security_002"
 TOPO_TASK = "reward_topological_sort_minimal_lexicographical_order_001"
@@ -449,7 +449,7 @@ def metadata_for(
             "script": LAUNCH_REL,
         },
         "environment": {
-            "venv": "slime-rc",
+            "image": "slime-rc0",
             "assets": "environment/assets.yaml",
         },
         "outcome": {
@@ -709,8 +709,8 @@ def materialize_one(
 
     environment = target / "environment"
     environment.mkdir()
-    # 环境不再逐任务建镜像：统一镜像 + metadata.environment.venv
-    # 决定用哪套栈。这里只铺一个 assets.yaml 骨架，给 environment/
+    # 环境不再逐任务建镜像：metadata.environment.image 指向 docker/images/ 下的
+    # 某个 Dockerfile。这里只铺一个 assets.yaml 骨架，给 environment/
     # 留个存在的理由（git 不跟空目录），具体内容靠打包时人工填。
     (environment / "assets.yaml").write_text(
         "# 这个任务要用的模型 / 数据集。迁移时必须填：\n"

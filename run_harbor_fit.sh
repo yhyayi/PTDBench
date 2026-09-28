@@ -19,8 +19,6 @@ args=(
   "${PTDBENCH_TASK:-tasks/slime_retool}"
   --evaluation-level "${PTDBENCH_EVALUATION_LEVEL:-solution}"
   --judge-model "${PTDBENCH_JUDGE_MODEL:-${PTDBENCH_MODEL:-gpt-5.5}}"
-  --debian-mirror "${PTDBENCH_DEBIAN_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn}"
-  --verifier-mode "${PTDBENCH_VERIFIER_MODE:-separate}"
   --agent-network "${PTDBENCH_AGENT_NETWORK:-public}"
   --verifier-network "${PTDBENCH_VERIFIER_NETWORK:-public}"
   --harbor-command "${PTDBENCH_HARBOR_COMMAND:-uv run --no-project --python python3 --with-editable ./harbor harbor}"
@@ -34,8 +32,6 @@ args=(
   --n-concurrent "${PTDBENCH_N_CONCURRENT:-1}"
   --timeout-multiplier "${PTDBENCH_TIMEOUT_MULTIPLIER:-4}"
   --jobs-dir "${PTDBENCH_JOBS_DIR:-outputs/harbor-slime-retool}"
-  --image "${PTDBENCH_IMAGE_TAG:-ptdbench/env:latest}"
-  --environment-build-timeout-multiplier 36
   --verifier-timeout-multiplier 12
   --yes
   --debug

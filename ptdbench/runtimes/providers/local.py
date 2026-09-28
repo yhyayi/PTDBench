@@ -7,7 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Optional
 
-from ...core.types import CommandResult
+from ...core.types import CommandResult, EnvironmentImage
 from ..base import CommandSpec, EnvironmentArtifact, SandboxInstance, SandboxRequest, SandboxRuntime
 from ..factory import register_runtime
 
@@ -22,14 +22,10 @@ class LocalRuntime(SandboxRuntime):
     def needs_environment_image(self) -> bool:
         return False
 
-    def build_environment(
-        self,
-        environment_dir: Path,
-        *,
-        dockerfile: str = "Dockerfile",
-        tag_prefix: str = "ptdbench",
+    def ensure_environment(
+        self, image: EnvironmentImage, *, rebuild: bool = False
     ) -> EnvironmentArtifact:
-        # local 模式不构建镜像，environment 仍由 task validator 检查。
+        # local 模式不构建镜像，直接用本机环境；environment 仍由 task validator 检查。
         return EnvironmentArtifact(backend=self.name)
 
     def path(self, request: SandboxRequest, name: str) -> str:

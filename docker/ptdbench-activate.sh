@@ -1,30 +1,53 @@
 #!/usr/bin/env sh
-# Installed as /etc/profile.d/ptdbench-activate.sh.
+# Installed as /etc/profile.d/ptdbench-activate.sh by every
+# docker/images/*.Dockerfile.
 #
 # Every command the harness runs goes through `sh -lc`, so this file is the one
 # place that shapes the per-stage environment. POSIX sh, not bash: it is sourced
 # by /bin/sh and has no reason to need more.
 #
-# It is short, and that is the point. The previous version was five sections of
-# repair work -- rewriting sys.path through a site hook, symlinking relocated
-# source trees back to their baked-in absolute paths, prepending a second copy
-# of the console scripts, reordering the loader path so two cudnn builds would
-# not fight. All of it existed because packages had been moved out of the prefix
-# they were built in. Nothing is moved now, so those patches are gone.
-# Activation is PATH, CUDA_HOME, and the loader path for pip's nvidia-* wheels
-# (they keep .so files next to the package, not in $prefix/lib).
+# Each environment is its own upstream image, used as-is: the interpreter, the
+# CUDA toolkit and the package set are whatever that image ships, so there is
+# nothing to activate. What remains is three small things:
 #
-# What remains is three things that are genuinely per-stage or per-task:
-#
-#   1. which environment is active            PTDBENCH_CONDA_ENV
-#   2. what prepare.sh left behind            $PTDBENCH_PREPARED/env
-#   3. where a stray `pip install` may write  agent stage only
+#   0. the image's PATH, if the login shell dropped part of it
+#   1. what prepare.sh left behind            $PTDBENCH_PREPARED/env
+#   2. where a stray `pip install` may write  agent stage only
 #
 # The task's workspace is not this file's business: the harness bind-mounts a
 # per-run copy of it at /workspace before the container starts.
 
-# Nothing to do outside a PTDBench sandbox (a plain `docker run` for debugging,
-# say), and nothing to do twice.
+# --- 0. the image's PATH -----------------------------------------------------
+# A login shell runs /etc/profile first, and on Debian that resets PATH to the
+# stock list -- dropping whatever the image's ENV PATH added (/usr/local/cuda/bin,
+# /root/.cargo/bin, ...). The Dockerfile recorded the image's PATH at build
+# time; any entry missing now goes back in front, in the image's order. Where
+# /etc/profile leaves PATH alone this changes nothing, and it is idempotent, so
+# it runs outside the once-only guard below (a debugging `docker run ... sh -l`
+# wants it too).
+if [ -r /etc/ptdbench-image-path ]; then
+    _ptdbench_image_path=""
+    IFS= read -r _ptdbench_image_path < /etc/ptdbench-image-path || :
+    _ptdbench_missing=""
+    _ptdbench_ifs=$IFS
+    IFS=:
+    for _ptdbench_dir in $_ptdbench_image_path; do
+        [ -n "$_ptdbench_dir" ] || continue
+        case ":$_ptdbench_missing:$PATH:" in
+            *":$_ptdbench_dir:"*) ;;
+            *) _ptdbench_missing="${_ptdbench_missing:+$_ptdbench_missing:}$_ptdbench_dir" ;;
+        esac
+    done
+    IFS=$_ptdbench_ifs
+    if [ -n "$_ptdbench_missing" ]; then
+        PATH="$_ptdbench_missing${PATH:+:$PATH}"
+        export PATH
+    fi
+    unset _ptdbench_image_path _ptdbench_missing _ptdbench_ifs _ptdbench_dir
+fi
+
+# Nothing more to do outside a PTDBench sandbox (a plain `docker run` for
+# debugging, say), and nothing to do twice.
 if [ -z "${PTDBENCH_STAGE:-}" ] || [ -n "${PTDBENCH_ACTIVATED:-}" ]; then
     return 0 2>/dev/null || :
 fi
@@ -36,63 +59,7 @@ PTDBENCH_MODELS="${PTDBENCH_MODELS:-/ptdbench/models}"
 PTDBENCH_DATASETS="${PTDBENCH_DATASETS:-/ptdbench/datasets}"
 export PTDBENCH_PREPARED PTDBENCH_MODELS PTDBENCH_DATASETS
 
-# --- 1. activate the environment --------------------------------------------
-# The prefix is where the packages were built. CUDA_HOME is set because nvcc
-# came from the conda layer and anything that JIT-compiles a kernel at runtime
-# (torch.utils.cpp_extension, and through it a few Megatron and TE paths) looks
-# it up rather than inferring it.
-if [ -n "${PTDBENCH_CONDA_ENV:-}" ]; then
-    _ptdbench_prefix="/opt/conda/envs/$PTDBENCH_CONDA_ENV"
-    if [ ! -x "$_ptdbench_prefix/bin/python" ]; then
-        echo "ptdbench: no such conda env '$PTDBENCH_CONDA_ENV' (looked in $_ptdbench_prefix)" >&2
-        echo "ptdbench: the image has: $(ls /opt/conda/envs 2>/dev/null | tr '\n' ' ')" >&2
-    else
-        PATH="$_ptdbench_prefix/bin:$PATH"
-        CONDA_PREFIX="$_ptdbench_prefix"
-        CUDA_HOME="$_ptdbench_prefix"
-        export PATH CONDA_PREFIX CUDA_HOME
-
-        # pip nvidia-* wheels keep .so next to the package, not in
-        # $prefix/lib. torch finds those via its own preload; transformer_engine
-        # (and anything else that dlopens with DT_NEEDED and no RPATH) does not.
-        # Inserted before $prefix/lib so the copies the wheels were built
-        # against win over the conda toolkit stubs. Existing LD_LIBRARY_PATH
-        # stays first: that is where --gpus puts libcuda.so.1.
-        # $prefix/lib is appended, never prepended -- putting the conda toolkit
-        # first would let its cudart disagree with pip's cublas/cudnn, which is
-        # the failure the old section 4 was fighting.
-        _ptdbench_nvidia_libs=""
-        for _ptdbench_nlib in "$_ptdbench_prefix"/lib/python*/site-packages/nvidia/*/lib \
-                              "$_ptdbench_prefix"/lib/python*/site-packages/nvidia/*/lib64; do
-            [ -d "$_ptdbench_nlib" ] || continue
-            _ptdbench_nvidia_libs="${_ptdbench_nvidia_libs:+$_ptdbench_nvidia_libs:}$_ptdbench_nlib"
-        done
-        LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}${_ptdbench_nvidia_libs:+$_ptdbench_nvidia_libs:}$_ptdbench_prefix/lib"
-        export LD_LIBRARY_PATH
-        unset _ptdbench_nvidia_libs _ptdbench_nlib
-
-        # Source trees that a task's launch scripts name by absolute path -- see
-        # docker/envs/*/sources.txt. They live inside the prefix, so they came
-        # through the image build with it; this only puts them where the scripts
-        # look. Safe because they are pure Python, resolved at import time.
-        if [ -d "$_ptdbench_prefix/src" ]; then
-            for _ptdbench_tree in "$_ptdbench_prefix"/src/*; do
-                [ -d "$_ptdbench_tree" ] || continue
-                _ptdbench_link="/root/$(basename "$_ptdbench_tree")"
-                if [ -e "$_ptdbench_link" ] && [ ! -L "$_ptdbench_link" ]; then
-                    echo "ptdbench: $_ptdbench_link exists and is not a symlink; leaving it" >&2
-                    continue
-                fi
-                ln -sfn "$_ptdbench_tree" "$_ptdbench_link" 2>/dev/null || \
-                    echo "ptdbench: could not link $_ptdbench_link -> $_ptdbench_tree" >&2
-            done
-            unset _ptdbench_tree _ptdbench_link
-        fi
-    fi
-    unset _ptdbench_prefix
-fi
-
-# --- 2. what prepare.sh left behind ------------------------------------------
+# --- 1. what prepare.sh left behind ------------------------------------------
 # The prepare stage records the paths it fetched to, plus whatever else the task
 # needs exported, as KEY=VALUE lines. Plain assignments, not shell code: this
 # file is sourced by every command in the agent and verifier stages, and a task
@@ -119,13 +86,18 @@ if [ -f "$PTDBENCH_PREPARED/env" ]; then
     unset _ptdbench_line _ptdbench_key
 fi
 
-# --- 3. where a stray install may write, agent stage only --------------------
-# The conda prefixes are root-owned and read-only in practice. An agent that
-# runs `pip install` anyway should land in its own workspace rather than half
-# succeed against the shared environment -- and the verifier must not see it,
-# because grading cannot depend on anything the agent installed.
+# --- 2. where a stray install may write, agent stage only --------------------
+# An agent that runs `pip install` should land in its own workspace rather than
+# modify the image's site-packages -- and the verifier must not see it, because
+# grading cannot depend on anything the agent installed.
+#
+# PIP_BREAK_SYSTEM_PACKAGES is there for the Ubuntu 24.04 images, whose system
+# interpreter is marked externally managed: pip refuses even a --user install
+# there without it. With PIP_USER set the install still lands in the workspace
+# user base, which is the thing that marker exists to protect.
 if [ "$PTDBENCH_STAGE" = "agent" ]; then
     PYTHONUSERBASE="${PYTHONUSERBASE:-/workspace/.ptdbench-user}"
     PIP_USER=1
-    export PYTHONUSERBASE PIP_USER
+    PIP_BREAK_SYSTEM_PACKAGES=1
+    export PYTHONUSERBASE PIP_USER PIP_BREAK_SYSTEM_PACKAGES
 fi

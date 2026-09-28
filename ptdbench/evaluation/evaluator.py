@@ -103,26 +103,15 @@ class TaskEvaluator:
                     run.results,
                     f"[START] environment_prepare backend={self.runtime.name}",
                 )
-                if package.environment.is_legacy:
-                    environment_dir = package.paths.environment
-                    dockerfile = self._environment_dockerfile(package)
-                    if config.debian_mirror or config.huggingface_mirror:
-                        environment_dir = self._prepare_environment(
-                            package,
-                            run,
-                            dockerfile=dockerfile,
-                            debian_mirror=config.debian_mirror,
-                            huggingface_mirror=config.huggingface_mirror,
-                        )
-                    artifact = self.runtime.build_environment(
-                        environment_dir,
-                        dockerfile=dockerfile,
-                        tag_prefix=config.image_tag_prefix,
+                image = package.environment.environment_image
+                if image is None:
+                    raise SchemaError(
+                        f"{package.paths.metadata_yaml}: metadata.environment.image "
+                        f"is required by the {self.runtime.name} backend"
                     )
-                else:
-                    # 非 raw 任务全部复用 docker/build.sh 产出的那一个镜像，不再每个
-                    # 任务建一份。几套栈都在里面，靠 PTDBENCH_CONDA_ENV 选。
-                    artifact = self.runtime.prebuilt_environment(config.image)
+                # 镜像按环境名共享：已存在就直接用，不存在才照
+                # docker/images/<image>.Dockerfile 构建。
+                artifact = self.runtime.ensure_environment(image)
                 self._append_run_log(
                     run.results,
                     f"[OK] environment_prepare backend={self.runtime.name} "
@@ -286,7 +275,6 @@ class TaskEvaluator:
             evaluation_level=evaluation.level,
             log_level=config.log_level,
             debian_mirror=config.debian_mirror,
-            conda_env=package.environment.conda,
             environment_dir=self._environment_mount(package),
             prepared_dir=run.prepared,
             models_dir=run.models,
@@ -296,13 +284,7 @@ class TaskEvaluator:
 
     @staticmethod
     def _environment_mount(package: TaskPackage) -> Optional[Path]:
-        """任务的 environment/ 目录，没有就不挂。
-
-        raw 任务的 environment/ 里只有一个 Dockerfile，已经在构建阶段用过了，
-        再挂一遍只会让容器里多一个没人读的目录。
-        """
-        if package.environment.is_legacy:
-            return None
+        """任务的 environment/ 目录，没有就不挂。"""
         return package.paths.environment if package.paths.environment.is_dir() else None
 
     @staticmethod
@@ -365,7 +347,6 @@ class TaskEvaluator:
             network="bridge",
             timeout_s=config.timeout_s,
             workdir="workspace",
-            conda_env=package.environment.conda,
             task_env=dict(package.environment.env),
         )
         if artifact is None:
@@ -496,7 +477,6 @@ class TaskEvaluator:
             network=config.verifier_network,
             timeout_s=config.timeout_s,
             workdir="task_root",
-            conda_env=package.environment.conda,
             host_environment=self._environment_mount(package),
             # verifier 也要看得到 prepare 交付的东西：判分脚本经常要读 checkpoint
             # 或对齐数据集里的样本。只读挂，所以读到的一定是 prepare 写的那一份。
@@ -583,84 +563,6 @@ class TaskEvaluator:
         if agent_spec.api_key:
             env["OPENAI_API_KEY"] = agent_spec.api_key
         return env
-
-    @staticmethod
-    def _environment_dockerfile(package: TaskPackage) -> str:
-        """Resolve metadata's task-relative Dockerfile to a context-relative path."""
-        environment = package.metadata.get("environment")
-        declared = environment.get("dockerfile") if isinstance(environment, dict) else None
-        value = str(declared or "environment/Dockerfile")
-        prefix = "environment/"
-        if value == "environment":
-            value = "Dockerfile"
-        elif value.startswith(prefix):
-            value = value[len(prefix) :]
-        path = Path(value)
-        if path.is_absolute() or ".." in path.parts:
-            raise SchemaError(f"metadata.environment.dockerfile must stay under environment/: {value}")
-        if not (package.paths.environment / path).is_file():
-            raise SchemaError(f"Dockerfile not found: {package.paths.environment / path}")
-        return value
-
-    def _prepare_environment(
-        self,
-        package: TaskPackage,
-        run: PreparedRun,
-        *,
-        dockerfile: str,
-        debian_mirror: Optional[str],
-        huggingface_mirror: Optional[str],
-    ) -> Path:
-        environment_dir = run.root / "environment"
-        copy_tree(package.paths.environment, environment_dir)
-        dockerfile_path = environment_dir / dockerfile
-        content = dockerfile_path.read_text(encoding="utf-8").rstrip()
-        if debian_mirror:
-            content = self._insert_debian_mirror_layer(content, debian_mirror).rstrip()
-        if huggingface_mirror:
-            content = self._rewrite_huggingface_endpoint(content, huggingface_mirror).rstrip()
-        write_text(dockerfile_path, content.rstrip() + "\n")
-        return environment_dir
-
-    @staticmethod
-    def _insert_debian_mirror_layer(dockerfile: str, mirror: str) -> str:
-        layer = TaskEvaluator._debian_mirror_layer(mirror).strip("\n")
-        lines = dockerfile.splitlines()
-        output: list[str] = []
-        inserted = False
-        for line in lines:
-            output.append(line)
-            if line.lstrip().lower().startswith("from "):
-                output.append(layer)
-                inserted = True
-        if not inserted:
-            output.append(layer)
-        return "\n".join(output).rstrip() + "\n"
-
-    @staticmethod
-    def _debian_mirror_layer(mirror: str) -> str:
-        mirror_value = shlex.quote(mirror)
-        return f"""
-
-# PTDBench evaluate adapter: switch Debian sources before runtime package installs.
-RUN set -eu; \\
-    mirror={mirror_value}; \\
-    for sources in /etc/apt/sources.list /etc/apt/sources.list.d/debian.sources; do \\
-        [ -f "$sources" ] || continue; \\
-        sed -i \\
-            -e "s|http://deb.debian.org/debian-security|$mirror/debian-security|g" \\
-            -e "s|https://deb.debian.org/debian-security|$mirror/debian-security|g" \\
-            -e "s|http://security.debian.org/debian-security|$mirror/debian-security|g" \\
-            -e "s|https://security.debian.org/debian-security|$mirror/debian-security|g" \\
-            -e "s|http://deb.debian.org/debian|$mirror/debian|g" \\
-            -e "s|https://deb.debian.org/debian|$mirror/debian|g" \\
-            "$sources"; \\
-    done
-"""
-
-    @staticmethod
-    def _rewrite_huggingface_endpoint(dockerfile: str, mirror: str) -> str:
-        return dockerfile.replace("https://huggingface.co", mirror)
 
     def _write_report(self, path: Path, result: EvaluationResult) -> None:
         write_text(path, json.dumps(result.to_dict(), indent=2, ensure_ascii=False))

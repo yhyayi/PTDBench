@@ -13,15 +13,14 @@ PTDBench（PostTrainDiagnosisBench）是一个面向社区提交的后训练诊�
 5. verifier 运行 `verifier/test.sh`，读取修复后的 workspace 并输出结果。
 6. 评测器汇总 `report.json`，同时保留 agent 轨迹和 verifier 结果。
 
-## 先跑 example
+## 快速上手
 
-当前最值得先跑的是 `example/swe_slugfix`，它是一个最小可运行的 SWE 修复任务。
-workspace 里有一个 `toy_swe.slugify.slugify()` 的 bug，agent 需要把它修好，让 verifier 测试通过。
+下面以 `tasks/slime_retool` 为例；`tasks/` 下的任意一个任务目录都可以替换进去。
 
 ### 1. 先做校验
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench validate example/swe_slugfix
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench validate tasks/slime_retool
 ```
 
 ### 2. 再跑本地 + Codex
@@ -32,7 +31,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench validate example/swe_slugfix
 - `--agent codex`：用 Codex 作为 agent
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate tasks/slime_retool \
   --backend local \
   --agent codex \
   --model gpt-5.5 \
@@ -72,7 +71,7 @@ export OPENAI_API_KEY='你的 API key'
 它等价于：
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate tasks/slime_retool \
   --backend docker \
   --agent codex \
   --model gpt-5.5 \
@@ -86,9 +85,17 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
 ```
 
 运行前需要确保 Docker daemon 已启动，并允许 Docker Desktop 访问当前仓库目录。
-评测器按 `metadata.yaml` 的 `environment` 段决定环境：写 `conda` 的任务直接用统一镜像
-（`--image` / `PTDBENCH_IMAGE_TAG` 可覆盖），写 `dockerfile` 的 legacy 任务仍然逐任务构建
-基础镜像。两种情况都分别启动 agent/verifier 容器。
+评测器按 `metadata.yaml` 的 `environment.image` 决定镜像：`image: verl` 对应
+`docker/images/verl.Dockerfile`，镜像 tag 由 Dockerfile 头部的 `# ptdbench-image:` 一行声明（如 `ptdbench/verl:vllm0.17-torch2.10-cu129`）。本地没有这个镜像时
+先构建再跑，已有就直接复用；prepare/agent/verifier 三个阶段用同一个镜像、各自起容器。
+想提前构建，或者改了 Dockerfile 之后需要重建（只改工具脚本时 tag 不变，改动不会被自动发现），用：
+
+```bash
+python3 -m ptdbench build-images                  # 构建 docker/images/ 下所有缺失的镜像
+python3 -m ptdbench build-images verl slime-rc0   # 只构建指定的
+python3 -m ptdbench build-images --rebuild verl   # 已存在也重建
+```
+
 `--backend` 是整次评测唯一的 runtime backend，agent 和 verifier 始终使用同一个 backend；
 两者的网络策略仍可分别通过 `--agent-network` 和 `--verifier-network` 配置。
 task 镜像不需要预装 Codex，框架会在 agent 容器启动后安装 `@openai/codex@latest`。
@@ -118,23 +125,37 @@ Docker 已经作为 agent 的外层安全边界，因此 Docker backend 会使�
 `TaskEvaluator`，后者在线生成临时 Harbor task 并交给 Harbor CLI 执行，最后再映射回同一个
 PTDBench 结果结构。因此不需要修改原有评测命令。
 
+Harbor 直接用预构建镜像，不再逐任务构建：生成的 task.toml 把 `[environment] docker_image`
+设成该环境 Dockerfile 头部声明的 tag。每个 task 的流程是：
+
+1. PTDBench 在同一个镜像里先跑 `environment/prepare.sh`（联网，与 `evaluate` 的 prepare
+   阶段完全一致），镜像不存在时先构建；
+2. prepare 写过的 workspace 放进 Harbor task 的 `environment/`（不含 Dockerfile），Harbor
+   起容器后把它上传到 `/workspace`；
+3. prepare 产物、任务的 `environment/`、模型和数据集缓存以只读 bind mount 挂到
+   `/ptdbench/prepared`、`/ptdbench/environment`、`/ptdbench/models`、`/ptdbench/datasets`；
+4. verifier 与 agent 共用同一个容器（shared 模式），agent / verifier 阶段对 HF / W&B 离线。
+
+Harbor 的挂载是 job 级的，所以每个 task 单独一个 `harbor run`，最后合并成一份报告。
+`--mounts`/`--mounts-json` 由 PTDBench 管理，不能再透传。Harbor 的 docker 环境没有 GPU
+选项，GPU 任务需要把 Docker daemon 的默认 runtime 设为 `nvidia`。
+
 如果 Harbor 是当前仓库旁边的 clone，可以这样运行：
 
 ```bash
 export OPENAI_API_KEY='你的 API key'
 export OPENAI_BASE_URL='https://yeysai.com/v1'
-./run_harbor.sh
+./run_harbor_fit.sh
 ```
 
-脚本默认使用 `example/swe_slugfix`、`solution`、`separate`、Codex、`gpt-5.5` 和
+脚本默认使用 `tasks/slime_retool`、`solution`、Codex、`gpt-5.5` 和
 `uv run --project harbor harbor`。也可以直接展开它对应的 CLI 命令：
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench harbor-evaluate example/swe_slugfix \
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench harbor-evaluate tasks/slime_retool \
   --evaluation-level solution \
   --judge-model gpt-5.5 \
-  --debian-mirror https://mirrors.tuna.tsinghua.edu.cn \
-  --verifier-mode separate \
+  --huggingface-mirror https://hf-mirror.com \
   --agent-network public \
   --verifier-network public \
   --harbor-command "uv run --project harbor harbor" \
@@ -148,8 +169,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench harbor-evaluate example/swe_slugfi
   --debug
 ```
 
-`--verifier-mode separate` 是默认值，表示 agent 结束后由 Harbor 使用独立 verifier 环境；
-需要复用同一个环境时改成 `--verifier-mode shared`。`--evaluation-level issue` 和
+`--evaluation-level issue` 和
 `solution` 分别选择 task package 中对应的两套 instruction/oracle/verifier，仍然只会运行
 选中的一套，不会离线复制成两个数据集。`--agent-network` 和 `--verifier-network` 用于生成
 Harbor task 中对应阶段的 `network_mode`。
@@ -157,16 +177,14 @@ Harbor task 中对应阶段的 `network_mode`。
 `--harbor-command` 是可拆分的命令字符串，也可以直接写成 `"harbor"`。运行前需确保该命令
 在当前 shell 中可用，并按 Harbor 的要求准备 agent、Docker 和模型凭据。
 
-`--debian-mirror` 是任务物化参数。设置后，adapter 会在生成的 Dockerfile 中替换 Debian
-软件源，确保 Harbor 启动容器后安装 agent 依赖时也使用该镜像；不设置则保持任务原始软件源。
-`run_harbor.sh` 默认使用 `https://mirrors.tuna.tsinghua.edu.cn`，可通过
-`PTDBENCH_DEBIAN_MIRROR` 覆盖。
+`--huggingface-mirror`、`--models-dir`、`--datasets-dir` 只作用于 prepare 阶段和挂载，
+含义与 `evaluate` 相同。
 
 除了上述 PTDBench 转换参数，其余参数会原样传给 `harbor run`。参数名、别名和行为均保持
 Harbor 原义，因此 Harbor 增加普通 CLI 参数时不需要同步修改 adapter：
 
 ```bash
-python3 -m ptdbench harbor-evaluate example/swe_slugfix \
+python3 -m ptdbench harbor-evaluate tasks/slime_retool \
   --evaluation-level solution \
   --judge-model gpt-4.1 \
   --agent codex \
@@ -176,29 +194,28 @@ python3 -m ptdbench harbor-evaluate example/swe_slugfix \
   --max-retries 2
 ```
 
-`--path/-p` 是唯一由 adapter 管理的 Harbor 参数，它始终指向在线生成的临时 Harbor task。
+`--path/-p` 和 `--mounts/--mounts-json` 由 adapter 管理：前者始终指向在线生成的临时 Harbor task，后者是 prepare 产物和缓存的只读挂载。
 `--harbor-temp-dir` 设置这些临时 task 的父目录；每次运行仍会创建并只清理一个随机唯一的
 子目录。未设置时使用操作系统临时目录。
 `--jobs-dir/-o` 和 `--job-name` 可以按 Harbor 原生方式使用；没有提供时 adapter 使用 `jobs`
 和一个唯一 job name，以便可靠读取结果。临时 task 在运行后自动清理，Harbor job 正常保留。
 使用 `--config/-c` 时，配置文件中的 `jobs_dir` 和 `job_name` 也会保持 Harbor 原义，不会被
 adapter 覆盖。
-`HarborEvaluator.evaluate()` 一次对应一个 Harbor job，并统一返回
-`HarborEvaluationReport`。默认只有一个 trial；`--n-attempts` 或多 model 产生多个 trial 时，
+`HarborEvaluator.evaluate()` 每个 task 对应一个 Harbor job，并统一返回
+`HarborEvaluationReport`。批量时用户给的 `--job-name` 会按 task 加后缀。默认只有一个 trial；`--n-attempts` 或多 model 产生多个 trial 时，
 它们仍然包含在同一个 report 中。
 
 `harbor-evaluate` 也可以一次提交多个 task。多个显式路径必须写在 Harbor 原生参数之前；也可以
-只传一个父目录，此时只展开它的直接子目录，不递归扫描更深层级。所有 task 会被物化到同一个
-临时 Harbor dataset，并通过一次 `harbor run` 提交。并发调度由 Harbor 原生的
-`--n-concurrent` 负责，PTDBench 不另开线程或进程：
+只传一个父目录，此时只展开它的直接子目录，不递归扫描更深层级。task 按顺序逐个 prepare、
+逐个提交 `harbor run`；某个 task 的 prepare 失败只让它出现在 `missing_task_ids` 里。
+同一 task 的多次 trial（`--n-attempts`）并发仍由 Harbor 原生的 `--n-concurrent` 负责：
 
 ```bash
 python3 -m ptdbench harbor-evaluate \
-  tasks/raw/rlve_hyper/task_001 \
-  tasks/raw/rlve_hyper/task_002 \
+  tasks/rlve_hyper/task_001 \
+  tasks/rlve_hyper/task_008 \
   --agent codex \
-  --model gpt-5.5 \
-  --n-concurrent 2
+  --model gpt-5.5
 ```
 
 也可以直接运行多任务脚本。无参数时它使用上面两个 task；传一个集合目录时会运行该目录的
@@ -206,7 +223,7 @@ python3 -m ptdbench harbor-evaluate \
 
 ```bash
 ./run_harbor_multi.sh
-./run_harbor_multi.sh tasks/raw/rlve_hyper -- --n-attempts 2
+./run_harbor_multi.sh tasks/rlve_hyper -- --n-attempts 2
 ```
 
 批次报告顶层使用 `task_ids`，并包含 `n_tasks`、`n_completed_tasks` 和
@@ -228,10 +245,9 @@ HarborEvaluationConfig(
 )
 ```
 
-`run_harbor.sh` 和 `run_harbor_fit.sh` 可通过 `PTDBENCH_TASK`、`PTDBENCH_MODEL`、`PTDBENCH_EVALUATION_LEVEL`、
+`run_harbor_fit.sh` 和 `run_harbor_multi.sh` 可通过 `PTDBENCH_TASK`、`PTDBENCH_MODEL`、`PTDBENCH_EVALUATION_LEVEL`、
 `PTDBENCH_JUDGE_MODEL`、`PTDBENCH_REASONING_EFFORT`、`PTDBENCH_BACKEND`、
-`PTDBENCH_AGENT_NETWORK`、`PTDBENCH_VERIFIER_NETWORK`、`PTDBENCH_VERIFIER_MODE`、
-`PTDBENCH_DEBIAN_MIRROR`、`PTDBENCH_HARBOR_COMMAND`、`PTDBENCH_HARBOR_TEMP_DIR`、
+`PTDBENCH_AGENT_NETWORK`、`PTDBENCH_VERIFIER_NETWORK`、`PTDBENCH_HARBOR_COMMAND`、`PTDBENCH_HARBOR_TEMP_DIR`、
 `PTDBENCH_TIMEOUT_MULTIPLIER`、`PTDBENCH_N_CONCURRENT` 和 `PTDBENCH_JOBS_DIR` 覆盖默认值；
 额外 CLI 参数可以直接追加在脚本命令后。
 
@@ -248,7 +264,7 @@ export PTDBENCH_DOCKER_NO_PROXY=localhost,127.0.0.1,host.docker.internal
 Harbor 的容器环境变量直接使用其原生参数。例如 Colima 中只有 HTTPS 需要经过宿主机代理时：
 
 ```bash
-bash run_harbor.sh \
+bash run_harbor_fit.sh \
   --agent-env HTTPS_PROXY=http://192.168.5.2:7890 \
   --verifier-env HTTPS_PROXY=http://192.168.5.2:7890
 ```
@@ -258,7 +274,7 @@ bash run_harbor.sh \
 如果你只想先看 verifier 是否能跑通，也可以先挂一个空 agent：
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate tasks/slime_retool \
   --backend local \
   --agent shell \
   --agent-command true \
@@ -269,16 +285,14 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix \
 ## 目录结构
 
 ```text
-example/your_task/
+tasks/your_task/
 ├── instruction.md
 ├── readme.md
 ├── metadata.yaml
 ├── workspace/
 ├── oracle/
-├── environment/
-│   ├── requirements.txt # 新形态：该 conda 环境的完整依赖闭包
-│   ├── prepare.sh       # 新形态：跑训练前要准备的东西（下模型、下数据集）
-│   └── Dockerfile      # legacy 形态
+├── environment/         # 可选
+│   └── prepare.sh       # 跑训练前要准备的东西（下模型、下数据集）
 └── verifier/
     ├── test.sh
     ├── tests/
@@ -289,7 +303,7 @@ example/your_task/
 
 - `instruction.md`：agent 可见
 - `workspace/`：agent 可写
-- `environment/`：环境声明（`requirements.txt` / `prepare.sh`，legacy 任务是 `Dockerfile`）；
+- `environment/`：任务自己的环境文件（主要是 `prepare.sh`）；
   三个阶段都以**只读**挂在 `/ptdbench/environment`
 - `oracle/`：仅 verifier 可见
 - `verifier/`、`verifier/tests/`、`verifier/resources/`：仅 verifier 可见
@@ -322,24 +336,25 @@ example/your_task/
 其中建议结构如下：
 
 ```yaml
-title: Toy slugify repair
+title: 'rlve_hyper hyperparameter diagnosis: task_001'
 submitter:
-  name: ptdbench
+  name: benchmark_evaluation
 license: MIT
-created_date: 2026-08-06
-domain: code
+created_date: '2026-08-08'
+domain: post_train
 model:
-  name: codex
+  name: Qwen2.5-0.5B-Instruct
 dataset:
-  name: toy-swe
+  name: RLVE held-out environments
 training:
-  framework: none
-  algo: none
+  framework: RLVE / slime + GRPO
+  algo: grpo
+  script: scripts/training/Qwen2.5-0.5B-Instruct/rlve.sh
 environment:
-  dockerfile: environment/Dockerfile
+  image: slime-rc0
 outcome:
-  failure_type: implementation_bug
-  failure_reason: slugify only handles spaces and does not normalize punctuation
+  failure_type: training_collapse
+  failure_reason: '--attention-dropout=0.5 keeps held-out eval moving the wrong way
 ```
 
 ### 字段说明
@@ -351,14 +366,14 @@ outcome:
 - `training.algo`：训练算法
 - `training.script`：训练启动脚本，写成相对 `workspace/` 的路径
 - `training.script_args`：启动脚本的位置参数，列表，一项一个参数
-- `environment`：运行环境，两种形态二选一，见下一节
+- `environment`：运行环境，见下文 environment 一节
 - `outcome.failure_type`：失败类型
 - `outcome.failure_reason`：失败原因说明
 
 ### training.script：任务怎么跑起来
 
-`training.script` 是"这个任务的训练入口是哪个脚本"的唯一出处：`docker/debug-env.sh
-run` 读它来跑训练，`instruction.md` 里写给 agent 看的也应该是同一条路径。路径相对
+`training.script` 是"这个任务的训练入口是哪个脚本"的唯一出处，任务卡上记的就是它，
+`instruction.md` 里写给 agent 看的也应该是同一条路径。路径相对
 `workspace/`，因为容器里 workspace 挂在 `/workspace`，训练脚本是在那儿跑的。
 
 启动脚本需要位置参数才能跑起来时（RLVE 的 `rlve.sh` 要 `WANDB_PROJECT`、
@@ -379,36 +394,34 @@ training:
 只有真的没有训练脚本的任务（比如 `framework: none` 的纯代码修复）可以不写这两个
 字段；声明了训练框架却没写 `script`，校验会给一条 warning。
 
-### environment 的两种形态
-
-**形态一：统一镜像 + conda 环境（新任务用这个）**
+### environment
 
 ```yaml
 environment:
-  conda: verl                                  # docker/envs/ 下的目录名
-  requirements: environment/requirements.txt   # 可选，默认就是这个路径
-  prepare: environment/prepare.sh              # 可选，默认就是这个路径
-  env:                                         # 可选，逐任务不同的环境变量
+  image: verl                       # docker/images/ 下的 <name>.Dockerfile
+  prepare: environment/prepare.sh   # 可选，默认就是这个路径
+  env:                              # 可选，逐任务不同的环境变量
     CUDA_VISIBLE_DEVICES: "0,1"
 ```
 
-- `conda`：用镜像里预建的哪个 conda 环境。可选值就是 `docker/envs/` 下的目录名
-  （目前是 `verl` 和 `slime`），镜像本来就是照它构建的，所以这里没有第二份常量表。
-  要加新环境得先加 `docker/envs/<name>/` 和 `docker/Dockerfile` 里对应的
-  `env-<name>` stage。
-- 用 conda 而不是 venv，是因为 slime-rc0 编译时对的是 CUDA 12.6、verl 对的是 12.9、
-  slime-v0.3.1 对的是 13.0，**一个 venv 装不下三个 nvcc**（何况跨了大版本）。每个环境都在自己的构建 stage 里落在
-  `/opt/conda/envs/<name>`，再原样 COPY 进最终镜像——路径一致，shebang、`.pth`、
-  RPATH、`conda-meta` 里记的 prefix 才都还成立。
-- `requirements` / `prepare`：不写就按约定路径找，找得到才算数。写了则以写的为准，
-  但必须待在 `environment/` 里——只有那个目录会被挂进（或 COPY 进）容器。
-- `requirements.txt` 是**这个 conda 环境的完整闭包**，不是"额外再装的东西"。
-  同一个 `conda` 名下的所有任务必须给出**完全一致**的一份，`docker/build.sh` 会校验。
-  取并集是不行的：加一个任务就会悄悄改掉另一个任务的环境，连带改掉它的 ground truth。
+- `image`：必填，用哪个环境镜像。可选值就是 `docker/images/` 下 `*.Dockerfile` 的文件名
+  （目前是 `verl`、`slime-rc0`、`slime-v0.3.2`），没有第二份常量表。
+  镜像 tag 写在 Dockerfile 头部 `# ptdbench-image: <tag>`，描述的是栈（框架、推理引擎、CUDA），
+  多个任务共用，不带 hash；构建上下文是 `docker/`。
+- 要加新环境就加一个 `docker/images/<name>.Dockerfile`：`FROM` 必须钉 digest
+  （`image:tag@sha256:...`），文件末尾照抄其他 Dockerfile 里
+  `# ---- PTDBench tooling ...` 之后的那一段（`ptdbench_fetch_*`、`ptdbench_dataset`、
+  激活 hook），测试会检查每个 Dockerfile 的这一段完全一致。
+- 一个镜像是多个任务共享的，镜像内容就是这些任务的 ground truth 环境。改 Dockerfile
+  等于同时改所有用它的任务；需要不同依赖的任务应该用新的镜像名，而不是改已有的。
+- `prepare`：不写就按约定路径找，找得到才算数。写了则以写的为准，
+  但必须待在 `environment/` 里——只有那个目录会被挂进容器。
 - `env`：值**必须是字符串**。YAML 里 `CUDA_VISIBLE_DEVICES: 0,1` 会读成字符串，
   但 `: 0` 会读成整数——后者会被拒掉而不是悄悄转成 `"0"`，因为"只用 0 号卡"和
   "写错了"必须能分清。另外不允许设 `PTDBENCH_*`，那是 harness 自己的通道。
-- 不写 `dockerfile`。两个都写会报错，因为运行时只有一个生效，不该让读者猜。
+- 旧的 `conda`、`requirements`、`dockerfile` 字段已经不支持，校验会直接报错。
+- agent 阶段 `pip install` 会装到用户目录（`PIP_USER=1`），不会改动镜像本身的
+  site-packages。
 
 `environment/prepare.sh`：跑训练前要准备的一切。它跑在一个独立的 **prepare 阶段**
 容器里，是三个阶段里**唯一联网**的一个，也是唯一挂到共享下载缓存的一个：
@@ -442,8 +455,8 @@ ptdbench_dataset --recipe gsm8k --dest "$PTDBENCH_WORKSPACE/gsm8k_verl"
 | `ptdbench_dataset` | 跑镜像内置的数据集配方（`docker/ptdbench_datasets/`），产物同样走缓存 |
 
 `$PTDBENCH_MODELS` / `$PTDBENCH_DATASETS` 是缓存，不是交付路径。任务脚本要引用的
-永远是 `--dest` 写出去的那份——Harbor 后端在构建期跑完 prepare.sh 就会把这两个目录
-`rm -rf` 掉，直接引用 `/ptdbench/models/...` 的任务在那条路径上会找不到文件。
+永远是 `--dest` 写出去的那份：缓存目录可能被清理或换机器，只有 `--dest` 那份会跟着
+workspace 交给 agent（Harbor 后端里它随 workspace 一起上传到 `/workspace`）。
 
 `$PTDBENCH_PREPARED/env` 是被当成**数据**逐行读取的，不会被 `.` 进任何 shell——
 否则一个任务包就能在 verifier 前面跑任意命令。
@@ -454,16 +467,8 @@ ptdbench_dataset --recipe gsm8k --dest "$PTDBENCH_WORKSPACE/gsm8k_verl"
 评测机没网的话，先在有网的机器上跑一次
 `docker/warm-cache.sh [--models-dir DIR] [--datasets-dir DIR]`，它会把每个任务的
 `prepare.sh` 各跑一遍填满这两个目录；之后把它们搬到评测机上，用 `--models-dir`
-和 `--datasets-dir` 指过去就能离线评测。
-
-**形态二：逐任务 Dockerfile（legacy，`tasks/raw/` 下还没迁的任务用）**
-
-```yaml
-environment:
-  dockerfile: environment/Dockerfile
-```
-
-字段缺省时按约定路径 `environment/Dockerfile` 算。
+和 `--datasets-dir` 指过去就能离线评测。评测机上也要有对应的镜像，可以在有网的机器上
+`build-images` 之后 `docker save` / `docker load` 过去。
 
 ### 失败类型
 
@@ -476,7 +481,7 @@ environment:
 
 ## 新任务怎么加
 
-最简单的方式是直接参考 `example/empty` 和 `example/swe_slugfix`。
+最简单的方式是参考 `tasks/` 下同类的现有任务，例如 `tasks/slime_retool`。
 
 ### 你需要补的东西
 
@@ -502,9 +507,9 @@ environment:
    - 放隐藏参考实现、正确数据、正确模型输出，或者 verifier 需要的真值
    - agent 不应该看到这里
 
-6. `environment/Dockerfile`
-   - 放运行环境依赖
-   - 如果任务未来要跑 Docker backend，这里尤其重要
+6. `metadata.yaml` 里的 `environment.image`，以及可选的 `environment/prepare.sh`
+   - 从 `docker/images/` 里挑一个现成的镜像；都不合适再新加一个 Dockerfile
+   - 模型、数据集等运行前要下载的东西写进 `prepare.sh`
 
 7. `verifier/test.sh`
    - 评测入口，只保留一个主脚本
@@ -528,17 +533,6 @@ environment:
 - 如果 verifier 里要 import workspace 代码，记得把 `PTDBENCH_WORKSPACE` 加进 `sys.path`
 - 本框架现在的运行轨迹会保存在 `results/agent_trace.json`
 
-### 结合 `example/swe_slugfix`
-
-这个 example 里：
-
-- `workspace/toy_swe/slugify.py`：故意写坏的实现
-- `oracle/toy_swe/slugify.py`：正确实现参考
-- `verifier/tests/test_slugify.py`：隐藏测试入口
-- `verifier/test.sh`：负责把 `workspace` 加到 `sys.path` 并运行 unittest
-- `instruction.md`：只告诉 agent 修复 `slugify`
-- `readme.md`：给人类审核者看的背景说明
-
 ## verifier 约定
 
 `verifier/test.sh` 是单一入口，建议读取这些环境变量：
@@ -555,25 +549,9 @@ environment:
 - 失败时退出非 `0`
 - 如有结构化结果，写入 `$PTDBENCH_RESULTS/result.json`
 
-## 示例
-
-### `example/empty`
-
-这是一个空模板 task，适合作为社区提交的起点。
-它保留了完整目录骨架，但具体内容仍然是占位符。
-
-### `example/swe_slugfix`
-
-这是一个可运行的 toy SWE 修复任务，也是目前最推荐先参考的 example。
-它用来验证：
-
-- 框架能否跑通 `local + codex`
-- workspace / oracle / verifier 的隔离是否正确
-- 结果目录是否足够干净、可回放
-
 ## 常用命令
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench validate example/swe_slugfix
-PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate example/swe_slugfix --backend local --agent codex --model gpt-5.5 --json
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench validate tasks/slime_retool
+PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate tasks/slime_retool --backend local --agent codex --model gpt-5.5 --json
 ```

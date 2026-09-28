@@ -16,7 +16,7 @@
 # （它 `dist.init_process_group(backend="nccl")` 并且 `torch.cuda.set_device`），
 # 所以：
 #
-#   1. 必须在**有 GPU 的机器**上、在统一镜像的 slime 栈里跑，不能在 CI 的 CPU 机器上跑；
+#   1. 必须在**有 GPU 的机器**上、在 slime 环境镜像里跑，不能在 CI 的 CPU 机器上跑；
 #   2. 产物**不保证逐字节可复现**——dist-checkpoint 的分片布局取决于 world size，
 #      元数据里还可能带非确定性内容。记下来的 sha256 的含义是"就是这一份构建
 #      产物"，不是"从上游能重算出来的确定值"。这一点和两个 parquet 脚本不同，
@@ -39,20 +39,20 @@
 # 本脚本不在镜像里，bind-mount 进去跑：
 #
 #   docker run --rm --gpus '"device=0"' \
-#     -e PTDBENCH_STAGE=agent -e PTDBENCH_CONDA_ENV=slime \
+#     -e PTDBENCH_STAGE=agent \
 #     -v "$PWD/convert:/convert:ro" \
 #     -v "$PWD/tasks/slime_retool/workspace:/workspace:ro" \
 #     -v /path/to/models:/models \
-#     ptdbench/env:latest \
+#     ptdbench/slime:v0.3.2-sglang0.5.15-cu130 \
 #     sh -lc 'HF_MODEL_DIR=/models/font-info_qwen3-4b-sft \
 #             SAVE_DIR=/models/font-info_qwen3-4b-sft_torch_dist \
 #             SLIME_DIR=/workspace \
 #             bash /convert/prepare_datasets/qwen3_4b_sft_torch_dist.sh'
 #
 # **SLIME_DIR 必须给。** slime 的源码树不在镜像里——它在任务的工作区里，每个用
-# slime 的任务自带一棵。镜像只提供 conda 环境和 /root/Megatron-LM。
+# slime 的任务自带一棵。镜像只提供 slime 的依赖和 /root/Megatron-LM。
 #
-# HF 侧的权重自己先下好（镜像里 HF_HUB_OFFLINE=1，脚本不会替你下）：
+# HF 侧的权重自己先下好（脚本不会替你下）：
 #   hf download font-info/qwen3-4b-sft-SGLang-RL --local-dir /path/to/models/font-info_qwen3-4b-sft
 
 set -euo pipefail

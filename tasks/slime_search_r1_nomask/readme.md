@@ -131,11 +131,11 @@ The historical final baseline is `0.145`; the healthy protocol is about
 
 ## Environment requirement
 
-- Conda environment: `slime-v0.3.1` (`environment: conda: slime-v0.3.1`), the
-  stack `slimerl/slime:latest` shipped at slime 0.3.1 — torch 2.11, CUDA 13.0,
-  sglang 0.5.15. There is no per-task Dockerfile any more.
+- Image: `slime-v0.3.2` (`environment: image: slime-v0.3.2`), the upstream
+  `slimerl/slime:v0.3.2-cu130` image pinned by digest — CUDA 13.0, sglang
+  0.5.15.post1. There is no per-task Dockerfile.
 - `environment/prepare.sh` installs `faiss-gpu-cuvs` into `$PTDBENCH_PREPARED`
-  (not into the shared environment, which four tasks must agree on) and
+  (not into the image, which all four slime tasks share) and
   exports it via `PYTHONPATH`. The `-cuvs` build is the CUDA 13 one, which is
   what this environment is; plain `faiss-gpu` is the CUDA 12 build.
 - `environment/prepare.sh` then stages the five assets a rerun needs into
@@ -147,7 +147,7 @@ The historical final baseline is `0.145`; the healthy protocol is about
   The body of the file is byte-identical to `slime_search_r1`'s.
 - `metadata.yaml`'s `environment.env` deliberately omits `HF_HUB_OFFLINE` /
   `TRANSFORMERS_OFFLINE`: the framework sets them per stage
-  (`ptdbench/runtimes/base.py:215-237`), whereas a task-level copy would also
+  (`_network_policy_env` in `ptdbench/runtimes/base.py`), whereas a task-level copy would also
   apply to `prepare` and disable the downloads above.
 - Use the Docker agent backend.
 - Issue diagnosis uses the frozen historical snapshot only. A solution rerun

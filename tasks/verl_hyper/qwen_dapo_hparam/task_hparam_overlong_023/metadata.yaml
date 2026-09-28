@@ -13,7 +13,7 @@ training:
   algo: grpo
   script: examples/grpo_trainer/run_qwen2_5_0_5b_instruct_dapo_math_fsdp.sh
 environment:
-  conda: verl
+  image: verl
   env:
     CUDA_VISIBLE_DEVICES: "0,1"
     NVIDIA_VISIBLE_DEVICES: "0,1"
