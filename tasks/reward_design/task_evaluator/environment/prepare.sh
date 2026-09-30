@@ -135,11 +135,25 @@ if [ ! -d "$PYEXT_MARKER" ]; then
     mkdir -p "$PYEXT_SRC"
 
     # 钉 sha256 而不是钉版本号：sdist 的地址可变、字节应当不变。
-    ptdbench_fetch_url \
-        --url https://pypi.tuna.tsinghua.edu.cn/packages/b0/be/9b6005ac644aaef022527ce49617263379e49dbdbd433d1d3dd66d71f570/pyext-0.7.tar.gz \
-        --sha256 e618a635be4e8c4a84b443cc27186601ad052efe35f01839815f2a2cf3947cdf \
-        --size 7772 \
-        --dest "$PYEXT_SRC/pyext-0.7.tar.gz"
+    PYEXT_SHA=e618a635be4e8c4a84b443cc27186601ad052efe35f01839815f2a2cf3947cdf
+
+    # vendor/ 里带了一份逐字节相同的 sdist（sha 同上），**优先用它**：Cybertron 这类
+    # 集群只有白名单出口代理（`whitelist-proxy…:7891`，hf-mirror 放行、pypi.tuna 不放行），
+    # 直接下 tsinghua 会在 TLS 握手上被重置（`SSLEOFError`）。vendored 文件让 prepare
+    # 在无外网时也能过；留着下面的 URL 兜底给出口开放的环境。两条路都按 $PYEXT_SHA 校验。
+    PYEXT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PYEXT_VENDORED="$PYEXT_DIR/vendor/pyext-0.7.tar.gz"
+    if [ -f "$PYEXT_VENDORED" ]; then
+        echo "[prepare] using vendored pyext sdist ($PYEXT_VENDORED)"
+        cp "$PYEXT_VENDORED" "$PYEXT_SRC/pyext-0.7.tar.gz"
+        echo "$PYEXT_SHA  $PYEXT_SRC/pyext-0.7.tar.gz" | sha256sum -c -
+    else
+        ptdbench_fetch_url \
+            --url https://pypi.tuna.tsinghua.edu.cn/packages/b0/be/9b6005ac644aaef022527ce49617263379e49dbdbd433d1d3dd66d71f570/pyext-0.7.tar.gz \
+            --sha256 "$PYEXT_SHA" \
+            --size 7772 \
+            --dest "$PYEXT_SRC/pyext-0.7.tar.gz"
+    fi
 
     tar -xzf "$PYEXT_SRC/pyext-0.7.tar.gz" -C "$PYEXT_SRC" --strip-components=1
     sed -i 's/inspect\.getargspec/inspect.getfullargspec/g' "$PYEXT_SRC/pyext.py"

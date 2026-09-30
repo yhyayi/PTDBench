@@ -24,6 +24,113 @@ class TestBuildEntry:
         assert "for p in tasks/*/environment/prepare.sh" in entry
         assert "set -euo pipefail" in entry
 
+    def test_exports_workspace_and_prepared_scratch(self):
+        # prepare.sh references PTDBENCH_WORKSPACE / PTDBENCH_PREPARED under
+        # `set -u`; both must be exported (as throwaway scratch) or it aborts.
+        entry = preheat.build_entry(
+            cache_dir="/user/me/ptdbench-cache",
+            prepare_glob="tasks/*/environment/prepare.sh",
+        )
+        assert "PTDBENCH_STAGE=prepare" in entry
+        assert 'export PTDBENCH_WORKSPACE="$ws/workspace"' in entry
+        assert 'PTDBENCH_PREPARED="$ws/prepared"' in entry
+        assert "/user/me/ptdbench-cache/.warm-scratch" in entry
+
+    def test_hf_endpoint_default_and_disable(self):
+        # Nodes can't reach huggingface.co; the mirror must be exported.
+        entry = preheat.build_entry(
+            cache_dir="/user/me/ptdbench-cache",
+            prepare_glob="tasks/*/environment/prepare.sh",
+            hf_endpoint="https://hf-mirror.com",
+        )
+        assert "export HF_ENDPOINT=https://hf-mirror.com HF_HUB_DISABLE_XET=1" in entry
+        # default flag value routes through the mirror
+        assert (
+            preheat.parse_args(
+                ["--project", "p", "--image", "i", "--git-path", "g"]
+            ).hf_endpoint
+            == "https://hf-mirror.com"
+        )
+        # explicit opt-out drops the export entirely
+        off = preheat.build_entry(
+            cache_dir="/user/me/ptdbench-cache",
+            prepare_glob="tasks/*/environment/prepare.sh",
+            hf_endpoint="",
+        )
+        assert "HF_ENDPOINT" not in off
+
+    def test_http_proxy_default_and_disable(self):
+        # The mirror is only reachable via the cluster whitelist proxy; a BATCH
+        # entry doesn't inherit it from Teleport, so it must be exported.
+        proxy = "http://whitelist-proxy.cybertron.svc.cluster.local:7891"
+        entry = preheat.build_entry(
+            cache_dir="/user/me/ptdbench-cache",
+            prepare_glob="tasks/*/environment/prepare.sh",
+            hf_endpoint="https://hf-mirror.com",
+            http_proxy=proxy,
+        )
+        assert f"export http_proxy={proxy} https_proxy={proxy}" in entry
+        assert "no_proxy=localhost,127.0.0.1,.modelbest.co,.svc.cluster.local" in entry
+        # proxy is exported before HF_ENDPOINT so mirror DNS/connect uses it
+        assert entry.index("http_proxy=") < entry.index("HF_ENDPOINT=")
+        # default flag value uses the whitelist proxy
+        assert (
+            preheat.parse_args(
+                ["--project", "p", "--image", "i", "--git-path", "g"]
+            ).http_proxy
+            == proxy
+        )
+        # explicit opt-out drops it entirely
+        off = preheat.build_entry(
+            cache_dir="/user/me/ptdbench-cache",
+            prepare_glob="tasks/*/environment/prepare.sh",
+            http_proxy="",
+        )
+        assert "http_proxy=" not in off
+
+    def test_seeds_task_workspace_tree(self):
+        # slime/rlve prepare.sh converts against $PTDBENCH_WORKSPACE/{scripts,tools}
+        # shipped in the task's workspace/; preheat must seed that tree.
+        entry = preheat.build_entry(
+            cache_dir="/user/me/ptdbench-cache",
+            prepare_glob="tasks/*/environment/prepare.sh",
+        )
+        assert 'tw="$(dirname "$(dirname "$p")")/workspace"' in entry
+        assert '[ -d "$tw" ] && cp -a "$tw/." "$PTDBENCH_WORKSPACE/"' in entry
+
+    def test_per_task_failure_does_not_abort_batch_but_fails_job(self):
+        # One task's failure must not abort warming the rest (the download cache
+        # is the deliverable and is written first), but the job must still exit
+        # non-zero so it is marked Failed -- a masked exit 0 misled the user into
+        # thinking a run with broken prepare steps had succeeded.
+        entry = preheat.build_entry(
+            cache_dir="/user/me/ptdbench-cache",
+            prepare_glob="tasks/*/environment/prepare.sh",
+        )
+        assert 'if (cd "$(dirname "$p")" && bash "$(basename "$p")"); then' in entry
+        assert 'failed="$failed $p"' in entry
+        # loop keeps going on failure (tally), then the job exits non-zero
+        assert '[ -z "$failed" ] || {' in entry
+        assert "exit 1; }" in entry
+
+    def test_overrides_baked_fetch_with_clone_copy(self):
+        # prepare.sh's ptdbench_fetch_hf shim execs the image-BAKED
+        # /usr/local/libexec/ptdbench_fetch.py, not the clone's copy, so the
+        # materialize() symlink fix only reaches a running job if the entry
+        # overwrites the baked file from the clone before the prepare loop.
+        entry = preheat.build_entry(
+            cache_dir="/user/me/ptdbench-cache",
+            prepare_glob="tasks/*/environment/prepare.sh",
+        )
+        assert (
+            "cp docker/ptdbench_fetch.py /usr/local/libexec/ptdbench_fetch.py" in entry
+        )
+        # guarded on both paths existing (no-op otherwise)
+        assert "[ -f docker/ptdbench_fetch.py ]" in entry
+        assert "[ -e /usr/local/libexec/ptdbench_fetch.py ]" in entry
+        # override happens before the prepare loop runs the fetches
+        assert entry.index("cp docker/ptdbench_fetch.py") < entry.index("for p in")
+
     def test_repo_subdir_cd(self):
         entry = preheat.build_entry(
             cache_dir="/user/me/ptdbench-cache",

@@ -37,30 +37,112 @@ def build_entry(
     cache_dir: str,
     prepare_glob: str,
     repo_subdir: str | None = None,
+    hf_endpoint: str | None = None,
+    http_proxy: str | None = None,
 ) -> str:
     """Build the BATCH ``--entry`` shell command that preheats the cache.
 
     It exports the ptdbench cache env vars, creates the cache subtree on the
     persistent ``/user`` fs (never container rootfs — ephemeral is tiny), then
     runs every ``prepare.sh`` matched by *prepare_glob* with those env vars set.
+
+    Cybertron nodes have no direct egress to ``huggingface.co``; *hf_endpoint*
+    (a mirror such as ``https://hf-mirror.com``) is exported as ``HF_ENDPOINT``
+    so ``ptdbench_fetch_hf`` / ``huggingface_hub`` route through it, matching the
+    task ``workspace/.env`` files. Pass an empty string to skip it.
+
+    The mirror itself is only reachable through the cluster's whitelist egress
+    proxy (*http_proxy*, e.g. ``http://whitelist-proxy.cybertron.svc.cluster.local:7891``).
+    Teleport injects that proxy into interactive ssh sessions but a BATCH
+    ``--entry`` never gets it, so without this export the fetch times out. It is
+    exported as http(s)_proxy (both cases); ``no_proxy`` keeps loopback and the
+    internal ``.modelbest.co`` / ``.svc.cluster.local`` traffic off the proxy.
+    Pass an empty string to skip it.
     """
     models = f"{cache_dir}/models"
     datasets = f"{cache_dir}/datasets"
+    # Egress proxy for the on-node HF fetches (see docstring). Exported first so
+    # even DNS/connect for the mirror goes through it.
+    proxy_export = ""
+    if http_proxy:
+        q = shlex.quote(http_proxy)
+        no_proxy = "localhost,127.0.0.1,.modelbest.co,.svc.cluster.local"
+        proxy_export = (
+            f"export http_proxy={q} https_proxy={q} HTTP_PROXY={q} HTTPS_PROXY={q} "
+            f"no_proxy={no_proxy} NO_PROXY={no_proxy}; "
+        )
+    # Mirror env for the on-node HF fetches. huggingface_hub reads HF_ENDPOINT at
+    # runtime; xet is disabled because the mirror does not serve it (same as the
+    # tasks' workspace/.env). Exported before any prepare.sh runs.
+    hf_export = ""
+    if hf_endpoint:
+        hf_export = (
+            f"export HF_ENDPOINT={shlex.quote(hf_endpoint)} HF_HUB_DISABLE_XET=1; "
+        )
+    # Throwaway scratch base on the persistent /user fs (container ephemeral is
+    # tiny). prepare.sh writes weights into $PTDBENCH_WORKSPACE and KEY=VALUE
+    # lines into $PTDBENCH_PREPARED/env; neither is what preheat is here for (the
+    # durable cache is $PTDBENCH_MODELS / $PTDBENCH_DATASETS), but both dirs must
+    # exist and be set or a script under `set -u` aborts on the unbound var.
+    # See docker/warm-cache.sh, which sets the same env for the docker path.
+    scratch = f"{cache_dir}/.warm-scratch"
     root = repo_subdir or "."
     return (
         "set -euo pipefail; "
+        f"export PTDBENCH_STAGE=prepare WANDB_MODE=offline WANDB_SILENT=true; "
+        f"{proxy_export}"
+        f"{hf_export}"
         f"export PTDBENCH_MODELS={shlex.quote(models)} "
         f"PTDBENCH_DATASETS={shlex.quote(datasets)}; "
-        f"mkdir -p {shlex.quote(models)} {shlex.quote(datasets)}; "
+        f"mkdir -p {shlex.quote(models)} {shlex.quote(datasets)} "
+        f"{shlex.quote(scratch)}; "
         f"cd {shlex.quote(root)}; "
-        f"found=0; "
+        # prepare.sh invokes ptdbench_fetch_hf, a shim that execs the IMAGE-BAKED
+        # /usr/local/libexec/ptdbench_fetch.py (COPYd in at build time), not this
+        # clone's docker/ptdbench_fetch.py. The materialize() symlink-dereference
+        # fix therefore does not reach a running job from a git push alone -- the
+        # baked copy is stale. Overwrite it from the clone so the fetch the loop
+        # runs below is the fixed one. Guarded: only when both paths exist, so a
+        # layout without the baked copy (or without the clone file) is a no-op.
+        f"if [ -f docker/ptdbench_fetch.py ] && "
+        f"[ -e /usr/local/libexec/ptdbench_fetch.py ]; then "
+        f"cp docker/ptdbench_fetch.py /usr/local/libexec/ptdbench_fetch.py && "
+        f'echo "[preheat] patched baked ptdbench_fetch.py (materialize symlink fix)"; fi; '
+        f"found=0; failed=''; "
         f"for p in {prepare_glob}; do "
         f'  [ -f "$p" ] || continue; '
         f"  found=$((found+1)); "
         f'  echo ">>> preparing $p"; '
-        f'  (cd "$(dirname "$p")" && bash "$(basename "$p")"); '
+        f'  ws="$(mktemp -d {shlex.quote(scratch)}/XXXXXX)"; '
+        f'  export PTDBENCH_WORKSPACE="$ws/workspace" PTDBENCH_PREPARED="$ws/prepared"; '
+        f'  mkdir -p "$PTDBENCH_WORKSPACE" "$PTDBENCH_PREPARED"; '
+        # Seed the scratch workspace with the task's own workspace/ tree (sibling
+        # of environment/). prepare.sh for slime/rlve tasks does its torch_dist
+        # conversion against $PTDBENCH_WORKSPACE/{scripts/models,tools} shipped by
+        # the task -- harbor materializes that tree before prepare runs, so we do
+        # too, or the GPU conversion step aborts on the missing files.
+        f'  tw="$(dirname "$(dirname "$p")")/workspace"; '
+        f'  [ -d "$tw" ] && cp -a "$tw/." "$PTDBENCH_WORKSPACE/"; '
+        # Per-task non-fatal: the durable deliverable is the download cache, which
+        # ptdbench_fetch_hf writes before any post-download step. A conversion /
+        # unpack failure (it only touches throwaway $ws) must not abort warming
+        # the remaining tasks; tally and report instead.
+        f'  if (cd "$(dirname "$p")" && bash "$(basename "$p")"); then '
+        f'    echo "<<< done $p"; '
+        f"  else "
+        f'    echo "!!! prepare failed (rc=$?): $p (downloads still cached)" >&2; '
+        f'    failed="$failed $p"; '
+        f"  fi; "
+        f'  rm -rf "$ws"; '
         f"done; "
-        f'echo "preheated $found prepare.sh script(s) into {cache_dir}"'
+        f'echo "preheated $found prepare.sh script(s) into {cache_dir}"; '
+        # Honest exit status: the loop above runs every task (one failure never
+        # aborts the batch -- the download cache is already warmed by then), but
+        # if any prepare.sh failed we exit non-zero so the job is marked Failed
+        # (and its logs archived) instead of a misleading Succeeded. The stderr
+        # line names which scripts to look at.
+        f'[ -z "$failed" ] || {{ '
+        f'echo "prepare.sh failed (downloads cached):$failed" >&2; exit 1; }}'
     )
 
 
@@ -133,6 +215,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="cd into this subdir of the cloned repo before globbing",
     )
+    parser.add_argument(
+        "--hf-endpoint",
+        default="https://hf-mirror.com",
+        help="HF mirror exported as HF_ENDPOINT (nodes can't reach "
+        "huggingface.co); pass empty string to disable",
+    )
+    parser.add_argument(
+        "--http-proxy",
+        default="http://whitelist-proxy.cybertron.svc.cluster.local:7891",
+        help="cluster egress proxy exported as http(s)_proxy so the HF mirror "
+        "is reachable from the BATCH job (Teleport only injects it into "
+        "interactive ssh); pass empty string to disable",
+    )
     parser.add_argument("--profile", default=None, help="cctl login profile")
     parser.add_argument(
         "--run",
@@ -149,6 +244,8 @@ def main(argv: list[str] | None = None) -> int:
         cache_dir=cache_dir,
         prepare_glob=args.prepare_glob,
         repo_subdir=args.repo_subdir,
+        hf_endpoint=args.hf_endpoint,
+        http_proxy=args.http_proxy,
     )
     cmd = build_cctl_command(args, entry)
     printable = " ".join(shlex.quote(part) for part in cmd)

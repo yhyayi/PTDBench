@@ -72,8 +72,41 @@ python harbor/scripts/cybertron_preheat.py "${COMMON[@]}" \
   多个 glob，相对仓库根（node 上 shell 展开，匹配不到的模式自动跳过）。默认值
   `"tasks/*/environment/prepare.sh environment/prepare.sh"` 只覆盖直接子目录，**匹配不到 rlve_hyper /
   verl_implementation 这类嵌套任务**，所以上面按镜像显式给全路径。
-- **torch_dist 转换**：`prepare.sh` 里带 GPU 探测——有可用 GPU 才就地把 HF 权重转成 mcore/torch_dist
-  ref 权重并缓存；CPU-only 预热会跳过、留给训练首跑兜底。想连转换结果一起缓存就保持 `--gpu 1`（且节点真有卡）。
+- **HF 镜像 + 出口代理**：节点无法直连 `huggingface.co`，且 `hf-mirror.com` 也只能经集群白名单
+  代理出网。脚本默认 `--hf-endpoint https://hf-mirror.com` +
+  `--http-proxy http://whitelist-proxy.cybertron.svc.cluster.local:7891`，跑 `prepare.sh` 前先
+  `export http(s)_proxy=… no_proxy=localhost,127.0.0.1,.modelbest.co,.svc.cluster.local` 再
+  `export HF_ENDPOINT=… HF_HUB_DISABLE_XET=1`。**代理是关键**：Teleport 只给交互式 `tsh ssh`
+  会话注入这个代理，BATCH `--entry` 不继承，漏了它 HF 拉取会 `ConnectTimeout`。要改/关代理传
+  `--http-proxy <url>` / `--http-proxy ''`；镜像同理用 `--hf-endpoint`。
+- **torch_dist 转换 + 工作区播种**：slime/rlve 的 `prepare.sh` 在有 GPU 时会就地把 HF 权重转成
+  mcore/torch_dist，转换脚本（`$PTDBENCH_WORKSPACE/scripts/models/*.sh`、`tools/convert_hf_to_torch_dist.py`）
+  是**任务自带在 `tasks/<t>/workspace/` 里**的，不在镜像里。所以脚本在跑每个 `prepare.sh` 前会把该任务的
+  `workspace/` 树 `cp -a` 进临时 `$PTDBENCH_WORKSPACE`（与 harbor materialize 一致），否则 GPU 转换会报
+  `scripts/models/*.sh: No such file or directory`。转换结果写在 throwaway 工作区（不进共享缓存），
+  CPU-only 会跳过、留给训练首跑兜底。
+- **materialize 不能留悬空软链（已修）**：`ptdbench_fetch_hf` 下载进 HF hub 缓存后，用
+  `docker/ptdbench_fetch.py` 的 `materialize()` 把快照 `--dest` 到 throwaway 工作区。HF 快照里每个文件
+  本身是指向 `blobs/<sha>` 的**相对软链**，而集群 `/user` 盘上 `os.link` **不跟随软链**，于是 dest 落的是
+  指向软链自身的硬链——换了目录相对目标就失效，成了**悬空链**。表现是下载明明 `ready`，后面读它的步骤却炸：
+  `config.json` 读不出（`Unrecognized model … model_type`）、`tokenizer.json` 读不出
+  （`Couldn't instantiate the backend tokenizer`）、taco 的 `tar: No such file`。修复：`materialize()` 在硬链
+  前先 `os.path.realpath` 解到真实 blob（跨设备回退到真字节拷贝，`open()` 必跟随软链，不会悬空）。
+- **运行时覆盖镜像内的 ptdbench_fetch.py（关键）**：`prepare.sh` 调的 `ptdbench_fetch_hf` 是镜像里 COPY 进
+  `/usr/local/libexec/ptdbench_fetch.py` 的**烘焙副本**，不是 clone 的 `docker/ptdbench_fetch.py`——所以上面那条
+  materialize 修复**光 git push 到不了跑着的作业**，镜像里那份还是旧的。`build_entry()` 在 `cd` 进仓库后、跑
+  prepare 循环前，先 `cp docker/ptdbench_fetch.py /usr/local/libexec/ptdbench_fetch.py`（两个路径都在才执行，
+  否则空操作），让循环里真正 exec 的是修过的那份。要让已提交的作业生效，重跑 `warm_cache.sh` 即可（代码在
+  `cyh` 分支，作业会重新 clone）。
+- **单任务失败不阻断整批，但作业如实失败**：预热的交付物是下载缓存（`ptdbench_fetch_hf` 在任何后处理之前
+  就写好了）。某个 `prepare.sh` 失败时，脚本记一笔、打到 stderr 并**继续**预热后面的任务；但整批跑完若有任何
+  失败，作业**以非零码退出**（状态 Failed、日志会归档），而不是误导性的 Succeeded。日志末尾列出
+  `prepare.sh failed (downloads cached): …` 方便排查。
+- **白名单代理只放行 HF 镜像，pypi.tuna 下不动（已处理）**：`reward_design/task_evaluator` 的 `prepare.sh` 要装
+  一个打补丁的 `pyext==0.7`，原本从 `pypi.tuna.tsinghua.edu.cn` 下 sdist——该 host 不在出口白名单里，TLS 握手被
+  重置（`SSLEOFError`，job 1108023）。已把那份 sha 钉死的 7772B sdist vendored 进
+  `tasks/reward_design/task_evaluator/environment/vendor/pyext-0.7.tar.gz`，`prepare.sh` 优先用它（无外网也能过），
+  URL 作兜底，两条路都校 sha。其余 URL/pip 下载若也命中白名单，同法 vendor。
 - **search_r1（`slime_search_r1` / `_nomask`）暂缓**：metadata 也绑 `slime-v0.3.2`，但数据量大（~79GB +
   wiki-18 索引）且有 cu130/确定性复现的未决问题，之前 deferred，未纳入 ② 。要预热时单独一条，`--prepare-glob
   'tasks/slime_search_r1/environment/prepare.sh tasks/slime_search_r1_nomask/environment/prepare.sh'`。

@@ -143,14 +143,31 @@ def materialize(source: Path, dest: Path) -> None:
     plain copy of the workspace, where a symlink would dangle or point at
     whatever that container happens to mount there. `--dest` has to be real
     bytes the agent and verifier stages can read on their own.
+
+    `source` is a HuggingFace snapshot dir whose entries are themselves
+    symlinks into the sibling blobs store (relative targets like
+    ``../../blobs/<sha>``). We resolve each to its real blob before hardlinking:
+    ``os.link`` does not follow the symlink on every filesystem (notably the
+    Cybertron ``/user`` mount), and hardlinking the *symlink* leaves a dangling
+    entry at `dest` whose relative target does not resolve from the new
+    location. That dangle surfaces far downstream -- an empty ``config.json``
+    ("Unrecognized model ... should have a model_type key"), an unreadable
+    ``tokenizer.json``, a ``tar: No such file`` -- long after fetch has printed
+    "ready". Resolving to the real blob keeps `dest` real bytes everywhere.
     """
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
         shutil.rmtree(dest)
+
+    def _link_real(src: str, dst: str) -> None:
+        os.link(os.path.realpath(src), dst)
+
     try:
-        shutil.copytree(source, dest, copy_function=os.link, symlinks=False)
+        shutil.copytree(source, dest, copy_function=_link_real, symlinks=False)
     except OSError:
-        # Cross-device, or a filesystem without hard links.
+        # Cross-device, or a filesystem without hard links. copytree's default
+        # copy_function open()s the source, which always follows symlinks, so
+        # the real bytes are copied and this path never dangles.
         if dest.exists():
             shutil.rmtree(dest)
         shutil.copytree(source, dest, symlinks=False)

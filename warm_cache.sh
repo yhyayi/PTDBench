@@ -1,8 +1,8 @@
 # 公共参数（每条命令都带）；不加 --run 即 dry-run，只打印将提交的 cctl job 命令
 COMMON=(--project xinfer-chenyinghao
-        --cluster wuxi_train --resource-pool speech-wx --billing-account-id N00069
-        --gpu 1 --gpu-model h100 --cpu 16 --memory 128
-        --git-path git@github.com:<org>/ptdbench.git --git-ref main
+        --cluster beijing --resource-pool model-autosft --billing-account-id N00069
+        --gpu 1 --gpu-model h800 --cpu 16 --memory 128
+        --git-path git@codehub.devcloud.cn-north-4.huaweicloud.com:090558ff0a7d43b1921956dc141bf7f8/ptdbench.git --git-ref cyh
         --cluster-user chenyinghao)
 
 # ① slime-rc0（cu126）: rlve_hyper 四个子任务
