@@ -1,0 +1,1 @@
+{"eval/aime": -0.48614583333333333, "eval/aime/response_len/mean": 8513.864583333334, "eval/aime/truncated_ratio": 0.125, "rollout/response_len/mean": 6132.125, "rollout/truncated_ratio": 0.03515625, "_runtime": null}

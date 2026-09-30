@@ -22,7 +22,7 @@ agent during evaluation.
 This is a correct task: the staged workspace is a faithful reproduction of the
 canonical ReTool recipe (SFT → RL with a Python code-interpreter tool) on top of
 an unmodified upstream `slime` snapshot. No defect has been injected. Frozen
-historical evidence through train step 100 shows modest held-out gain, not a
+historical evidence through train step 69 shows modest held-out gain, not a
 collapse.
 
 ## Workspace and hidden evaluations
@@ -45,18 +45,18 @@ evidence_kind: historical_run
 packaging_ready: true
 verify:
   num_gpus: 8
-  max_train_steps: 100
+  max_train_steps: 70
   eval_interval: 10
-  last_eval_step: 99
+  last_eval_step: 69
   eval_metric_key: eval/aime
 historical_run:
   metric_status: wandb_extracted
-  wandb_run_id: pc70p4t4
+  wandb_run_id: coo8r67n
   wandb_group: qwen3-4B-retool-multi-turn
-  eval_first: -0.59125
-  eval_last: -0.4965625
-  held_out_accuracy_last: 0.25171875
-  n_eval_points: 11
+  eval_first: -0.5808333333333333
+  eval_last: -0.48614583333333333
+  held_out_accuracy_last: 0.25692708333333335
+  n_eval_points: 8
   attempt: 1
 ```
 
@@ -64,15 +64,16 @@ The workspace preserves the SFT and RL launch scripts, the custom multi-turn
 tool-calling rollout, the sandboxed Python code interpreter, the math_dapo
 exact-match reward, a compact frozen metrics package under
 `workspace/outputs/`, and a slimmed offline W&B run (console `output.log`
-through train step 100, config, summary; no `.wandb` binary history).
+through train step 69, config, summary; no `.wandb` binary history).
 
 ## Original run evidence
 
-- eleven AIME-2024 eval points from step 0 to step 99
-- `eval/aime` moves from about −0.591 (20.4% acc) to −0.497 (25.2% acc)
-- eval response length grows from about 4.2k to 10.1k; eval truncation rises
-  from about 1% to 22%
-- train response length at step 100 is about 6394 tokens with a 5.1% truncate
+- eight AIME-2024 eval points from step 0 to step 69
+- `eval/aime` moves from about −0.581 (21.0% acc) to −0.486 (25.7% acc),
+  peaking at −0.425 (28.8% acc) at step 59
+- eval response length grows from about 4.0k to 8.5k; eval truncation rises
+  from about 1% to 13%
+- train response length at step 69 is about 6132 tokens with a 3.5% truncate
   ratio
 
 The preserved source metric is `eval/aime`. The frozen workspace is the
@@ -141,8 +142,10 @@ training, exactly as in the bug-injected tasks.
 experiment for real, and the verifier reconstructs `eval/aime` from the logs
 under `$PTDBENCH_RESULTS/experiment_logs`. Nothing about the protocol tells
 the agent whether this run is healthy — that is the point. The bar is
-`-0.55` on the best eval point, calibrated so an untrained step 0 (`-0.5913`)
-fails and every trained point in the historical trace passes; see
+`-0.55` on the best eval point (`score_mode: best`), calibrated so an untrained
+step 0 (`-0.5808`) fails while the run's peak (step 59, `-0.4246`) clears it by
+0.125; because best takes the run's high-water mark, early trained points still
+below the bar (step 9, `-0.5706`) do not fail a run that later learns. See
 `evaluations/solution/verifier/README.md`.
 
 **Scheduling note for maintainers.** This task has no injected defect, so its

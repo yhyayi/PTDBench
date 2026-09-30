@@ -8,18 +8,18 @@ algo: grpo
 recipe: examples/retool
 expected_verdict: healthy
 evidence_kind: historical_run
-historical_cutoff_train_step: 100
-last_eval_step: 99
+historical_cutoff_train_step: 69
+last_eval_step: 69
 eval_interval: 10
 eval_metric_key: eval/aime
-eval_first: -0.59125
-eval_last: -0.4965625
-held_out_accuracy_last: 0.25171875
+eval_first: -0.5808333333333333
+eval_last: -0.48614583333333333
+held_out_accuracy_last: 0.25692708333333335
 note: >-
   Correct task. The workspace is a pristine upstream slime snapshot plus the
   in-tree examples/retool recipe (multi-turn code-interpreter tool-use GRPO,
   adapted from verl's recipe/retool). No defect is injected. Frozen historical
-  evidence covers train step 100 / last eval step 99 (eval_interval 10).
+  evidence covers train step 69 / last eval step 69 (eval_interval 10).
   Expected root_cause and fix are empty.
 key_files:
 - examples/retool/retool_qwen3_4b_rl.sh

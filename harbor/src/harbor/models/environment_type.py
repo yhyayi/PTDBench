@@ -9,6 +9,7 @@ class EnvironmentType(str, Enum):
     RUNLOOP = "runloop"
     LANGSMITH = "langsmith"
     EC2 = "ec2"
+    CYBERTRON = "cybertron"
     GKE = "gke"
     ACK = "ack"
     OPENSHIFT = "openshift"

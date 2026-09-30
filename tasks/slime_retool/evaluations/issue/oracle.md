@@ -13,13 +13,14 @@ root-cause list is empty.
 
 - Primary source evaluation metric: `eval/aime` (mean of `reward_func` scores
   on AIME 2024). Accuracy is `(score + 1) / 2`.
-- Historical cutoff is train step 100. Eval interval is 10; the last held-out
-  point in the frozen snapshot is step 99.
-- Held-out `eval/aime` moves from about −0.591 (20.4% acc) at step 0 to
-  −0.497 (25.2% acc) at step 99. That is a modest, non-collapsing gain.
-- Eval response length grows from about 4.2k to 10.1k tokens; eval truncation
-  rises from about 1% to 22%. Train response length at step 100 is about 6.4k
-  with a 5.1% truncate ratio. Length growth is present but remains bounded.
+- Historical cutoff is train step 69. Eval interval is 10; the last held-out
+  point in the frozen snapshot is step 69.
+- Held-out `eval/aime` moves from about −0.581 (21.0% acc) at step 0 to
+  −0.486 (25.7% acc) at step 69, peaking at −0.425 (28.8% acc) at step 59.
+  That is a modest, non-collapsing gain.
+- Eval response length grows from about 4.0k to 8.5k tokens; eval truncation
+  rises from about 1% to 13%. Train response length at step 69 is about 6.1k
+  with a 3.5% truncate ratio. Length growth is present but remains bounded.
 - Frozen evidence is in `outputs/metrics.json` and
   `outputs/historical_eval_trace.log`.
 
@@ -38,4 +39,4 @@ root-cause list is empty.
   logging, and `/root/…` asset paths are expected recipe properties, not
   defects.
 - A truncated historical log is not by itself proof of a defect. The frozen
-  step-100 snapshot is the scored evidence window.
+  step-69 snapshot is the scored evidence window.

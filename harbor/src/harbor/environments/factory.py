@@ -61,6 +61,11 @@ _ENVIRONMENT_REGISTRY: dict[EnvironmentType, _EnvEntry] = {
         "EC2Environment",
         "ec2",
     ),
+    EnvironmentType.CYBERTRON: _EnvEntry(
+        "harbor.environments.cybertron",
+        "CybertronEnvironment",
+        None,
+    ),
     EnvironmentType.OPENSHIFT: _EnvEntry(
         "harbor.environments.openshift",
         "OpenshiftEnvironment",

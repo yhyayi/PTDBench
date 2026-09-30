@@ -211,7 +211,7 @@ _wandb:
                 program: /user/chenyinghao/workspace/data_call/tasks/slime_retool/workspace/train.py
                 python: CPython 3.12.3
                 root: /user/chenyinghao/workspace/data_call/tasks/slime_retool/workspace
-                startedAt: "2026-08-20T03:56:18.429230Z"
+                startedAt: "2026-09-29T23:51:49.021000Z"
                 writerId: 8exsppoysfunvq36e7jdzef4lqnfii3c
         m:
             - "1": rollout/step

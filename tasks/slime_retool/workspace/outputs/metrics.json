@@ -1,18 +1,18 @@
 {
   "task_id": "slime_retool",
-  "created_at": "2026-08-20T19:20:13+00:00",
-  "scoring_note": "Historical AIME-2024 evaluation metrics frozen from the original run through train step 100 (last eval at step 99; eval_interval=10).",
+  "created_at": "2026-09-30T06:17:00+00:00",
+  "scoring_note": "Historical AIME-2024 evaluation metrics frozen from the original run through train step 69 (last eval at step 69; eval_interval=10).",
   "run_once": {
     "executed": true,
     "ok": true,
     "returncode": 0,
-    "note": "Original Cybertron job continued past the historical cutoff and was later killed. This snapshot freezes train step 100 / eval step 99.",
+    "note": "Original Cybertron job trained under the sandbox with no CUDA/OOM/EXDEV errors; the devspace node was reclaimed mid step-70 rollout (not a training crash). This snapshot freezes train step 69 / eval step 69.",
     "receipt_path": "outputs/metrics.json"
   },
   "logs": {
     "run_log_dirs": [],
     "source_logs": [
-      "wandb/run-20260820_102600-pc70p4t4/files/output.log",
+      "wandb/offline-run-20260929_235149-coo8r67n/files/output.log",
       "outputs/historical_eval_trace.log"
     ]
   },
@@ -20,195 +20,147 @@
     "eval_interval": 10,
     "metric_key": "eval/aime",
     "metric_status": "wandb_extracted",
-    "historical_cutoff_train_step": 100,
-    "last_eval_step": 99,
+    "historical_cutoff_train_step": 69,
+    "last_eval_step": 69,
     "eval_points": [
       {
         "step": 0,
-        "eval_score": -0.59125,
+        "eval_score": -0.5808333333333333,
         "eval_key": "eval/aime",
-        "response_len_mean": 4167.772916666667,
-        "truncate_ratio": 0.010416666666666666
+        "response_len_mean": 4042.0583333333334,
+        "truncate_ratio": 0.008333333333333333
       },
       {
         "step": 9,
-        "eval_score": -0.5203125,
+        "eval_score": -0.5706249999999999,
         "eval_key": "eval/aime",
-        "response_len_mean": 3944.93125,
-        "truncate_ratio": 0.010416666666666666
-      },
-      {
-        "step": 19,
-        "eval_score": -0.5375,
-        "eval_key": "eval/aime",
-        "response_len_mean": 4079.4958333333334,
+        "response_len_mean": 4071.6979166666665,
         "truncate_ratio": 0.00625
       },
       {
-        "step": 29,
-        "eval_score": -0.4747916666666666,
+        "step": 19,
+        "eval_score": -0.5078124999999999,
         "eval_key": "eval/aime",
-        "response_len_mean": 4956.88125,
-        "truncate_ratio": 0.016666666666666666
+        "response_len_mean": 4598.783333333334,
+        "truncate_ratio": 0.008333333333333333
+      },
+      {
+        "step": 29,
+        "eval_score": -0.5035416666666667,
+        "eval_key": "eval/aime",
+        "response_len_mean": 5290.889583333334,
+        "truncate_ratio": 0.008333333333333333
       },
       {
         "step": 39,
-        "eval_score": -0.4970833333333333,
+        "eval_score": -0.5064583333333333,
         "eval_key": "eval/aime",
-        "response_len_mean": 5911.227083333333,
+        "response_len_mean": 5935.066666666667,
         "truncate_ratio": 0.01875
       },
       {
         "step": 49,
-        "eval_score": -0.5113541666666667,
+        "eval_score": -0.43729166666666663,
         "eval_key": "eval/aime",
-        "response_len_mean": 6809.020833333333,
-        "truncate_ratio": 0.04791666666666667
+        "response_len_mean": 6965.9875,
+        "truncate_ratio": 0.05625
       },
       {
         "step": 59,
-        "eval_score": -0.45062499999999994,
+        "eval_score": -0.4245833333333333,
         "eval_key": "eval/aime",
-        "response_len_mean": 7763.5625,
-        "truncate_ratio": 0.08125
+        "response_len_mean": 7792.322916666667,
+        "truncate_ratio": 0.07916666666666666
       },
       {
         "step": 69,
-        "eval_score": -0.4748958333333333,
+        "eval_score": -0.48614583333333333,
         "eval_key": "eval/aime",
-        "response_len_mean": 8376.89375,
-        "truncate_ratio": 0.09791666666666667
-      },
-      {
-        "step": 79,
-        "eval_score": -0.5113541666666667,
-        "eval_key": "eval/aime",
-        "response_len_mean": 8779.941666666668,
-        "truncate_ratio": 0.11875
-      },
-      {
-        "step": 89,
-        "eval_score": -0.44635416666666666,
-        "eval_key": "eval/aime",
-        "response_len_mean": 9309.516666666666,
-        "truncate_ratio": 0.14791666666666667
-      },
-      {
-        "step": 99,
-        "eval_score": -0.49656249999999996,
-        "eval_key": "eval/aime",
-        "response_len_mean": 10066.55625,
-        "truncate_ratio": 0.21875
+        "response_len_mean": 8513.864583333334,
+        "truncate_ratio": 0.125
       }
     ],
     "eval_scores": [
       {
         "step": 0,
-        "score": -0.59125
+        "score": -0.5808333333333333
       },
       {
         "step": 9,
-        "score": -0.5203125
+        "score": -0.5706249999999999
       },
       {
         "step": 19,
-        "score": -0.5375
+        "score": -0.5078124999999999
       },
       {
         "step": 29,
-        "score": -0.4747916666666666
+        "score": -0.5035416666666667
       },
       {
         "step": 39,
-        "score": -0.4970833333333333
+        "score": -0.5064583333333333
       },
       {
         "step": 49,
-        "score": -0.5113541666666667
+        "score": -0.43729166666666663
       },
       {
         "step": 59,
-        "score": -0.45062499999999994
+        "score": -0.4245833333333333
       },
       {
         "step": 69,
-        "score": -0.4748958333333333
-      },
-      {
-        "step": 79,
-        "score": -0.5113541666666667
-      },
-      {
-        "step": 89,
-        "score": -0.44635416666666666
-      },
-      {
-        "step": 99,
-        "score": -0.49656249999999996
+        "score": -0.48614583333333333
       }
     ],
     "train_points": [
       {
         "step": 0,
-        "response_len_mean": 1959.09765625,
-        "truncate_ratio": 0.0
-      },
-      {
-        "step": 10,
-        "response_len_mean": 2945.0390625,
-        "truncate_ratio": 0.01171875
-      },
-      {
-        "step": 20,
-        "response_len_mean": 2701.01953125,
+        "response_len_mean": 2449.25390625,
         "truncate_ratio": 0.00390625
       },
       {
-        "step": 30,
-        "response_len_mean": 2900.6484375,
+        "step": 10,
+        "response_len_mean": 2607.83984375,
+        "truncate_ratio": 0.00390625
+      },
+      {
+        "step": 20,
+        "response_len_mean": 2664.8671875,
         "truncate_ratio": 0.0
+      },
+      {
+        "step": 30,
+        "response_len_mean": 3413.95703125,
+        "truncate_ratio": 0.0078125
       },
       {
         "step": 40,
-        "response_len_mean": 3312.8125,
-        "truncate_ratio": 0.0
+        "response_len_mean": 4051.26171875,
+        "truncate_ratio": 0.015625
       },
       {
         "step": 50,
-        "response_len_mean": 4231.16796875,
-        "truncate_ratio": 0.015625
+        "response_len_mean": 4279.91796875,
+        "truncate_ratio": 0.0078125
       },
       {
         "step": 60,
-        "response_len_mean": 4421.3671875,
-        "truncate_ratio": 0.01953125
+        "response_len_mean": 4842.3046875,
+        "truncate_ratio": 0.0234375
       },
       {
-        "step": 70,
-        "response_len_mean": 5233.94921875,
-        "truncate_ratio": 0.0390625
-      },
-      {
-        "step": 80,
-        "response_len_mean": 5833.6484375,
-        "truncate_ratio": 0.015625
-      },
-      {
-        "step": 90,
-        "response_len_mean": 5850.10546875,
+        "step": 69,
+        "response_len_mean": 6132.125,
         "truncate_ratio": 0.03515625
-      },
-      {
-        "step": 100,
-        "response_len_mean": 6393.53125,
-        "truncate_ratio": 0.05078125
       }
     ]
   },
   "first_rollout_ok": true,
   "attempt": 1,
   "wandb_run": {
-    "id": "pc70p4t4",
+    "id": "coo8r67n",
     "group": "qwen3-4B-retool-multi-turn"
   }
 }

@@ -2,7 +2,7 @@ title: Slime ReTool GRPO run assessment
 submitter:
   name: chenyinghao
 license: Apache-2.0
-created_date: '2026-08-19'
+created_date: '2026-09-30'
 domain: math_tool_use
 model:
   name: Qwen3-4B
@@ -21,4 +21,4 @@ environment:
     NVIDIA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
 outcome:
   failure_type: run_health_unknown
-  failure_reason: The staged ReTool recipe requires independent evidence-based assessment; the ground-truth verdict is healthy because the multi-turn code-interpreter rollout, observation masking, token/log-prob alignment, math_dapo exact-match reward, and GRPO configuration follow the canonical ReTool reproduction with no injected defect, and frozen eval/aime at step 99 is about 25.2% accuracy
+  failure_reason: The staged ReTool recipe requires independent evidence-based assessment; the ground-truth verdict is healthy because the multi-turn code-interpreter rollout, observation masking, token/log-prob alignment, math_dapo exact-match reward, and GRPO configuration follow the canonical ReTool reproduction with no injected defect, and frozen eval/aime at step 69 is about 25.7% accuracy

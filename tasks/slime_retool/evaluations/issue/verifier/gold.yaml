@@ -11,6 +11,6 @@ evidence_metrics:
 - reward is math_dapo exact-match with strict_box_verify on Answer:\boxed{...} plus a bounded tool-call shaping term (generate_with_retool.reward_func); length does not add reward
 - standard GRPO config: adv_estimator=grpo, use_kl_loss kl_loss_coef=0.00 low_var_kl, eps_clip 0.2/0.28, entropy_coef 0.00, Adam lr=1e-6 constant
 - recipe wired only via --custom-generate-function-path and --custom-rm-path on an unmodified upstream slime snapshot
-- historical eval/aime at step 99 is -0.4966 (about 25.2% acc), up from -0.591 (20.4%) at step 0; train response_len at step 100 is about 6394 with 5.1% truncate
+- historical eval/aime at step 69 is -0.4861 (about 25.7% acc), up from -0.581 (21.0%) at step 0 and peaking at -0.4246 (28.8%) at step 59; train response_len at step 69 is about 6132 with 3.5% truncate
 fix:
   must: []

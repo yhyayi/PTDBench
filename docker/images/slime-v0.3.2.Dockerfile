@@ -1,14 +1,14 @@
 # PTDBench environment `slime-v0.3.2`.
-# ptdbench-image: ptdbench/slime:v0.3.2-sglang0.5.15-cu130
+# ptdbench-image: ptdbench/slime:v0.3.2-sglang0.5.15-cu129
 #
-# slime v0.3.2 stack: sglang 0.5.15.post1, CUDA 13.0, Ubuntu 24.04.
+# slime v0.3.2 stack: sglang 0.5.15.post1, CUDA 12.9, Ubuntu 24.04.
 # Tasks: slime_retool, slime_retool_length_hack, slime_search_r1,
 # slime_search_r1_nomask.
 #
 # The upstream image is used as-is; the only thing added is the PTDBench
 # tooling block below. The FROM is pinned by digest because the tag moves
 # upstream and the tasks' recorded outcomes must not move with it.
-FROM slimerl/slime:v0.3.2-cu130@sha256:2467cba4ad307c02b97afd5b22e297b510898d30f430c1ba827acd36ed2102ae
+FROM slimerl/slime:v0.3.2-cu129@sha256:39be6cbb00f9b6770e664ace0c7b9f5ecff2977a1a205e7926a720f906fbc62c
 
 # ---- PTDBench tooling: keep identical in every docker/images/*.Dockerfile ----
 # Build context is docker/ (see docker/.dockerignore for what it may COPY).

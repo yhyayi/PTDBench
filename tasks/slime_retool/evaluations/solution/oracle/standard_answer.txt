@@ -4,15 +4,15 @@ BENCHMARK_GROUP: B-slime-implementation
 EXPECTED_VERDICT: healthy
 EXPECTED_ATTRIBUTION: none; the ReTool recipe on the unmodified upstream slime snapshot has no injected defect.
 EVIDENCE_KIND: historical_run
-HISTORICAL_CUTOFF: train step 100; last eval step 99
+HISTORICAL_CUTOFF: train step 69; last eval step 69
 PRIMARY_METRIC: eval/aime
-EVAL_LAST: -0.4965625 (about 25.2% accuracy)
+EVAL_LAST: -0.48614583333333333 (about 25.7% accuracy)
 
 REQUIRED_ALL:
 - Classify the run as healthy.
 - Report an empty root_cause (no invented defect) and an empty fix.
-- Use the frozen step-100 historical evidence together with the recipe code;
-  do not treat moderate length growth or a 22% eval truncate ratio as a defect.
+- Use the frozen step-69 historical evidence together with the recipe code;
+  do not treat moderate length growth or a 13% eval truncate ratio as a defect.
 
 GLOBAL_JUDGE_POLICY:
 - The score must be exactly 0 or 1.

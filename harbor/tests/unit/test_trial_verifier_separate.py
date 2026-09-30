@@ -125,6 +125,7 @@ def _stock_mock_env() -> AsyncMock:
 
     env.with_default_user = with_default_user
     env.scoped_exec_env = MagicMock(side_effect=lambda _env: contextlib.nullcontext())
+    env.sandbox_scope = MagicMock(side_effect=lambda: contextlib.nullcontext())
     return env
 
 

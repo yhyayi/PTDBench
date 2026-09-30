@@ -206,6 +206,9 @@ class BaseEnvironment(ABC):
         self._exec_env_overlays: contextvars.ContextVar[ExecEnvOverlays] = (
             contextvars.ContextVar("exec_env_overlays", default=())
         )
+        self._sandbox_scope_depth: contextvars.ContextVar[int] = contextvars.ContextVar(
+            "sandbox_scope_depth", default=0
+        )
 
         self.logger = (logger or global_logger).getChild(__name__)
 
@@ -482,6 +485,27 @@ class BaseEnvironment(ABC):
             yield
         finally:
             self._output_callbacks.reset(token)
+
+    @contextlib.contextmanager
+    def sandbox_scope(self) -> Generator[None, None, None]:
+        """Mark ``exec`` calls in this block as untrusted (agent/verifier).
+
+        Environments that support in-VM file isolation (e.g. Cybertron's
+        Landlock launcher) confine every ``exec`` issued while this scope is
+        active, while leaving setup/install commands outside it unconfined.
+        The default implementation is a no-op, so backends without isolation
+        simply ignore it. Like :meth:`scoped_exec_env`, the depth is held in a
+        per-instance ``contextvars.ContextVar`` so it survives ``await``
+        boundaries and stays isolated per asyncio task. Scopes nest.
+        """
+        token = self._sandbox_scope_depth.set(self._sandbox_scope_depth.get() + 1)
+        try:
+            yield
+        finally:
+            self._sandbox_scope_depth.reset(token)
+
+    def _in_sandbox_scope(self) -> bool:
+        return self._sandbox_scope_depth.get() > 0
 
     def _output_callback(self) -> OutputCallback | None:
         callbacks = self._output_callbacks.get()

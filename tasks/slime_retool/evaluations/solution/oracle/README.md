@@ -16,8 +16,8 @@ None. The expected `fix` array is empty. A healthy run requires no change.
 
 ## Historical evidence
 
-Evidence kind: `historical_run`. The frozen window is train step 100; the last
-held-out eval is step 99 (`eval_interval=10`). Machine-readable copies:
+Evidence kind: `historical_run`. The frozen window is train step 69; the last
+held-out eval is step 69 (`eval_interval=10`). Machine-readable copies:
 
 - `oracle/historical_evidence_manifest.json`
 - `oracle/dirty_reference/historical_metrics.json`
@@ -25,9 +25,10 @@ held-out eval is step 99 (`eval_interval=10`). Machine-readable copies:
   `workspace/outputs/historical_eval_trace.log`, and the slimmed W&B
   `workspace/wandb/*/files/output.log`
 
-Primary metric `eval/aime` at step 99 is `-0.4965625` (about 25.2% accuracy),
-up from `-0.59125` (20.4%) at step 0. Train response length at step 100 is
-about 6394 tokens with a 5.1% truncate ratio.
+Primary metric `eval/aime` at step 69 is `-0.48614583333333333` (about 25.7%
+accuracy), up from `-0.5808333333333333` (21.0%) at step 0 and peaking at
+`-0.4245833333333333` (28.8%) at step 59. Train response length at step 69 is
+about 6132 tokens with a 3.5% truncate ratio.
 
 ## Why it is healthy
 
@@ -65,7 +66,7 @@ about 6394 tokens with a 5.1% truncate ratio.
 - The optional SFT warm-up stage (`retool_qwen3_4b_sft.sh`) — skipping it and
   starting RL from the released SFT checkpoint is supported.
 - Runtime asset paths under `/root/…` fulfilled on the training host.
-- Moderate length growth and a 22% eval truncate ratio at step 99. These are
+- Moderate length growth and a 13% eval truncate ratio at step 69. These are
   not a collapse and are not caused by a length bonus.
 
 Machine grading at the solution level is deterministic and metric-only: the

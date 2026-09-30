@@ -477,14 +477,18 @@ class Trial(ABC):
                                 run = self.agent.resume
                             else:
                                 run = self.agent.run
-                            await asyncio.wait_for(
-                                run(
-                                    instruction=instruction,
-                                    environment=self.agent_environment,
-                                    context=target.agent_result,
-                                ),
-                                timeout=timeout_sec,
-                            )
+                            # Confine agent execution to the trial workspace on
+                            # environments that support in-VM isolation (no-op
+                            # elsewhere); setup/install ran outside this scope.
+                            with self.agent_environment.sandbox_scope():
+                                await asyncio.wait_for(
+                                    run(
+                                        instruction=instruction,
+                                        environment=self.agent_environment,
+                                        context=target.agent_result,
+                                    ),
+                                    timeout=timeout_sec,
+                                )
         except asyncio.TimeoutError as exc:
             raise AgentTimeoutError(
                 f"Agent execution timed out after {timeout_sec} seconds"
@@ -562,9 +566,10 @@ class Trial(ABC):
                 with self._log_context(
                     "verification", self.agent_environment, step_name
                 ):
-                    return await asyncio.wait_for(
-                        verifier.verify(), timeout=timeout_sec
-                    )
+                    with self.agent_environment.sandbox_scope():
+                        return await asyncio.wait_for(
+                            verifier.verify(), timeout=timeout_sec
+                        )
 
     async def _run_separate_verifier(
         self,
@@ -632,9 +637,10 @@ class Trial(ABC):
                     phase_policy=plan.verifier_phase,
                 ):
                     with self._log_context("verification", target_env, step_name):
-                        return await asyncio.wait_for(
-                            verifier.verify(), timeout=timeout_sec
-                        )
+                        with target_env.sandbox_scope():
+                            return await asyncio.wait_for(
+                                verifier.verify(), timeout=timeout_sec
+                            )
 
     @contextlib.asynccontextmanager
     async def _separate_verifier_env(
