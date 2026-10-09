@@ -73,6 +73,12 @@ class SandboxRequest:
     # harbor 路径下这两个目录根本不在镜像里。
     host_models: Optional[Path] = None
     host_datasets: Optional[Path] = None
+    # prepare 阶段用：仓库 docker/ 目录，只读挂进去。里面有 install-ptdbench-tooling.sh
+    # 和它要装的 ptdbench_fetch.py / ptdbench_dataset.py / ptdbench_datasets。prepare
+    # 跑 prepare.sh 前先跑这个安装脚本，让 fetch/dataset 工具是仓库当前的版本，而不是
+    # 构建镜像时烤进去的那份（那份一旦有 bug，光 git push 到不了跑着的作业）。只有 prepare
+    # 用得上，agent / verifier 不挂。
+    host_tooling: Optional[Path] = None
     workdir: str = "workspace"
     env: Mapping[str, str] = field(default_factory=dict)
     network: str = "bridge"

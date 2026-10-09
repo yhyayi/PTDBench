@@ -176,7 +176,6 @@ def run_test(sample, test=None):
     _install_sigalrm()
 
     sys.stdout = StringIO()
-    sys.stderr = StringIO()
 
     try:
         in_outs = json.loads(sample['input_output'])

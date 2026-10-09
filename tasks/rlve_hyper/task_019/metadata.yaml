@@ -23,4 +23,4 @@ environment:
     NVIDIA_VISIBLE_DEVICES: "0,1,2,3"
 outcome:
   failure_type: training_collapse
-  failure_reason: '--lr-warmup-iters=2000 and --lr-decay-iters=10000 keep the schedule from reaching the 2e-6 baseline (lr ends at 1e-7), so eval improvement stays below healthy p10'
+  failure_reason: '--lr-warmup-iters=2000 keeps the schedule inside the warmup ramp over the 100-step budget so lr ends at 1e-7 instead of the 2e-6 baseline, and eval improvement stays below healthy p10; --lr-decay-iters=10000 is an inert decoy under --lr-decay-style constant'

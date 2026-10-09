@@ -49,6 +49,29 @@ export WANDB_MODE=${WANDB_MODE:-offline}
 # only covers the driver/train side and is kept as defense-in-depth.
 export SGLANG_ENABLE_TP_MEMORY_INBALANCE_CHECK=0
 
+# On the cybertron devspaces an egress whitelist proxy is exported into every
+# shell (http_proxy/https_proxy -> whitelist-proxy:7891) with a no_proxy that
+# does NOT cover localhost or this node. ray's "ray job submit" then routes its
+# request to the local dashboard (127.0.0.1:8265) through that proxy and gets a
+# 502 Bad Gateway, and the same happens for sglang's node-local HTTP. Prepend
+# the loopback addresses, this node's IP and its /16 to no_proxy so all
+# in-cluster / on-node traffic bypasses the proxy. Harmless off-cluster (the
+# vars are simply absent). hostname -I is the reliable source for the node IP;
+# `ip` is not always on PATH in these non-login shells, so it is only a fallback.
+NODE_IP=$(hostname -I 2>/dev/null | awk '{print $1}') || true
+if [ -z "${NODE_IP:-}" ]; then
+   NODE_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}') || true
+fi
+case "${NODE_IP:-}" in
+   *.*.*.*)
+      PREFIX16=$(echo "$NODE_IP" | awk -F. '{print $1"."$2".0.0/16"}')
+      export no_proxy="127.0.0.1,localhost,0.0.0.0,${NODE_IP},${PREFIX16}${no_proxy:+,$no_proxy}"
+      export NO_PROXY="$no_proxy" ;;
+   *)
+      export no_proxy="127.0.0.1,localhost,0.0.0.0${no_proxy:+,$no_proxy}"
+      export NO_PROXY="$no_proxy" ;;
+esac
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 # slime repo root (this recipe lives at <slime>/examples/search-r1)
 SLIME_DIR="$(cd -- "${SCRIPT_DIR}/../.." &>/dev/null && pwd)"
@@ -268,7 +291,10 @@ WANDB_ARGS=(
    --use-wandb
    --wandb-project slime-search-r1
    --wandb-group search-r1_qwen2.5-3B-nomask
-   --wandb-key ${WANDB_API_KEY}
+   # wandb runs offline here, so no real key is ever used; --wandb-key still
+   # needs *an* argument or argparse aborts with "expected one argument" when
+   # WANDB_API_KEY is unset. The literal EMPTY is the placeholder slime accepts.
+   --wandb-key "${WANDB_API_KEY:-EMPTY}"
 )
 
 SGLANG_ARGS=(

@@ -15,6 +15,7 @@ from ...core.types import (
     MODELS_DIR,
     PREPARED_DIR,
     PTDBENCH_ENVIRONMENT_DIR,
+    TOOLING_DIR,
     CommandResult,
     EnvironmentImage,
 )
@@ -427,6 +428,12 @@ class DockerRuntime(SandboxRuntime):
                 DockerMount(request.host_visible_task, "/task", read_only=True),
                 DockerMount(request.host_prepared, PREPARED_DIR),
             ]
+            # 仓库 docker/ 只读挂进来：prepare 跑脚本前先用它装最新的 fetch/dataset 工具
+            # （见 TOOLING_DIR / install-ptdbench-tooling.sh）。只有 prepare 需要。
+            if request.host_tooling is not None:
+                mounts.append(
+                    DockerMount(request.host_tooling, TOOLING_DIR, read_only=True)
+                )
         elif request.stage == "agent":
             mounts = [
                 DockerMount(request.host_workspace, "/workspace"),

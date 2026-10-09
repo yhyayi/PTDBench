@@ -92,12 +92,13 @@ python harbor/scripts/cybertron_preheat.py "${COMMON[@]}" \
   `config.json` 读不出（`Unrecognized model … model_type`）、`tokenizer.json` 读不出
   （`Couldn't instantiate the backend tokenizer`）、taco 的 `tar: No such file`。修复：`materialize()` 在硬链
   前先 `os.path.realpath` 解到真实 blob（跨设备回退到真字节拷贝，`open()` 必跟随软链，不会悬空）。
-- **运行时覆盖镜像内的 ptdbench_fetch.py（关键）**：`prepare.sh` 调的 `ptdbench_fetch_hf` 是镜像里 COPY 进
-  `/usr/local/libexec/ptdbench_fetch.py` 的**烘焙副本**，不是 clone 的 `docker/ptdbench_fetch.py`——所以上面那条
-  materialize 修复**光 git push 到不了跑着的作业**，镜像里那份还是旧的。`build_entry()` 在 `cd` 进仓库后、跑
-  prepare 循环前，先 `cp docker/ptdbench_fetch.py /usr/local/libexec/ptdbench_fetch.py`（两个路径都在才执行，
-  否则空操作），让循环里真正 exec 的是修过的那份。要让已提交的作业生效，重跑 `warm_cache.sh` 即可（代码在
-  `cyh` 分支，作业会重新 clone）。
+- **运行时从 clone 安装 fetch/dataset 工具（关键）**：`prepare.sh` 调的 `ptdbench_fetch_hf` /
+  `ptdbench_fetch_url` / `ptdbench_dataset` 是 shim，exec 的是 `/usr/local/libexec/*.py`。这些**不再**烤进镜像
+  （Dockerfile 只保留 `ptdbench-activate.sh` 钩子和 `/etc/ptdbench-image-path`），所以像上面 materialize 这类
+  修复**光 git push 就能生效，无需重建镜像**。`build_entry()` 在 `cd` 进仓库后、跑 prepare 循环前先跑
+  `bash docker/install-ptdbench-tooling.sh`（装 clone 当前的 `ptdbench_fetch.py` / `ptdbench_dataset.py` /
+  `ptdbench_datasets` 到 `/usr/local`，幂等；文件不在则空操作），让循环里真正 exec 的是仓库最新那份。要让
+  已提交的作业生效，重跑 `warm_cache.sh` 即可（代码在 `cyh` 分支，作业会重新 clone）。
 - **单任务失败不阻断整批，但作业如实失败**：预热的交付物是下载缓存（`ptdbench_fetch_hf` 在任何后处理之前
   就写好了）。某个 `prepare.sh` 失败时，脚本记一笔、打到 stderr 并**继续**预热后面的任务；但整批跑完若有任何
   失败，作业**以非零码退出**（状态 Failed、日志会归档），而不是误导性的 Succeeded。日志末尾列出
@@ -114,13 +115,17 @@ python harbor/scripts/cybertron_preheat.py "${COMMON[@]}" \
 
 ### 1b. 本地 docker（单机自测）
 
-本地路径下 `prepare.sh` 由 `harbor-evaluate` / `harbor-shell` 自动触发；
+本地路径下 `prepare.sh` 由 `harbor-evaluate` / `harbor-shell` / `harbor-stage` 自动触发；
 也可以显式指定缓存目录（默认 `<repo>/models`、`<repo>/datasets`）：
 
 ```bash
 export PTDBENCH_MODELS_DIR=/abs/models
 export PTDBENCH_DATASETS_DIR=/abs/datasets
 ```
+
+> prepare 容器会把仓库 `docker/` 只读挂到 `/ptdbench/tooling`，跑 `prepare.sh` 前先执行
+> `install-ptdbench-tooling.sh`——和集群路径一样，用的始终是 clone 当前的 fetch/dataset 工具，
+> 改完无需 `build-images --rebuild`（`ptdbench-activate.sh` 仍烤在镜像里，改它才需要重建）。
 
 ---
 
@@ -139,42 +144,31 @@ python3 -m ptdbench harbor-shell tasks/slime_retool \
 ```
 
 进 shell 后直接手动跑该任务的训练脚本即可复现 / 调试环境。
+（`harbor-shell` 等价于 `harbor-stage --backend docker`，后者是跨后端的统一入口。）
 
 ### 2b. Cybertron devspace 版（真集群、多卡）
 
-**① 建 devspace**（与后端 `_create_devspace` 同参数，手动多要几张卡）：
+一条命令跑到 pre-agent 手动态（建/attach devspace → `install-ptdbench-tooling.sh` →
+上传任务 → 在 devspace 上跑 `prepare.sh`），然后**留着 devspace 不停**，打印 `tsh ssh` 入口：
 
 ```bash
-cctl devspace create \
-  --project xinfer-chenyinghao \
-  --cluster wuxi_train --resource-pool speech-wx --billing-account-id N00069 \
-  --image 25607131 \
-  --gpu 8 --gpu-model h100 --cpu 16 --memory 128 \
-  --description manual-slime-retool
-# 输出里的 name/id 即 devspace_id（形如 tasks/1098539）
+python3 -m ptdbench harbor-stage tasks/slime_retool --backend cybertron \
+  --gpus 8 --image 25607131 \
+  --environment-kwarg project=xinfer-chenyinghao \
+  --environment-kwarg cluster=wuxi_train \
+  --environment-kwarg resource_pool=speech-wx \
+  --environment-kwarg billing_account_id=N00069 \
+  --run                                   # 不加 --run 即 dry-run，只打印将做什么
+# attach 已有 devspace（不新建、不销毁）：--devspace-id tasks/1098539
+# 停掉自建的 devspace：--stop（attach 的永不停）
 ```
 
-**② SSH 进去**（tsh 传输，无需 `~/.ssh/config`）：
+命令打印出 `tsh ssh --cluster=… root@<node>` 后，ssh 进去 `cd /workspace` 即是 prepare 好的工作区，
+按任务 README / 启动脚本手动起训练、观察日志、复现 bug。用完 `cctl devspace stop <id>` 释放资源。
 
-```bash
-tsh ls --format json                 # 找到名字以 -<数字id> 结尾的节点
-tsh ssh --cluster=teleport.cybertron.modelbest.co root@<node>
-```
-
-**③ 在 devspace 内构建到 pre-agent 状态并手动跑**：
-
-```bash
-# 指到持久盘上的共享缓存（第 1 步已预热）
-export PTDBENCH_MODELS=/user/chenyinghao/ptdbench-cache/models
-export PTDBENCH_DATASETS=/user/chenyinghao/ptdbench-cache/datasets
-
-cd <repo>/tasks/slime_retool/environment && bash prepare.sh   # 若缓存已在，秒过
-# 然后按任务 README / 启动脚本手动起训练，观察日志、复现 bug
-```
-
-> 注：`harbor-shell` 是 docker-only 的；在 Cybertron 上「pre-agent 手动态」就是
-> 「建 devspace + ssh + 手跑 prepare/训练」这条链路。用完记得 `cctl devspace stop <id>`
-> 释放资源。
+> harbor-stage 复用后端 `CybertronEnvironment`，一条命令里自动完成建/attach devspace、
+> `install-ptdbench-tooling.sh`、上传任务、在 devspace 上跑 `prepare.sh`，无需再手动
+> `cctl devspace create` + `tsh ssh` + 导出缓存环境变量那条链路。
 
 ---
 

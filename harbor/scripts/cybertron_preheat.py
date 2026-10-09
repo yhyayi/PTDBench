@@ -32,6 +32,36 @@ import subprocess
 import sys
 
 
+def proxy_export(http_proxy: str | None) -> str:
+    """Shell `export http(s)_proxy=… no_proxy=…;` for the whitelist egress proxy.
+
+    Cybertron nodes only reach the HF mirror through this proxy, and a BATCH
+    ``--entry`` / non-interactive ssh does not inherit it from Teleport. Exported
+    first so even DNS/connect for the mirror goes through it. Empty when no proxy.
+    Shared with scripts/cybertron_stage.py so both paths set it identically.
+    """
+    if not http_proxy:
+        return ""
+    q = shlex.quote(http_proxy)
+    no_proxy = "localhost,127.0.0.1,.modelbest.co,.svc.cluster.local"
+    return (
+        f"export http_proxy={q} https_proxy={q} HTTP_PROXY={q} HTTPS_PROXY={q} "
+        f"no_proxy={no_proxy} NO_PROXY={no_proxy}; "
+    )
+
+
+def hf_export(hf_endpoint: str | None) -> str:
+    """Shell `export HF_ENDPOINT=… HF_HUB_DISABLE_XET=1;` for the HF mirror.
+
+    huggingface_hub reads HF_ENDPOINT at runtime; xet is disabled because the
+    mirror does not serve it (same as the tasks' workspace/.env). Empty when no
+    endpoint. Shared with scripts/cybertron_stage.py.
+    """
+    if not hf_endpoint:
+        return ""
+    return f"export HF_ENDPOINT={shlex.quote(hf_endpoint)} HF_HUB_DISABLE_XET=1; "
+
+
 def build_entry(
     *,
     cache_dir: str,
@@ -61,24 +91,10 @@ def build_entry(
     """
     models = f"{cache_dir}/models"
     datasets = f"{cache_dir}/datasets"
-    # Egress proxy for the on-node HF fetches (see docstring). Exported first so
-    # even DNS/connect for the mirror goes through it.
-    proxy_export = ""
-    if http_proxy:
-        q = shlex.quote(http_proxy)
-        no_proxy = "localhost,127.0.0.1,.modelbest.co,.svc.cluster.local"
-        proxy_export = (
-            f"export http_proxy={q} https_proxy={q} HTTP_PROXY={q} HTTPS_PROXY={q} "
-            f"no_proxy={no_proxy} NO_PROXY={no_proxy}; "
-        )
-    # Mirror env for the on-node HF fetches. huggingface_hub reads HF_ENDPOINT at
-    # runtime; xet is disabled because the mirror does not serve it (same as the
-    # tasks' workspace/.env). Exported before any prepare.sh runs.
-    hf_export = ""
-    if hf_endpoint:
-        hf_export = (
-            f"export HF_ENDPOINT={shlex.quote(hf_endpoint)} HF_HUB_DISABLE_XET=1; "
-        )
+    # Egress proxy + HF mirror for the on-node fetches (see proxy_export/hf_export).
+    # proxy first so even DNS/connect for the mirror goes through it.
+    proxy_exports = proxy_export(http_proxy)
+    hf_exports = hf_export(hf_endpoint)
     # Throwaway scratch base on the persistent /user fs (container ephemeral is
     # tiny). prepare.sh writes weights into $PTDBENCH_WORKSPACE and KEY=VALUE
     # lines into $PTDBENCH_PREPARED/env; neither is what preheat is here for (the
@@ -90,24 +106,23 @@ def build_entry(
     return (
         "set -euo pipefail; "
         f"export PTDBENCH_STAGE=prepare WANDB_MODE=offline WANDB_SILENT=true; "
-        f"{proxy_export}"
-        f"{hf_export}"
+        f"{proxy_exports}"
+        f"{hf_exports}"
         f"export PTDBENCH_MODELS={shlex.quote(models)} "
         f"PTDBENCH_DATASETS={shlex.quote(datasets)}; "
         f"mkdir -p {shlex.quote(models)} {shlex.quote(datasets)} "
         f"{shlex.quote(scratch)}; "
         f"cd {shlex.quote(root)}; "
-        # prepare.sh invokes ptdbench_fetch_hf, a shim that execs the IMAGE-BAKED
-        # /usr/local/libexec/ptdbench_fetch.py (COPYd in at build time), not this
-        # clone's docker/ptdbench_fetch.py. The materialize() symlink-dereference
-        # fix therefore does not reach a running job from a git push alone -- the
-        # baked copy is stale. Overwrite it from the clone so the fetch the loop
-        # runs below is the fixed one. Guarded: only when both paths exist, so a
-        # layout without the baked copy (or without the clone file) is a no-op.
-        f"if [ -f docker/ptdbench_fetch.py ] && "
-        f"[ -e /usr/local/libexec/ptdbench_fetch.py ]; then "
-        f"cp docker/ptdbench_fetch.py /usr/local/libexec/ptdbench_fetch.py && "
-        f'echo "[preheat] patched baked ptdbench_fetch.py (materialize symlink fix)"; fi; '
+        # prepare.sh invokes ptdbench_fetch_hf / ptdbench_dataset, shims that exec
+        # /usr/local/libexec/*.py. The Dockerfiles no longer bake those (only the
+        # activate hook) -- docker/install-ptdbench-tooling.sh installs the clone's
+        # CURRENT fetch/dataset tooling into /usr/local at prepare time, so a fix
+        # (e.g. materialize()'s symlink-dereference) reaches a running job without
+        # an image rebuild. Run it after the cd into the repo, before the loop.
+        # Guarded: a layout without the installer (older checkout) is a no-op.
+        f"if [ -f docker/install-ptdbench-tooling.sh ]; then "
+        f"bash docker/install-ptdbench-tooling.sh && "
+        f'echo "[preheat] installed latest ptdbench tooling from clone"; fi; '
         f"found=0; failed=''; "
         f"for p in {prepare_glob}; do "
         f'  [ -f "$p" ] || continue; '

@@ -61,7 +61,7 @@ locked_heldout_environment_list:
 - Expression_AddingParenthese_Counting
 - Clique_IndependentSet_Partitioning_Counting
 oracle:
-  primary_cause: 'Suspected unhealthy hyperparameters: lr_warmup_iters, lr_decay_iters. Auto-draft only; human must verify.'
+  primary_cause: 'Causal flag: lr_warmup_iters=2000 (lr stays in warmup ramp over the 100-step budget). lr_decay_iters=10000 is an inert decoy under lr_decay_style=constant and is not required for diagnosis or fix.'
   buggy_keys:
   - lr_warmup_iters
   - lr_decay_iters

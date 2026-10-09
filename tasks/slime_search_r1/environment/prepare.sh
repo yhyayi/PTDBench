@@ -53,6 +53,20 @@ set -euo pipefail
 # 容器**（evaluator.py 的 _run_prepare 建了就关），装进镜像 site-packages 的东西出了这个容器就
 # 没了。$PTDBENCH_PREPARED 是唯一会被后两个阶段只读挂进去的目录。约 640MB。
 FAISS_SITE="$PTDBENCH_PREPARED/pysite"
+# 为什么要走集群 PyPI 镜像：cybertron 的 whitelist-proxy 能和 files.pythonhosted.org
+# （PyPI 的 fastly CDN）握上手，但下这几个几百 MB 的 RAPIDS cu13 轮子时会被半途
+# reset（SSLEOFError: UNEXPECTED_EOF_WHILE_READING），和 HF xet cas-bridge 被挡是
+# 同一类。集群自建的 proxying 源直接把 pythonhosted 的 wheel 代理过来，稳得多。
+# 默认用京算（cluster=beijing）的源；换集群时用 PTDBENCH_PIP_INDEX_URL /
+# PTDBENCH_PIP_TRUSTED_HOST 覆盖，别把某个集群的地址写死进 task。设成空串可强制
+# 回退到原来的直连 pythonhosted 行为。
+PIP_INDEX_URL="${PTDBENCH_PIP_INDEX_URL-https://pypi.mb1.bj3.paratera.com/root/pypi/+simple}"
+PIP_TRUSTED_HOST="${PTDBENCH_PIP_TRUSTED_HOST-pypi.mb1.bj3.paratera.com}"
+PIP_INDEX_ARGS=()
+if [ -n "$PIP_INDEX_URL" ]; then
+    PIP_INDEX_ARGS+=(--index-url "$PIP_INDEX_URL")
+    [ -n "$PIP_TRUSTED_HOST" ] && PIP_INDEX_ARGS+=(--trusted-host "$PIP_TRUSTED_HOST")
+fi
 # 守卫认的是这一版的 dist-info，不是 `faiss/` 目录：认目录的话，一棵装了一半的、
 # 或者上一版 cu12 的树会被当成装好了，然后在 agent 阶段才炸。
 FAISS_MARKER="$FAISS_SITE/faiss_gpu_cuvs-1.15.0.dist-info"
@@ -61,8 +75,10 @@ if [ ! -d "$FAISS_MARKER" ]; then
         echo "[prepare] $FAISS_SITE is stale or incomplete; reinstalling from scratch"
         rm -rf "$FAISS_SITE"
     fi
-    echo "[prepare] installing faiss-gpu-cuvs==1.15.0 (CUDA 13) into $FAISS_SITE"
+    echo "[prepare] installing faiss-gpu-cuvs==1.15.0 (CUDA 13) into $FAISS_SITE${PIP_INDEX_URL:+ via $PIP_INDEX_URL}"
     python3 -m pip install --no-cache-dir --no-deps \
+        --retries 10 --timeout 120 \
+        ${PIP_INDEX_ARGS[@]+"${PIP_INDEX_ARGS[@]}"} \
         --target "$FAISS_SITE" \
         faiss-gpu-cuvs==1.15.0 \
         libcuvs-cu13==26.6.0 \

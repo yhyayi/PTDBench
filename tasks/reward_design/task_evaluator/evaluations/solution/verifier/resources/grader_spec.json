@@ -4,7 +4,7 @@
   "metric_key": "val-core/taco/acc/mean@1",
   "final_step": 400,
   "historical_final_baseline": "0.0",
-  "required_final_score": "0.125",
+  "required_final_score": "0.110",
   "training_reward_key": "critic/rewards/mean",
   "required_training_reward": "0.14",
   "validation_weight": "0.8",

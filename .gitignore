@@ -14,3 +14,5 @@ datasets/
 # disk these two lines can go too.
 docker/wheels/
 docker/gitmirror/
+
+tasks/PTDBench_candidate_bundle_20260821

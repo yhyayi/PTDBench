@@ -48,8 +48,22 @@ _DEFAULT_CLUSTER = "wuxi_train"
 _DEFAULT_RESOURCE_POOL = "speech-wx"
 _DEFAULT_BILLING_ACCOUNT_ID = "N00069"
 _DEFAULT_GPU_MODEL = "h100"
-_DEFAULT_CPU = 16
-_DEFAULT_MEMORY_GB = 128
+# Scheduling tier passed to ``cctl devspace create --priority``. NORMAL is a
+# quota-backed allocation; PREEMPTABLE borrows idle capacity and can be killed at
+# any time (useful on a cluster/pool where you have no NORMAL quota, e.g. running
+# on huhehaote without a normal allocation); HIGH is above NORMAL. Default NORMAL
+# matches cctl's own default. ``requeue=True`` adds ``--requeue`` so a preempted
+# devspace is re-queued rather than lost.
+_DEFAULT_PRIORITY = "NORMAL"
+_VALID_PRIORITIES = ("HIGH", "NORMAL", "PREEMPTABLE")
+# CPU / memory scale with the GPU count by default: an 8-GPU verl FSDP job asks
+# Ray for a STRICT_PACK placement group of {GPU:1, CPU:max_colocate_count}*N on a
+# single node (max_colocate_count=3 for FSDP), so a flat 16-CPU devspace could
+# not satisfy 8*3=24 CPU and the placement group pended forever. Sizing per GPU
+# keeps the node proportioned to the job. A GPU-less task still gets one GPU's
+# worth (max(gpus, 1)) so it is never provisioned at zero CPU/memory.
+_CPU_PER_GPU = 16
+_MEMORY_GB_PER_GPU = 152
 
 _DEFAULT_CLUSTER_USER = "chenyinghao"
 
@@ -398,8 +412,10 @@ class CybertronEnvironment(BaseEnvironment):
         resource_pool: str = _DEFAULT_RESOURCE_POOL,
         billing_account_id: str = _DEFAULT_BILLING_ACCOUNT_ID,
         gpu_model: str = _DEFAULT_GPU_MODEL,
-        cpu: int = _DEFAULT_CPU,
-        memory_gb: int = _DEFAULT_MEMORY_GB,
+        priority: str = _DEFAULT_PRIORITY,
+        requeue: bool = False,
+        cpu: int | None = None,
+        memory_gb: int | None = None,
         image_id: str | None = None,
         image_map: dict[str, str] | None = None,
         image_map_path: str | Path | None = None,
@@ -425,8 +441,22 @@ class CybertronEnvironment(BaseEnvironment):
         self._resource_pool = resource_pool
         self._billing_account_id = billing_account_id
         self._gpu_model = gpu_model
-        self._cpu = cpu
-        self._memory_gb = memory_gb
+        # Normalize + validate the scheduling tier up front so a typo fails at
+        # construction with a clear message rather than as an opaque cctl error.
+        self._priority = str(priority).upper()
+        if self._priority not in _VALID_PRIORITIES:
+            raise ValueError(
+                f"priority must be one of {_VALID_PRIORITIES}, got {priority!r}"
+            )
+        self._requeue = requeue
+        # Explicit cpu/memory_gb win; otherwise scale with the GPU count so the
+        # devspace is proportioned to the job (see _CPU_PER_GPU note above). A
+        # 0-GPU task is sized as one GPU so it never lands at zero.
+        gpu_units = max(task_env_config.gpus or 0, 1)
+        self._cpu = cpu if cpu is not None else _CPU_PER_GPU * gpu_units
+        self._memory_gb = (
+            memory_gb if memory_gb is not None else _MEMORY_GB_PER_GPU * gpu_units
+        )
         self._image_id_override = image_id
         # Precedence (low -> high): built-in < image_map_path file < image_map.
         self._image_map = {
@@ -629,9 +659,13 @@ class CybertronEnvironment(BaseEnvironment):
             str(self._cpu),
             "--memory",
             str(self._memory_gb),
+            "--priority",
+            self._priority,
             "--description",
             f"harbor:{self.environment_name}:{self.session_id}",
         ]
+        if self._requeue:
+            args.append("--requeue")
         parsed, code, stderr = await self._cctl(args, timeout_sec=180)
         if code != 0 or not isinstance(parsed, dict):
             raise RuntimeError(f"cctl devspace create failed: {stderr or parsed}")
@@ -650,25 +684,48 @@ class CybertronEnvironment(BaseEnvironment):
         return self._project
 
     async def _wait_for_status(self) -> None:
+        """Wait until the devspace is Running *and* its ssh host resolves.
+
+        ``cctl`` reports ``Running`` before Teleport registers the node in
+        ``tsh ls`` (or before the ssh-config ``Host`` entry is written), so a
+        single host-resolution attempt right after ``Running`` can miss a node
+        that is genuinely coming up. Both conditions share this one deadline:
+        the status poll gates on ``Running``, then host resolution is retried
+        until it returns a host. ``_resolve_devspace_host`` returns ``None``
+        while the node is still registering (retry) and raises on hard errors
+        (ambiguous match, ``tsh ls`` / login failure, missing ssh config), which
+        propagate immediately. On success ``self._host`` is set.
+        """
         if self._devspace_id is None:
             raise RuntimeError("devspace id is not set")
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self._status_timeout_sec
         last = ""
+        running = False
         while loop.time() < deadline:
-            parsed, code, stderr = await self._cctl(
-                ["devspace", "get", self._devspace_id, "-F", "status"]
-            )
-            status = ""
-            if isinstance(parsed, dict):
-                status = str(parsed.get("status", ""))
-            last = status or stderr
-            if status in _RUNNING_STATUSES:
-                return
-            if status in _TERMINAL_STATUSES:
-                raise RuntimeError(
-                    f"Devspace {self._devspace_id} entered terminal status {status}."
+            if not running:
+                parsed, code, stderr = await self._cctl(
+                    ["devspace", "get", self._devspace_id, "-F", "status"]
                 )
+                status = ""
+                if isinstance(parsed, dict):
+                    status = str(parsed.get("status", ""))
+                last = status or stderr
+                if status in _TERMINAL_STATUSES:
+                    raise RuntimeError(
+                        f"Devspace {self._devspace_id} entered terminal "
+                        f"status {status}."
+                    )
+                running = status in _RUNNING_STATUSES
+                if not running:
+                    await asyncio.sleep(10)
+                    continue
+            # Running: wait for the Teleport node / ssh host to register too.
+            host = await self._resolve_devspace_host()
+            if host is not None:
+                self._host = host
+                return
+            last = f"Running but ssh host not registered yet (id {self._devspace_id})"
             await asyncio.sleep(10)
         raise RuntimeError(
             f"Devspace {self._devspace_id} did not become ready within "
@@ -677,13 +734,17 @@ class CybertronEnvironment(BaseEnvironment):
 
     # -- SSH host resolution ------------------------------------------------
 
-    async def _resolve_devspace_host(self) -> str:
+    async def _resolve_devspace_host(self) -> str | None:
         """Resolve the Teleport node name / ssh alias for this devspace.
 
         Order: explicit ``ssh_host`` override; then, in tsh mode, the Teleport
         node whose name ends in ``-<numeric id>`` (``tsh ls``); otherwise the
         matching ``Host`` entry in ``~/.ssh/config``. The same string is used
         as the ssh alias (fallback) and as the ``tsh ssh root@<node>`` target.
+
+        Returns ``None`` when the node/host is not registered *yet* (a transient
+        condition ``_wait_for_status`` retries); hard errors (ambiguous match,
+        ``tsh ls`` / login failure, missing ssh config) raise immediately.
         """
         if self._ssh_host_override:
             return self._ssh_host_override
@@ -691,7 +752,7 @@ class CybertronEnvironment(BaseEnvironment):
             return await self._resolve_node_via_tsh()
         return self._resolve_ssh_host()
 
-    async def _resolve_node_via_tsh(self) -> str:
+    async def _resolve_node_via_tsh(self) -> str | None:
         if self._devspace_id is None:
             raise RuntimeError("devspace id is not set")
         if self._tsh_path is None:
@@ -733,10 +794,9 @@ class CybertronEnvironment(BaseEnvironment):
             }
         )
         if not matches:
-            raise RuntimeError(
-                f"No Teleport node ending in -{numeric} in `tsh ls`. The "
-                "devspace may still be registering; retry or pass ssh_host."
-            )
+            # Not registered in Teleport yet -- cctl reports Running before the
+            # node joins `tsh ls`. Transient: let _wait_for_status poll again.
+            return None
         if len(matches) > 1:
             raise RuntimeError(
                 f"Multiple Teleport nodes match devspace {numeric}: {matches}. "
@@ -744,11 +804,14 @@ class CybertronEnvironment(BaseEnvironment):
             )
         return matches[0]
 
-    def _resolve_ssh_host(self) -> str:
+    def _resolve_ssh_host(self) -> str | None:
         """Find the ~/.ssh/config Host entry for this devspace id.
 
         Teleport writes ``Host devspace-<user>-<proj>-...-<id>`` entries; we
-        pick the unique one ending in ``-<numeric id>``.
+        pick the unique one ending in ``-<numeric id>``. Returns ``None`` when
+        no entry matches *yet* (transient: the config may not be refreshed until
+        the devspace registers); a missing config file or an ambiguous match
+        raises.
         """
         if self._devspace_id is None:
             raise RuntimeError("devspace id is not set")
@@ -768,10 +831,9 @@ class CybertronEnvironment(BaseEnvironment):
                     matches.append(alias)
         unique = sorted(set(matches))
         if not unique:
-            raise RuntimeError(
-                f"No `Host devspace-*-{numeric}` entry in {self._ssh_config_path}. "
-                "Refresh the Teleport SSH config for the new devspace."
-            )
+            # Entry not written yet (config refreshed on registration).
+            # Transient: let _wait_for_status poll again.
+            return None
         if len(unique) > 1:
             raise RuntimeError(
                 f"Multiple SSH hosts match devspace {numeric}: {unique}. "
@@ -1102,11 +1164,22 @@ set -e
 mkdir -p {shlex.quote(self._workspace_dir)} {shlex.quote(self._logs_dir)}
 mkdir -p {shlex.quote(self._cache_dir + "/models")} {shlex.quote(self._cache_dir + "/datasets")}
 chmod 777 {shlex.quote(self._logs_dir)}
-ln -sfn {shlex.quote(self._workspace_dir)} /workspace
-ln -sfn {shlex.quote(self._logs_dir)} /logs
 mkdir -p /ptdbench
-ln -sfn {shlex.quote(self._cache_dir + "/models")} /ptdbench/models
-ln -sfn {shlex.quote(self._cache_dir + "/datasets")} /ptdbench/datasets
+# The eval images bake /workspace (WORKDIR) and /ptdbench/{{models,datasets}}
+# (RUN mkdir) as real directories. `ln -sfn TARGET DIR` against a real directory
+# does NOT replace it: GNU ln silently creates the link *inside* it
+# (/workspace/workspace -> ...) and exits 0, so training then writes to the real
+# /workspace on the ephemeral overlay instead of the persistent /user target and
+# the whole run is lost when the devspace stops. Remove any pre-existing real
+# dir first (it is never a correct symlink), then link with -T so any future
+# real-dir surprise is a loud failure rather than another silent nest.
+for _link in /workspace /logs /ptdbench/models /ptdbench/datasets; do
+  if [ -e "$_link" ] && [ ! -L "$_link" ]; then rm -rf "$_link"; fi
+done
+ln -sfnT {shlex.quote(self._workspace_dir)} /workspace
+ln -sfnT {shlex.quote(self._logs_dir)} /logs
+ln -sfnT {shlex.quote(self._cache_dir + "/models")} /ptdbench/models
+ln -sfnT {shlex.quote(self._cache_dir + "/datasets")} /ptdbench/datasets
 # Always (re)compile so the binary tracks the embedded source (cheap, ~1s).
 if command -v gcc >/dev/null 2>&1; then
   cat > {shlex.quote(_LLRUN_SRC)} <<'LLRUN_EOF'
@@ -1148,8 +1221,7 @@ fi
     async def start(self, force_build: bool) -> None:
         if self._devspace_id is None:
             self._devspace_id = await self._create_devspace()
-        await self._wait_for_status()
-        self._host = await self._resolve_devspace_host()
+        await self._wait_for_status()  # gates on Running + sets self._host
         self._cluster_user = self._resolve_cluster_user()
         self.logger.info(
             f"Devspace {self._devspace_id} ready via SSH host {self._host} "

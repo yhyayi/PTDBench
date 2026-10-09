@@ -31,22 +31,13 @@ RUN set -eux; \
 ENV CUDA_DEVICE_ORDER=PCI_BUS_ID \
     TOKENIZERS_PARALLELISM=false
 
-# Called by every task's environment/prepare.sh. The shims resolve `python3`
-# at call time, so they run under the image's interpreter and its
-# huggingface_hub / datasets.
-COPY ptdbench_fetch.py /usr/local/libexec/ptdbench_fetch.py
-RUN set -eux; \
-    for kind in hf url; do \
-        printf '#!/bin/sh\nexec python3 /usr/local/libexec/ptdbench_fetch.py %s "$@"\n' \
-            "${kind}" > "/usr/local/bin/ptdbench_fetch_${kind}"; \
-        chmod 0755 "/usr/local/bin/ptdbench_fetch_${kind}"; \
-    done
-COPY ptdbench_dataset.py /usr/local/libexec/ptdbench_dataset.py
-COPY ptdbench_datasets /usr/local/libexec/ptdbench_datasets
-RUN set -eux; \
-    printf '#!/bin/sh\nexec python3 /usr/local/libexec/ptdbench_dataset.py "$@"\n' \
-        > /usr/local/bin/ptdbench_dataset; \
-    chmod 0755 /usr/local/bin/ptdbench_dataset
+# The prepare-stage fetch/dataset tooling (ptdbench_fetch.py, ptdbench_dataset.py,
+# ptdbench_datasets/) is deliberately NOT baked here. docker/install-ptdbench-tooling.sh
+# installs it into /usr/local at the start of every prepare run, from the repo's
+# current copy (mounted RO locally, uploaded on Cybertron). That keeps a fix to
+# those files reaching running jobs without an image rebuild. Only the activate
+# hook above stays baked -- it must exist in the agent/verifier containers too,
+# which never run prepare-time provisioning.
 
 # The harness bind-mounts a per-run copy of the task's workspace here.
 WORKDIR /workspace

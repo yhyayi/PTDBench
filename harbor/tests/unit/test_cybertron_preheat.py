@@ -113,23 +113,21 @@ class TestBuildEntry:
         assert '[ -z "$failed" ] || {' in entry
         assert "exit 1; }" in entry
 
-    def test_overrides_baked_fetch_with_clone_copy(self):
-        # prepare.sh's ptdbench_fetch_hf shim execs the image-BAKED
-        # /usr/local/libexec/ptdbench_fetch.py, not the clone's copy, so the
-        # materialize() symlink fix only reaches a running job if the entry
-        # overwrites the baked file from the clone before the prepare loop.
+    def test_installs_latest_tooling_from_clone(self):
+        # prepare.sh's ptdbench_fetch_hf / ptdbench_dataset shims exec
+        # /usr/local/libexec/*.py, which the Dockerfiles no longer bake. The
+        # entry must run docker/install-ptdbench-tooling.sh (from the clone) to
+        # install the current tooling before the prepare loop runs the fetches,
+        # so a fix reaches a running job without an image rebuild.
         entry = preheat.build_entry(
             cache_dir="/user/me/ptdbench-cache",
             prepare_glob="tasks/*/environment/prepare.sh",
         )
-        assert (
-            "cp docker/ptdbench_fetch.py /usr/local/libexec/ptdbench_fetch.py" in entry
-        )
-        # guarded on both paths existing (no-op otherwise)
-        assert "[ -f docker/ptdbench_fetch.py ]" in entry
-        assert "[ -e /usr/local/libexec/ptdbench_fetch.py ]" in entry
-        # override happens before the prepare loop runs the fetches
-        assert entry.index("cp docker/ptdbench_fetch.py") < entry.index("for p in")
+        assert "bash docker/install-ptdbench-tooling.sh" in entry
+        # guarded on the installer existing (no-op on an older checkout)
+        assert "[ -f docker/install-ptdbench-tooling.sh ]" in entry
+        # install happens before the prepare loop runs the fetches
+        assert entry.index("install-ptdbench-tooling.sh") < entry.index("for p in")
 
     def test_repo_subdir_cd(self):
         entry = preheat.build_entry(

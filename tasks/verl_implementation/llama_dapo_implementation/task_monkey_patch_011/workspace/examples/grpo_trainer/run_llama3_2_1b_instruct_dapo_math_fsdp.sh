@@ -22,7 +22,10 @@ LOG_DIR="${LOG_DIR:-${VERL_ROOT}/logs}"
 mkdir -p "${LOG_DIR}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="${LOG_DIR}/llama3_2_1b_instruct_dapo_math_fsdp_${TIMESTAMP}.log"
-: "${WANDB_API_KEY:?Set WANDB_API_KEY in the runtime environment}"
+# Offline wandb: keep all run data local, no API key / network required.
+# Logs land under ${WANDB_DIR}/wandb/ (sync later with `wandb sync` if desired).
+export WANDB_MODE="${WANDB_MODE:-offline}"
+export WANDB_DIR="${WANDB_DIR:-${LOG_DIR}}"
 export WANDB_PROJECT="${WANDB_PROJECT:-verl_grpo_dapo_math}"
 # ---- end logging / wandb ----
 

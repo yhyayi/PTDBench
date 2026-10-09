@@ -1,17 +1,28 @@
 #!/bin/bash
 
-if [ $# -lt 3 ]; then
-    echo "Usage: $0 WANDB_PROJECT RUN_NAME ENVIRONMENT_LIST [EXTRA_TRAIN_ARGS...]"
-    exit 1
-fi
+# Directly executable with no arguments. The historical positional interface is
+# still accepted for back-compat:
+#   $0 [WANDB_PROJECT] [RUN_NAME] [ENVIRONMENT_LIST] [EXTRA_TRAIN_ARGS...]
+# WANDB_PROJECT / RUN_NAME only label the run; the third positional
+# (ENVIRONMENT_LIST) is a dummy token — the task set is locked below and the
+# argument is intentionally ignored. All positionals are optional.
 
 # BENCH: locked training task types for this workspace — do not change names.
 LOCKED_ENVIRONMENT_LIST="Division EuclidGame GCDOne_Counting HamiltonianPath LampChanging LargestConvexPolygon Multiplication PCPPermutation Path_NoGoingBack_Counting SAT ShortestPath Sorting SpiralMatrix SubsequenceReversalLNDS UndamagedSubmatrixCounting WYRLevelingGround"
 
-WANDB_PROJECT=$1
-RUN_NAME=$2
+WANDB_PROJECT="${1:-ptdbench}"
+RUN_NAME="${2:-rlve_task_008}"
 ENVIRONMENT_LIST="${LOCKED_ENVIRONMENT_LIST}"
-shift 3
+
+# Consume up to the three leading positionals (whatever subset was supplied);
+# anything after them is forwarded to train.py as EXTRA_TRAIN_ARGS. With three or
+# fewer args there are no extras, so just clear the positional list instead of
+# `shift 3` (which is a no-op error when fewer than three args were passed).
+if [ "$#" -gt 3 ]; then
+    shift 3
+else
+    set --
+fi
 EXTRA_ARGS=("$@")
 
 if [ -z "${WANDB_API_KEY:-}" ] || [ "${WANDB_API_KEY}" = "offline" ]; then
@@ -39,6 +50,15 @@ else
 fi
 
 set -ex
+
+# The devspace injects an egress proxy (http_proxy/https_proxy) whose no_proxy
+# does not cover the loopback, so every `ray job ...` call to the local Ray
+# dashboard (http://127.0.0.1:PORT) gets routed through the proxy and 502s —
+# the readiness loop then never sees the server come up. Make localhost and this
+# node's own IP bypass the proxy so the Ray CLI can reach its own dashboard.
+_NODE_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+export no_proxy="127.0.0.1,localhost,${_NODE_IP},${no_proxy:-}"
+export NO_PROXY="${no_proxy}"
 
 # will prevent ray from buffering stdout/stderr
 export PYTHONBUFFERED=16

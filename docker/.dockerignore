@@ -1,9 +1,11 @@
 # Build context for every docker/images/*.Dockerfile is docker/ itself. The
 # images COPY exactly the in-container tooling; everything else here runs on the
 # host, so the context is an allowlist rather than a denylist.
+#
+# Only the activate hook is baked now. The fetch/dataset tooling
+# (ptdbench_fetch.py, ptdbench_dataset.py, ptdbench_datasets/) and
+# install-ptdbench-tooling.sh are provisioned at prepare time from the repo (see
+# install-ptdbench-tooling.sh), not COPY'd, so they stay out of the build context.
 *
 !ptdbench-activate.sh
-!ptdbench_fetch.py
-!ptdbench_dataset.py
-!ptdbench_datasets
 **/__pycache__

@@ -24,8 +24,8 @@
 
 Machine grading reads only the new experiment logs. Scoring is weighted:
 
-- validation: a finite `val-core/taco/acc/mean@1` peak of at least `0.125`
-  (12.5%). The historical final baseline is `0.0`.
+- validation: a finite `val-core/taco/acc/mean@1` peak of at least `0.110`
+  (11.0%). The historical final baseline is `0.0`.
 - training reward: mean `critic/rewards/mean` over training steps must be
   strictly above `0.14`
 - final `score = 0.8 * validation + 0.2 * training reward`

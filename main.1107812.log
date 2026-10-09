@@ -1,62 +1,0 @@
-now using node gpu013
->>> preparing tasks/reward_design/task_evaluator/environment/prepare.sh
-[fetch] cache hit  LIF1014/ptdbench-verl-coding-task-evaluator@39b3e1ddfff5 -> /user/chenyinghao/ptdbench-cache/models/hf/hub/models--LIF1014--ptdbench-verl-coding-task-evaluator/snapshots/39b3e1ddfff50c16220ea43b87193a9dd4e03d8b
-[fetch] ready /user/chenyinghao/ptdbench-cache/.warm-scratch/grN0iY/workspace/Qwen2.5-1.5B-Instruct
-[fetch] cache hit  LIF1014/ptdbench-verl-coding-task-evaluator-dataset@1e49d4a87c83 -> /user/chenyinghao/ptdbench-cache/datasets/hf/hub/datasets--LIF1014--ptdbench-verl-coding-task-evaluator-dataset/snapshots/1e49d4a87c839b4b1d5b7a104280f189bc026f6e
-[fetch] ready /user/chenyinghao/ptdbench-cache/.warm-scratch/grN0iY/workspace/.ptdbench-taco-archive
-[prepare] unpacking taco_verl -> /user/chenyinghao/ptdbench-cache/.warm-scratch/grN0iY/workspace/taco_verl
-tar (child): /user/chenyinghao/ptdbench-cache/.warm-scratch/grN0iY/workspace/.ptdbench-taco-archive/artifacts/workspace-assets.tar.gz: Cannot open: No such file or directory
-tar (child): Error is not recoverable: exiting now
-tar: Child returned status 2
-tar: Error is not recoverable: exiting now
-!!! prepare failed (rc=2): tasks/reward_design/task_evaluator/environment/prepare.sh (downloads still cached)
->>> preparing tasks/reward_design/task_function_call/environment/prepare.sh
-[fetch] downloading LIF1014/ptdbench-verl-coding-tasks-function-call@8d94247a55f3
-Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files:  11%|█         | 1/9 [00:01<00:13,  1.69s/it]Fetching 9 files:  44%|████▍     | 4/9 [00:02<00:02,  2.22it/s]Fetching 9 files:  56%|█████▌    | 5/9 [00:04<00:03,  1.19it/s]Fetching 9 files:  67%|██████▋   | 6/9 [02:12<01:51, 37.14s/it]Fetching 9 files: 100%|██████████| 9/9 [02:12<00:00, 14.71s/it]
-[fetch] ready /user/chenyinghao/ptdbench-cache/.warm-scratch/YuPA2D/workspace/Qwen2.5-1.5B-Instruct
-[fetch] downloading LIF1014/ptdbench-verl-coding-tasks-function-call-dataset@11329cf7797c
-Fetching 1 files:   0%|          | 0/1 [00:00<?, ?it/s]Fetching 1 files: 100%|██████████| 1/1 [00:21<00:00, 21.37s/it]Fetching 1 files: 100%|██████████| 1/1 [00:21<00:00, 21.37s/it]
-[fetch] ready /user/chenyinghao/ptdbench-cache/.warm-scratch/YuPA2D/workspace/.ptdbench-taco-archive
-[prepare] unpacking taco_verl -> /user/chenyinghao/ptdbench-cache/.warm-scratch/YuPA2D/workspace/taco_verl
-tar (child): /user/chenyinghao/ptdbench-cache/.warm-scratch/YuPA2D/workspace/.ptdbench-taco-archive/artifacts/workspace-assets.tar.gz: Cannot open: No such file or directory
-tar (child): Error is not recoverable: exiting now
-tar: Child returned status 2
-tar: Error is not recoverable: exiting now
-!!! prepare failed (rc=2): tasks/reward_design/task_function_call/environment/prepare.sh (downloads still cached)
->>> preparing tasks/verl_hyper/qwen_dapo_hparam/task_hparam_overlong_023/environment/prepare.sh
-[fetch] cache hit  LIF1014/ptdbench-Qwen2.5-0.5B-Instruct@e967ddaecb74 -> /user/chenyinghao/ptdbench-cache/models/hf/hub/models--LIF1014--ptdbench-Qwen2.5-0.5B-Instruct/snapshots/e967ddaecb746b9cea032fc1ae80c29a9a49bb73
-[fetch] ready /user/chenyinghao/ptdbench-cache/.warm-scratch/QZaU5t/workspace/verl/Qwen2.5-0.5B-Instruct
-[dataset] building dapo_math_17k v2
-下载 BytedTsinghua-SIA/DAPO-Math-17k@65877096c24f ...
-Generating train split: 0 examples [00:00, ? examples/s]Generating train split: 1048576 examples [00:02, 425906.84 examples/s]Generating train split: 1791700 examples [00:02, 776717.62 examples/s]Generating train split: 1791700 examples [00:02, 660419.89 examples/s]
-  去掉重复副本：1791700 行 -> 17917 行
-  train: 16109 行 (89.91%) -> /user/chenyinghao/ptdbench-cache/datasets/derived/dapo_math_17k-v2.partial/train.parquet
-  test: 1808 行 (10.09%) -> /user/chenyinghao/ptdbench-cache/datasets/derived/dapo_math_17k-v2.partial/test.parquet
-[dataset] ready /user/chenyinghao/ptdbench-cache/.warm-scratch/QZaU5t/workspace/DAPO-Math-17k_verl
-<<< done tasks/verl_hyper/qwen_dapo_hparam/task_hparam_overlong_023/environment/prepare.sh
->>> preparing tasks/verl_implementation/data_format/task_agent_loop_022-llama-dapo-math/environment/prepare.sh
-[fetch] downloading LIF1014/ptdbench-Llama-3.2-1B-Instruct@32f9e721f796
-Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files:  10%|█         | 1/10 [00:01<00:11,  1.29s/it]Fetching 10 files:  50%|█████     | 5/10 [00:01<00:01,  3.50it/s]Fetching 10 files:  60%|██████    | 6/10 [02:06<01:56, 29.19s/it]Fetching 10 files: 100%|██████████| 10/10 [02:06<00:00, 12.60s/it]
-[fetch] ready /user/chenyinghao/ptdbench-cache/.warm-scratch/ppKRbo/workspace/verl/Llama-3.2-1B-instruct
-[dataset] cache hit  dapo_math_17k v2 -> /user/chenyinghao/ptdbench-cache/datasets/derived/dapo_math_17k-v2
-[dataset] ready /user/chenyinghao/ptdbench-cache/.warm-scratch/ppKRbo/workspace/DAPO-Math-17k_verl
-<<< done tasks/verl_implementation/data_format/task_agent_loop_022-llama-dapo-math/environment/prepare.sh
->>> preparing tasks/verl_implementation/llama_dapo_implementation/task_monkey_patch_011/environment/prepare.sh
-[fetch] cache hit  LIF1014/ptdbench-Llama-3.2-1B-Instruct@32f9e721f796 -> /user/chenyinghao/ptdbench-cache/models/hf/hub/models--LIF1014--ptdbench-Llama-3.2-1B-Instruct/snapshots/32f9e721f796d3c639ab64d2f58ceeaa2c3213b9
-[fetch] ready /user/chenyinghao/ptdbench-cache/.warm-scratch/f9zrfk/workspace/verl/Llama-3.2-1B-instruct
-[dataset] cache hit  dapo_math_17k v2 -> /user/chenyinghao/ptdbench-cache/datasets/derived/dapo_math_17k-v2
-[dataset] ready /user/chenyinghao/ptdbench-cache/.warm-scratch/f9zrfk/workspace/DAPO-Math-17k_verl
-<<< done tasks/verl_implementation/llama_dapo_implementation/task_monkey_patch_011/environment/prepare.sh
->>> preparing tasks/verl_implementation/verl_reward_implementation/task_engine_base_025/environment/prepare.sh
-[fetch] cache hit  LIF1014/ptdbench-Qwen2.5-0.5B-Instruct@e967ddaecb74 -> /user/chenyinghao/ptdbench-cache/models/hf/hub/models--LIF1014--ptdbench-Qwen2.5-0.5B-Instruct/snapshots/e967ddaecb746b9cea032fc1ae80c29a9a49bb73
-[fetch] ready /user/chenyinghao/ptdbench-cache/.warm-scratch/OQS9in/workspace/verl/Qwen2.5-0.5B-Instruct
-[dataset] building gsm8k v1
-下载 openai/gsm8k (config=main) ...
-Generating train split:   0%|          | 0/7473 [00:00<?, ? examples/s]Generating train split: 100%|██████████| 7473/7473 [00:00<00:00, 546978.11 examples/s]
-Generating test split:   0%|          | 0/1319 [00:00<?, ? examples/s]Generating test split: 100%|██████████| 1319/1319 [00:00<00:00, 335554.50 examples/s]
-  train: 7473 行 -> /user/chenyinghao/ptdbench-cache/datasets/derived/gsm8k-v1.partial/train.parquet
-  test: 1319 行 -> /user/chenyinghao/ptdbench-cache/datasets/derived/gsm8k-v1.partial/test.parquet
-[dataset] ready /user/chenyinghao/ptdbench-cache/.warm-scratch/OQS9in/workspace/gsm8k_verl
-<<< done tasks/verl_implementation/verl_reward_implementation/task_engine_base_025/environment/prepare.sh
-preheated 6 prepare.sh script(s) into /user/chenyinghao/ptdbench-cache
-prepare.sh with post-download failures: tasks/reward_design/task_evaluator/environment/prepare.sh tasks/reward_design/task_function_call/environment/prepare.sh

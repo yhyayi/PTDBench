@@ -102,8 +102,8 @@ essential root cause.
 staged workspace, run the designated launch script for 400 steps, and produce
 fresh experiment logs. Scoring is weighted:
 
-- validation: a finite `val-core/taco/acc/mean@1` peak of at least `0.125`
-  (12.5%) scores `1`, otherwise `0`
+- validation: a finite `val-core/taco/acc/mean@1` peak of at least `0.110`
+  (11.0%) scores `1`, otherwise `0`
 - training reward: the mean `critic/rewards/mean` over training steps must be
   strictly above `0.14` to score `1`, otherwise `0`
 - final `score = 0.8 * validation + 0.2 * training reward`

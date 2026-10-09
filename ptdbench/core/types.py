@@ -162,6 +162,12 @@ DATASETS_DIR = "/ptdbench/datasets"
 # 任务的 environment/ 目录挂进来的位置。三个阶段都只读——prepare.sh 是环境说明，
 # 不是答案，但也没有哪个阶段有理由改仓库里的任务定义。
 PTDBENCH_ENVIRONMENT_DIR = "/ptdbench/environment"
+# 仓库 docker/ 目录（见 DOCKER_DIR）在 prepare 容器里挂进来的位置。只读、仅 prepare 阶段。
+# prepare 跑 prepare.sh 前先 `bash $TOOLING_DIR/install-ptdbench-tooling.sh`，把 fetch/
+# dataset 工具按仓库当前版本装进 /usr/local，避免用到烤进镜像的旧副本。
+TOOLING_DIR = "/ptdbench/tooling"
+# 这个安装脚本在仓库 docker/ 里，挂进来后的容器路径。
+TOOLING_INSTALLER = f"{TOOLING_DIR}/install-ptdbench-tooling.sh"
 
 # task package 里的约定文件名。写成常量是因为 loader 和 evaluator 都要用，而
 # "默认值散落多处"正是 schema 漂移的起点。

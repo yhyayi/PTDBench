@@ -56,6 +56,82 @@ class TestRegistration:
         assert caps.mounted is False
 
 
+class TestResourceScaling:
+    """CPU / memory default to 16 CPU + 152 GB per GPU unless given explicitly."""
+
+    def _env(self, tmp_path, *, gpus, **kwargs):
+        env_dir = tmp_path / "environment"
+        env_dir.mkdir(parents=True, exist_ok=True)
+        (env_dir / "Dockerfile").write_text("FROM ubuntu:22.04\n")
+        return CybertronEnvironment(
+            environment_dir=env_dir,
+            environment_name="test-task",
+            session_id="test-task__abc123",
+            trial_paths=_trial_paths(tmp_path),
+            task_env_config=EnvironmentConfig(
+                docker_image=None, workdir="/workspace", gpus=gpus
+            ),
+            project="xinfer-chenyinghao",
+            image_id="1",
+            **kwargs,
+        )
+
+    def test_scales_with_gpu_count(self, tmp_path):
+        env = self._env(tmp_path, gpus=8)
+        assert env._cpu == 16 * 8
+        assert env._memory_gb == 152 * 8
+
+    def test_zero_gpu_sized_as_one(self, tmp_path):
+        env = self._env(tmp_path, gpus=0)
+        assert env._cpu == 16
+        assert env._memory_gb == 152
+
+    def test_explicit_values_win(self, tmp_path):
+        env = self._env(tmp_path, gpus=8, cpu=24, memory_gb=256)
+        assert env._cpu == 24
+        assert env._memory_gb == 256
+
+
+class TestPriority:
+    """`--priority` (and optional `--requeue`) reach `cctl devspace create`."""
+
+    async def _captured_create_args(self, env, monkeypatch) -> list[str]:
+        captured: dict[str, list[str]] = {}
+
+        async def fake_cctl(self, args, *a, **kw):
+            captured["args"] = args
+            return {"name": "tasks/999"}, 0, ""
+
+        monkeypatch.setattr(CybertronEnvironment, "_cctl", fake_cctl)
+        await env._create_devspace()
+        return captured["args"]
+
+    async def test_defaults_to_normal(self, tmp_path, monkeypatch):
+        env = _make_env(tmp_path, image_id="1")
+        args = await self._captured_create_args(env, monkeypatch)
+        assert "--priority" in args
+        assert args[args.index("--priority") + 1] == "NORMAL"
+        assert "--requeue" not in args
+
+    async def test_preemptable_is_passed(self, tmp_path, monkeypatch):
+        env = _make_env(tmp_path, image_id="1", priority="PREEMPTABLE")
+        args = await self._captured_create_args(env, monkeypatch)
+        assert args[args.index("--priority") + 1] == "PREEMPTABLE"
+
+    async def test_lowercase_is_normalized(self, tmp_path):
+        env = _make_env(tmp_path, image_id="1", priority="preemptable")
+        assert env._priority == "PREEMPTABLE"
+
+    async def test_requeue_appends_flag(self, tmp_path, monkeypatch):
+        env = _make_env(tmp_path, image_id="1", priority="PREEMPTABLE", requeue=True)
+        args = await self._captured_create_args(env, monkeypatch)
+        assert "--requeue" in args
+
+    def test_invalid_priority_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="priority must be one of"):
+            _make_env(tmp_path, image_id="1", priority="URGENT")
+
+
 class TestImageResolution:
     def test_builtin_map(self, tmp_path):
         env = _make_env(tmp_path, docker_image="ptdbench/ptdbench-slime-rc0:latest")
@@ -169,7 +245,10 @@ class TestNodeResolutionViaTsh:
         )
         assert await env._resolve_node_via_tsh() == "devspace-u-p-1098539"
 
-    async def test_no_match_raises(self, tmp_path, monkeypatch):
+    async def test_no_match_returns_none_for_retry(self, tmp_path, monkeypatch):
+        # cctl reports Running before Teleport registers the node, so a
+        # not-yet-present node is transient: resolution returns None and
+        # _wait_for_status polls again rather than failing the start.
         env = _make_env(
             tmp_path, image_id="1", tsh_path="/opt/tsh", devspace_id="tasks/1098539"
         )
@@ -181,14 +260,69 @@ class TestNodeResolutionViaTsh:
             "_collect_process",
             AsyncMock(return_value=(b"[]", b"", 0)),
         )
-        with pytest.raises(RuntimeError, match="No Teleport node ending in -1098539"):
-            await env._resolve_node_via_tsh()
+        assert await env._resolve_node_via_tsh() is None
 
     async def test_ssh_host_override_short_circuits(self, tmp_path):
         env = _make_env(
             tmp_path, image_id="1", ssh_host="devspace-explicit-9", tsh_path="/opt/tsh"
         )
         assert await env._resolve_devspace_host() == "devspace-explicit-9"
+
+
+class TestWaitForStatus:
+    """_wait_for_status gates on Running AND the ssh host registering."""
+
+    def _env(self, tmp_path, monkeypatch, **kwargs):
+        env = _make_env(tmp_path, image_id="1", devspace_id="tasks/1098539", **kwargs)
+        # Never actually sleep between polls.
+        monkeypatch.setattr(cybertron_mod.asyncio, "sleep", AsyncMock())
+        return env
+
+    async def test_running_and_host_resolved_sets_host(self, tmp_path, monkeypatch):
+        env = self._env(tmp_path, monkeypatch)
+        monkeypatch.setattr(
+            env, "_cctl", AsyncMock(return_value=({"status": "Running"}, 0, ""))
+        )
+        monkeypatch.setattr(
+            env,
+            "_resolve_devspace_host",
+            AsyncMock(return_value="devspace-u-p-1098539"),
+        )
+        await env._wait_for_status()
+        assert env._host == "devspace-u-p-1098539"
+
+    async def test_waits_for_host_registration_after_running(
+        self, tmp_path, monkeypatch
+    ):
+        # cctl is Running immediately, but the Teleport node is not registered
+        # for the first two polls (None) -- _wait_for_status must retry, not fail.
+        env = self._env(tmp_path, monkeypatch)
+        monkeypatch.setattr(
+            env, "_cctl", AsyncMock(return_value=({"status": "Running"}, 0, ""))
+        )
+        resolve = AsyncMock(side_effect=[None, None, "devspace-u-p-1098539"])
+        monkeypatch.setattr(env, "_resolve_devspace_host", resolve)
+        await env._wait_for_status()
+        assert env._host == "devspace-u-p-1098539"
+        assert resolve.await_count == 3
+
+    async def test_terminal_status_raises(self, tmp_path, monkeypatch):
+        env = self._env(tmp_path, monkeypatch)
+        monkeypatch.setattr(
+            env, "_cctl", AsyncMock(return_value=({"status": "Failed"}, 0, ""))
+        )
+        monkeypatch.setattr(env, "_resolve_devspace_host", AsyncMock())
+        with pytest.raises(RuntimeError, match="terminal status Failed"):
+            await env._wait_for_status()
+
+    async def test_times_out_when_host_never_registers(self, tmp_path, monkeypatch):
+        env = self._env(tmp_path, monkeypatch, status_timeout_sec=0)
+        monkeypatch.setattr(
+            env, "_cctl", AsyncMock(return_value=({"status": "Running"}, 0, ""))
+        )
+        monkeypatch.setattr(env, "_resolve_devspace_host", AsyncMock(return_value=None))
+        with pytest.raises(RuntimeError, match="did not become ready"):
+            await env._wait_for_status()
 
 
 class TestWrapSandbox:
@@ -272,3 +406,29 @@ class TestSetupDevspaceScript:
         assert "gcc -O2 -shared -fPIC" in setup
         # idempotent install (don't double-append the preload line)
         assert "grep -qxF" in setup
+
+    async def test_replaces_baked_real_dirs_before_symlinking(
+        self, tmp_path, monkeypatch
+    ):
+        # The eval images ship /workspace + /ptdbench/{models,datasets} as real
+        # dirs; `ln -sfn` would silently nest inside them. Setup must drop any
+        # pre-existing real (non-symlink) dir first, then link with -T so a
+        # lingering real dir fails loudly instead of nesting again.
+        env = _make_env(tmp_path, image_id="1")
+        env._cluster_user = "u"
+        captured: dict[str, str] = {}
+
+        async def fake_exec(self, command, *args, **kwargs):
+            captured["setup"] = command
+            return cybertron_mod.ExecResult(stdout="", stderr=None, return_code=0)
+
+        monkeypatch.setattr(CybertronEnvironment, "_ssh_exec", fake_exec)
+        await env._setup_devspace()
+        setup = captured["setup"]
+        # only real dirs are removed (an existing correct symlink is left alone)
+        assert '[ -e "$_link" ] && [ ! -L "$_link" ]' in setup
+        assert "rm -rf" in setup
+        # every mount point is linked with -T (no plain `ln -sfn` that would nest)
+        for link in ("/workspace", "/logs", "/ptdbench/models", "/ptdbench/datasets"):
+            assert f" {link}\n" in setup
+        assert setup.count("ln -sfnT ") == 4

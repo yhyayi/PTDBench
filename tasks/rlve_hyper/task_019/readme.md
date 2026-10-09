@@ -17,9 +17,12 @@ tasks using the same held-out protocol may intentionally share a name.
 
 ## Canonical failure reason
 
-`--lr-warmup-iters=2000` and `--lr-decay-iters=10000` keep the schedule
-from reaching the 2e-6 baseline (lr ends at 1e-7), so eval improvement
-stays below healthy p10
+`--lr-warmup-iters=2000` keeps the schedule from reaching the 2e-6 baseline
+(over the 100-step budget the lr stays inside the warmup ramp and ends at
+1e-7), so eval improvement stays below healthy p10. `--lr-decay-iters=10000`
+is a non-causal decoy: under `--lr-decay-style constant` the scheduler
+returns `max_lr` immediately after warmup and never consults
+`lr_decay_iters`, so it has no effect at any step count.
 
 ## Workspace and hidden evaluations
 
@@ -50,10 +53,11 @@ packaging_ready: true
 b1_scoring_ready: false
 label_review: false
 bug_type: hyperparameter/warmup
-buggy_keys: lr_warmup_iters,lr_decay_iters
+buggy_keys: lr_warmup_iters
+decoy_keys: lr_decay_iters  # present in the script but inert under constant decay
 verify:
   num_gpus: 4
-  timeout_minutes: 90
+  timeout_minutes: 180  # a correct 100-step rerun measured ~160 min wall-clock
   max_train_steps: 100
   eval_interval: 20
   eval_metric_key: eval/HELD-OUT_ENVIRONMENTS_128
@@ -69,7 +73,7 @@ required_final_score: "-0.24"
 
 ## Original failure evidence
 
-- train/lr-pg_0 ends at only 1e-7; never reaches baseline 2e-6
+- train/lr-pg_0 ends at only 1e-7; never reaches baseline 2e-6 (warmup ramp over 100 of 2000 iters)
 - raw_reward -0.599 to -0.531 (+0.068)
 - eval -0.620 to -0.522; improvement below healthy p10
 
@@ -92,16 +96,17 @@ Verdict: **unhealthy**.
 
 Root cause targets:
 
-- `--lr-decay-iters`
-- `--lr-warmup-iters`
+- `--lr-warmup-iters` (essential)
+- `--lr-decay-iters` (non-essential; inert under constant decay)
 
 Required fix targets:
 
-- `scripts/training/Qwen2.5-0.5B-Instruct/rlve.sh::--lr-warmup-iters`: `decrease`; target state/value: `0`, or any small warmup the judge considers reasonable.
-- `scripts/training/Qwen2.5-0.5B-Instruct/rlve.sh::--lr-decay-iters`: `remove`; target state/value: unset, or any value the judge considers reasonable for restoring a schedule that can reach the baseline learning rate.
+- `scripts/training/Qwen2.5-0.5B-Instruct/rlve.sh::--lr-warmup-iters`: `decrease`; target state/value: `0`, or any small warmup the judge considers reasonable. This is the only fix that restores the schedule.
+- `scripts/training/Qwen2.5-0.5B-Instruct/rlve.sh::--lr-decay-iters`: `remove` (optional cleanup); target state/value: unset. Removing it is harmless but not required — it does not affect the run under `--lr-decay-style constant`.
 
 Documentation reconciliation:
-- The two flags jointly keep the schedule from reaching the baseline `2e-6`.
+- `--lr-warmup-iters=2000` alone keeps the schedule from reaching the baseline `2e-6`.
+- `--lr-decay-iters` is inert under constant decay and is not part of the causal chain; omitting it from a diagnosis must not reduce the score.
 - Weak reward/eval movement is a symptom of the truncated learning-rate schedule.
 - The judge may accept any expected values it considers reasonable for restoring a schedule that can reach the baseline learning rate; the listed targets are references, not the only correct numbers.
 
@@ -110,10 +115,13 @@ Documentation reconciliation:
 `issue` grades `$PTDBENCH_RESULTS/agent_answer.md` against hidden
 `oracle.md`. The judge scores verdict, root-cause, and evidence agreement
 (weights 0.2 / 0.6 / 0.2). Pass is a weighted score of at least `0.8`.
-`--lr-decay-iters` and `--lr-warmup-iters` are both essential; naming only
-one should receive partial `root_cause_score`. Listed expected values are
-references; the judge may accept any values it considers reasonable for
-restoring a schedule that can reach the baseline learning rate.
+`--lr-warmup-iters` is the sole essential root cause; naming it with its
+causal role earns full `root_cause_score`. `--lr-decay-iters` is a
+non-causal decoy (inert under `--lr-decay-style constant`): omitting it must
+not reduce the score, and an answer that correctly argues it is inert should
+be credited. Listed expected values are references; the judge may accept any
+values it considers reasonable for restoring a schedule that can reach the
+baseline learning rate.
 
 `solution` does not grade a structured diagnosis. The agent must repair the
 staged workspace, run the designated launch script, and produce fresh
