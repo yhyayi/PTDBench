@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# rlve_hyper/task_001 — 训练前要准备的东西。
+# 训练前要准备的东西。
+#
+# 这个文件 agent 读得到（environment/ 只读挂在 /ptdbench/environment），所以不要
+# 在这里写任务 id、任务分类名或源实验名——那些名字会点出缺陷类别。维护侧的说明
+# 写在 readme.md 的 name-leak audit 一节。
 #
 # 由 environment/Dockerfile 的 MODEL_* ARG 和 environment/assets.yaml 迁移而来。
 # 跑在独立的 prepare 阶段容器里：root、已激活 `slime` 环境、**唯一有网的阶段**。

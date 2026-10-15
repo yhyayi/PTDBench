@@ -1,5 +1,5 @@
 {
-  "task_id": "task_llama_dapo_math_17k/task_monkey_patch_011",
+  "task_id": "task_llama_dapo_math_17k/__BENCH_TASK_ID__",
   "host_cuda": "2,3",
   "use_docker": true,
   "stop_after_first_step": true,
@@ -8,6 +8,6 @@
   "locked_environment_list": [
     "dapo_math_17k"
   ],
-  "param_path": "/REDACTED/BENCH_HOME/Benchmark_Evaluation/tasks/task_llama_dapo_math_17k/task_monkey_patch_011/workspace/outputs/_remote_execute_params.json",
-  "result_path": "/REDACTED/BENCH_HOME/Benchmark_Evaluation/tasks/task_llama_dapo_math_17k/task_monkey_patch_011/workspace/outputs/remote_execute_result.json"
+  "param_path": "/REDACTED/BENCH_HOME/Benchmark_Evaluation/tasks/task_llama_dapo_math_17k/__BENCH_TASK_ID__/workspace/outputs/_remote_execute_params.json",
+  "result_path": "/REDACTED/BENCH_HOME/Benchmark_Evaluation/tasks/task_llama_dapo_math_17k/__BENCH_TASK_ID__/workspace/outputs/remote_execute_result.json"
 }

@@ -32,6 +32,22 @@ The agent cannot read oracle or verifier paths. `issue` grading compares
 `$PTDBENCH_RESULTS/agent_answer.md` to hidden `oracle.md` with an LLM
 judge. `solution` grading reads only the new experiment logs.
 
+### Leaf-id sanitization
+
+The original experiment name was `taco_qwen2_5_1.5b_function_call`, which
+names the defect and so handed the agent the answer from the frozen evidence:
+it appeared 30 times across the training log, the offline W&B
+`config.yaml` / `output.log` / `debug.log` / `run-*.wandb`, and the hydra
+configs under `outputs/`. Every occurrence inside `workspace/` is now
+`__BENCH_TASK_ID__`, and the launch script reads
+`EXPERIMENT_NAME=${EXPERIMENT_NAME:-${BENCH_TASK_LEAF_ID:-__BENCH_TASK_ID__}}`.
+No harness code sets `BENCH_TASK_LEAF_ID`, so a fresh agent run emits exactly
+the same string and the snapshot stays self-consistent. Do not restore the
+original name. The binary `run-*.wandb` datastore was re-emitted record by
+record (lengths, CRCs and 32KB block framing recomputed) rather than patched
+in place; `oracle/task.yaml` still records the historical name because the
+oracle tree is not agent-visible.
+
 ## Source and preserved context
 
 The following source and historical packaging fields were moved from
@@ -64,9 +80,19 @@ historical_baseline:
 
 ## Original failure evidence
 
-- dirty validation rises from 0.0217 to 0.0543 and peaks at 0.0870 at step 300; the healthy scorer under the same setup reaches 0.0598 at step 0 and 0.139 at step 400
+- dirty validation rises from 0.0217 to 0.0543 and peaks at 0.0870 at step 300
 - official function solutions score 0 on both train and validation, while official stdin solutions still score 1
 - the held-out set contains 41 call-based and 143 stdin problems, so every call-based row is capped at zero even for a correct function solution
+
+A repaired run of this exact package was executed on reference devspace
+`1236983` (`/user/chenyinghao/harbor-runs/task_function_call__stage__env`),
+alongside a defective re-run on the same host, and the solution thresholds are
+calibrated from those two curves — see `evaluations/solution/oracle/README.md`
+for the table. The "healthy scorer reaches 0.139 at step 400" figure that
+earlier revisions of this document used as the reference point belongs to
+`tasks_coding_pass_01`, a different experiment whose stack included `pyext`;
+this task's `prepare.sh` deliberately omits `pyext`, and the repaired run here
+ends at 0.0978.
 
 The preserved source metric is `val-core/taco/acc/mean@1`. The frozen workspace remains
 the evidence package; solution grading requires a new 400-step training run and reads only
@@ -102,14 +128,25 @@ root cause.
 staged workspace, run the designated launch script for 400 steps, and produce
 fresh experiment logs. Scoring is weighted:
 
-- validation: a finite `val-core/taco/acc/mean@1` peak of at least `0.125`
-  (12.5%) scores `1`, otherwise `0`
-- training reward: the mean `critic/rewards/mean` over training steps must be
-  strictly above `0.14` to score `1`, otherwise `0`
+- validation: the mean of `val-core/taco/acc/mean@1` over the pinned step set
+  `200, 250, 300, 350, 400` must land in `[0.095, 0.35]` to score `1`,
+  otherwise `0`. All five steps must be present, which is what the designated
+  400-step run at `TEST_FREQ=50` produces.
+- training reward: the mean `critic/rewards/mean` over training steps `1..400`
+  must be strictly above `0.14` and at most `0.6` to score `1`, otherwise `0`.
+  All 400 steps must be present.
 - final `score = 0.8 * validation + 0.2 * training reward`
 
 Pass requires both components (`score == 1.0`). The framework still records
 the weighted float when only one component passes.
+
+Reference values from the calibration runs: repaired `0.1098` / `0.1838`,
+defective `0.0783` / `0.1003`. Pinning the step set rather than taking a peak
+matters because `TEST_FREQ` and `TOTAL_TRAINING_STEPS` are plain environment
+overrides in the launch script, and because the repaired run's peak (`0.125`)
+occurs exactly once. The upper bounds guard against a scorer rewritten to
+return a constant reward, since both graded quantities come out of the file
+the agent is asked to repair.
 
 ## External dataset asset
 
@@ -137,3 +174,55 @@ not download or verify a published external dataset revision.
 - The local backend does not hydrate the baked model and dataset assets.
 - The designated experiment uses 8 GPUs, a 400-step budget, and a large shared-memory allocation.
 - Model weights and historical training checkpoints are not external dataset assets.
+- `verify.timeout_minutes` is 660. The repaired reference run alone took 9h37m
+  (the defective one 8h44m — restoring call-based execution makes the run
+  slower), so the agent's diagnose-and-repair phase has under 1h20m of slack.
+
+### Notes moved out of `environment/prepare.sh`
+
+`prepare.sh` is mounted read-only into the agent container at
+`/ptdbench/environment`, so it must not carry maintainer background that names
+the defect, the sibling task, or the grading thresholds. These notes used to
+live in its comments and belong here instead. Keep it that way.
+
+**Migration.** `prepare.sh` replaced `environment/{Dockerfile,hydrate-assets.sh}`
+on 2026-09-23. The legacy Dockerfile only installed a patched `pyext` and baked
+`workspace/` into the image — it downloaded neither the model nor the dataset,
+and neither is git-tracked under `workspace/`, so a container built from it
+failed immediately on `MODEL_PATH` and `TRAIN_FILE`. The two assets were
+reconstructed against the runtime paths, byte counts and SHA-256 values in the
+"External dataset asset" table above.
+
+**Sibling.** `reward_design/task_evaluator` is built from the same recipe — two
+different injections into the same source file. Asset *contents* are
+byte-identical, but each task publishes its own HF repo at its own revision, so
+changes here usually need review there too. The two `prepare.sh` files are
+deliberately **not** identical: only the sibling installs `pyext`.
+
+**Why `pyext` is deliberately not installed.** The scorer tries
+`from pyext import RuntimeModule` and falls back to a complete, self-contained
+`_FallbackRuntimeModule` on `ImportError`; the fallback is reached on every
+sample of the stdin path, so installing `pyext` or not is a choice that lands
+on the reward, not a cosmetic one. The decision follows this task's own frozen
+run manifest: `workspace/logs/wandb/run-20260821_153903-js8e27l6/files/requirements.txt`
+is 282 lines with no `pyext`, while the sibling's frozen manifest is 283 lines
+and records `pyext==0.7`. Sorted line-by-line, that one package is the only
+difference. The shared legacy Dockerfile installed `pyext` for both, which
+contradicts the run recorded *here*, so the wandb manifest wins. The two
+implementations are not equivalent: `pyext`'s `from_string` execs into a
+temporary globals dict and copies the new names into a fresh module, leaving a
+function's `__globals__` and the module `__dict__` as two objects, whereas the
+fallback execs straight into `module.__dict__`. For the single `getattr(mod,
+'code')` use here the result is the same, but the semantics are not — which is
+exactly why each task has to be aligned separately. To reinstate it, lift the
+trailing section of the sibling's `prepare.sh` (installs into
+`$PTDBENCH_PREPARED/pysite` and appends `PYTHONPATH` to `$PTDBENCH_PREPARED/env`).
+Do **not** edit `docker/images/verl.Dockerfile`; that image is shared by every
+verl task.
+
+**Known residual leak.** The two HF repositories are named
+`LIF1014/ptdbench-verl-coding-tasks-function-call` and
+`…-function-call-dataset`. `prepare.sh` must name them to fetch them, so the
+string survives there and cannot be sanitized from inside this package —
+closing it means republishing both repos under a neutral name and updating the
+revisions here.

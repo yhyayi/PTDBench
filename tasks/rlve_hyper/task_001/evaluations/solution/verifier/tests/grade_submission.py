@@ -166,13 +166,21 @@ def extract(spec: dict[str, Any], results: Path):
     return experiment, values, keys_seen
 
 
-def select_best(values: dict[int, tuple[Any, Decimal, str]]):
-    best = None
+def select_peak(values: dict[int, tuple[Any, Decimal, str]]):
+    """Highest point over the whole curve. Informational only, never graded.
+
+    Grading the peak let a repaired run pass on its luckiest eval point and let
+    a truncated run pass at all: in the calibration run step 39 already cleared
+    the old bar two hours into a five-hour schedule, and `--num-rollout` /
+    `--eval-interval` reach `rlve.sh` through its `EXTRA_TRAIN_ARGS...` tail,
+    so more eval points were an agent-side knob. See `resources/README.md`.
+    """
+    peak = None
     for step, (rank, value, relative) in values.items():
         candidate = (value, step, rank, relative)
-        if best is None or candidate > best:
-            best = candidate
-    return best
+        if peak is None or candidate > peak:
+            peak = candidate
+    return peak
 
 
 def grade(spec: dict[str, Any], results: Path):
@@ -182,13 +190,19 @@ def grade(spec: dict[str, Any], results: Path):
     baseline = Decimal(str(spec["historical_final_baseline"]))
     required_score = Decimal(str(spec["required_final_score"]))
     errors = []
-    best = select_best(values)
-    best_value = best[0] if best is not None else None
-    best_step = best[1] if best is not None else None
-    best_source = best[3] if best is not None else None
-    improvement = best_value - baseline if best_value is not None else None
-    if best_value is None:
-        if metric_key in keys_seen:
+    peak = select_peak(values)
+    final = values.get(final_step)
+    final_value = final[1] if final is not None else None
+    final_source = final[2] if final is not None else None
+    improvement = final_value - baseline if final_value is not None else None
+    if final_value is None:
+        if values:
+            steps_seen = ", ".join(str(step) for step in sorted(values))
+            errors.append(
+                f"missing {metric_key} at step {final_step}; "
+                f"steps present: {steps_seen}"
+            )
+        elif metric_key in keys_seen:
             errors.append(f"missing finite {metric_key}")
         elif keys_seen:
             errors.append(
@@ -196,24 +210,26 @@ def grade(spec: dict[str, Any], results: Path):
             )
         else:
             errors.append(f"missing {metric_key} in experiment_logs")
-    elif best_value < required_score:
+    elif final_value < required_score:
         errors.append(
-            f"best score {best_value} at step {best_step} is below "
+            f"final score {final_value} at step {final_step} is below "
             f"required score {required_score}"
         )
     passed = not errors
     score = 1.0 if passed else 0.0
-    judged = float(best_value) if best_value is not None else None
+    judged = float(final_value) if final_value is not None else None
+    peak_step = peak[1] if peak is not None else None
+    peak_score = float(peak[0]) if peak is not None else None
     metrics = {
         "task_id": spec["task_id"],
         "metric_key": metric_key,
         "final_step": final_step,
         "historical_final_baseline": float(baseline),
         "required_final_score": float(required_score),
-        "best_step": best_step,
-        "best_score": judged,
-        "best_source_log": best_source,
         "final_score": judged,
+        "final_source_log": final_source,
+        "peak_step": peak_step,
+        "peak_score": peak_score,
         "absolute_improvement": (
             float(improvement) if improvement is not None else None
         ),
@@ -225,9 +241,11 @@ def grade(spec: dict[str, Any], results: Path):
         "deterministic": True,
         "judge_used": False,
     }
-    experiment["metrics"]["best_step"] = best_step
-    experiment["metrics"]["best_score"] = judged
-    experiment["metrics"]["best_source_log"] = best_source
+    experiment["metrics"]["final_step"] = final_step
+    experiment["metrics"]["final_score"] = judged
+    experiment["metrics"]["final_source_log"] = final_source
+    experiment["metrics"]["peak_step"] = peak_step
+    experiment["metrics"]["peak_score"] = peak_score
     return experiment, metrics, {"passed": passed, "score": score, "metrics": metrics}
 
 

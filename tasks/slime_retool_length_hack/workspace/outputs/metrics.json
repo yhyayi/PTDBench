@@ -1,5 +1,5 @@
 {
-  "task_id": "slime_retool_length_hack",
+  "task_id": "slime_retool",
   "created_at": "2026-08-20T22:32:43+00:00",
   "scoring_note": "Historical AIME-2024 evaluation metrics frozen from the original run through train step 100 (last eval at step 99; eval_interval=10).",
   "run_once": {
@@ -209,6 +209,6 @@
   "attempt": 1,
   "wandb_run": {
     "id": "jwszcocp",
-    "group": "qwen3-4B-retool-multi-turn-reward-hack"
+    "group": "qwen3-4B-retool-multi-turn"
   }
 }

@@ -37,4 +37,4 @@ environment:
     TOKENIZERS_PARALLELISM: "false"
 outcome:
   failure_type: rollout_loss_mask
-  failure_reason: Observation tokens are trained on (loss_mask=1 on retrieved <information> text); frozen eval/nq_test reaches only 14.5% at the 100-step horizon versus a healthy protocol baseline of 37.5%
+  failure_reason: Observation tokens are trained on (loss_mask=1 on retrieved <information> text); frozen eval/nq_test reaches only 16.5% at the 200-step horizon versus a healthy protocol baseline of 40.8%, and train response length collapses from about 1751 tokens to about 9 as the policy stops searching

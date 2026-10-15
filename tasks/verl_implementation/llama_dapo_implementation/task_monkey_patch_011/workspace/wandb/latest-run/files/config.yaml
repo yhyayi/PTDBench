@@ -532,7 +532,7 @@ actor_rollout_ref:
             trace:
                 _target_: verl.workers.config.TraceConfig
                 backend: null
-                experiment_name: task_monkey_patch_011
+                experiment_name: __BENCH_TASK_ID__
                 max_samples_per_step_per_worker: null
                 project_name: verl_grpo_dapo_math
                 token2text: false
@@ -1020,11 +1020,11 @@ trainer:
         balance_batch: true
         critic_warmup: 0
         default_hdfs_dir: null
-        default_local_dir: checkpoints/verl_grpo_dapo_math/task_monkey_patch_011
+        default_local_dir: checkpoints/verl_grpo_dapo_math/__BENCH_TASK_ID__
         del_local_ckpt_after_load: false
         device: cuda
         esi_redundant_time: 0
-        experiment_name: task_monkey_patch_011
+        experiment_name: __BENCH_TASK_ID__
         log_val_generations: 0
         logger:
             - console

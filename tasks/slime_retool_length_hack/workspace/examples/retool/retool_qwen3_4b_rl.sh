@@ -75,11 +75,17 @@ if [ ! -d "$DIST_MODEL_DIR" ] || [ -z "$(ls -A "$DIST_MODEL_DIR" 2>/dev/null)" ]
       --save "$DIST_MODEL_DIR"
 fi
 
+# Where training checkpoints go. This must NOT live under $HF_MODEL_DIR: that
+# directory is the input checkpoint and may be mounted read-only, in which case
+# --save would fail partway through the first save interval rather than at
+# startup. Default keeps the old directory name, just under a writable root.
+OUTPUT_DIR=${OUTPUT_DIR:-$PWD/outputs}
+
 CKPT_ARGS=(
    --hf-checkpoint "$HF_MODEL_DIR"
    --ref-load "$DIST_MODEL_DIR"
    # --load "$MODEL_DIR/Qwen3-4B_slime/"
-   --save "$HF_MODEL_DIR/qwen3-4b-sft-multi-turn-hack/"
+   --save "$OUTPUT_DIR/qwen3-4b-sft-multi-turn/"
    --save-interval 10
    --rotary-base 5000000
 )
@@ -105,7 +111,6 @@ ROLLOUT_ARGS=(
 EVAL_ARGS=(
    --eval-interval 10
    --eval-prompt-data aime  "$EVAL_DATA"
-   --eval-reward-key acc
    --n-samples-per-eval-prompt 16
    --eval-max-response-len 16384
    --eval-top-p 1
@@ -150,7 +155,7 @@ OPTIMIZER_ARGS=(
 WANDB_ARGS=(
    --use-wandb
    --wandb-project slime-retool
-   --wandb-group qwen3-4B-retool-multi-turn-reward-hack
+   --wandb-group qwen3-4B-retool-multi-turn
    --wandb-key ${WANDB_API_KEY}
 )
 

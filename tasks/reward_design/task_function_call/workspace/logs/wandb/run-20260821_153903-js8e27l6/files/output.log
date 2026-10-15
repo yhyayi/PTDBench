@@ -1,7 +1,7 @@
 wandb: Detected [openai] in use.
 wandb: Use W&B Weave for improved LLM call tracing. Install Weave with `pip install weave` then add `import weave` to the top of your script.
 wandb: For more information, check out the docs at: https://weave-docs.wandb.ai/
-Checkpoint tracker file does not exist: /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_function_call/latest_checkpointed_iteration.txt
+Checkpoint tracker file does not exist: /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/latest_checkpointed_iteration.txt
 Training from scratch
 test_gen_batch meta info: {'eos_token_id': 151645, 'pad_token_id': 151643, 'recompute_log_prob': False, 'do_sample': True, 'validate': True, 'global_steps': 0}
 validation generation end
@@ -37659,7 +37659,7 @@ print(solution.generate(numRows))
 [expected] None
 [output] None
 ========================================================================
-local_global_step_folder: checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_function_call/global_step_400
+local_global_step_folder: checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400
 test_gen_batch meta info: {'eos_token_id': 151645, 'pad_token_id': 151643, 'recompute_log_prob': False, 'do_sample': True, 'validate': True, 'global_steps': 400}
 validation generation end
 ========================================================================

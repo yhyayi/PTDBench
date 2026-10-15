@@ -23,9 +23,15 @@ note: >-
   single injected defect: generate_with_search.py::generate appends retrieved
   <information> tokens with loss_mask=1 so search-engine results are trained
   on. Frozen historical evidence covers train step 200 / last eval step 199
-  (eval_interval 10). Solution grading is metric-only after a repair-and-rerun:
-  best eval/nq_test must be at least 0.30 (historical 0.1647; healthy protocol
-  about 0.408).
+  (eval_interval 10). Solution grading is metric-only after a repair-and-rerun
+  at the instruction's --num-rollout 100 / --eval-interval 10 budget, so the
+  new run has eval points 0..99: the best finite eval/nq_test must land in
+  [0.28, 1.0]. The frozen defective run is 0.1543 at step 99 (0.1647 at 199);
+  a repaired run reaches about 0.3733 by step 99 (0.4083 at 199). 0.28 is the
+  same bar the healthy twin slime_search_r1 uses. The graded horizon stops at
+  99 and not 199 because at 199 the defective side is unmeasured -- the one
+  defective run observed past step 99 was still climbing (0.2713 at step 119)
+  when it was killed.
 key_files:
 - examples/search-r1/generate_with_search.py
 - examples/search-r1/run_qwen2.5_3B.sh

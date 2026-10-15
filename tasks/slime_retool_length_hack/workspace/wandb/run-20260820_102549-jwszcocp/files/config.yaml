@@ -98,7 +98,7 @@ _wandb:
                     - --wandb-project
                     - slime-retool
                     - --wandb-group
-                    - qwen3-4B-retool-multi-turn-reward-hack
+                    - qwen3-4B-retool-multi-turn
                     - --wandb-key
                     - REDACTED
                     - --tensor-model-parallel-size
@@ -208,9 +208,9 @@ _wandb:
                 memory:
                     total: "2164281171968"
                 os: Linux-5.15.0-78-generic-x86_64-with-glibc2.39
-                program: /user/chenyinghao/workspace/data_call/tasks/slime_retool_length_hack/workspace/train.py
+                program: /user/chenyinghao/workspace/data_call/tasks/slime_retool/workspace/train.py
                 python: CPython 3.12.3
-                root: /user/chenyinghao/workspace/data_call/tasks/slime_retool_length_hack/workspace
+                root: /user/chenyinghao/workspace/data_call/tasks/slime_retool/workspace
                 startedAt: "2026-08-20T06:54:10.275215Z"
                 writerId: qv6ueacir39olwst5fwp46b2mmotks6m
         m:
@@ -3072,7 +3072,7 @@ wandb_entity:
 wandb_exp_name:
     value: null
 wandb_group:
-    value: qwen3-4B-retool-multi-turn-reward-hack
+    value: qwen3-4B-retool-multi-turn
 wandb_host:
     value: null
 wandb_key:

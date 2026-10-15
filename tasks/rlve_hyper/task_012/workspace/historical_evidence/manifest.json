@@ -1,7 +1,6 @@
 {
   "schema_version": 1,
   "evidence_kind": "historical_failure",
-  "task_id": "task_012",
   "source_run": "run_38",
   "failure_signature": "metric_failure",
   "held_out_eval": {

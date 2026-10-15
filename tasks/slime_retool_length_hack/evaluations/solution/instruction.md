@@ -29,9 +29,8 @@ The effective run must use:
 - Megatron torch_dist reference `/workspace/font-info_qwen3-4b-sft_torch_dist`
 - train data `/workspace/zhuzilin_dapo-math-17k/dapo-math-17k.jsonl`
 - validation data `/workspace/zhuzilin_aime-2024/aime-2024.jsonl`
-- `--num-rollout 100`
+- `--num-rollout 70`
 - `--eval-interval 10`
-- `--eval-reward-key acc`
 - `LOG_DIR=$PTDBENCH_RESULTS/experiment_logs`
 - `WANDB_MODE=offline`
 - `WANDB_DIR=$PTDBENCH_RESULTS/experiment_logs`

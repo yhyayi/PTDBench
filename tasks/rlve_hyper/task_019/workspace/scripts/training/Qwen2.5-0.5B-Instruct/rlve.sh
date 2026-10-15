@@ -11,7 +11,9 @@
 LOCKED_ENVIRONMENT_LIST="Division EuclidGame GCDOne_Counting HamiltonianPath LampChanging LargestConvexPolygon Multiplication PCPPermutation Path_NoGoingBack_Counting SAT ShortestPath Sorting SpiralMatrix SubsequenceReversalLNDS UndamagedSubmatrixCounting WYRLevelingGround"
 
 WANDB_PROJECT="${1:-ptdbench}"
-RUN_NAME="${2:-rlve_task_019}"
+# RUN_NAME only labels the run (wandb group + run directory). No harness code
+# sets BENCH_TASK_LEAF_ID, so a fresh run emits the placeholder itself.
+RUN_NAME="${2:-${BENCH_TASK_LEAF_ID:-__BENCH_TASK_ID__}}"
 ENVIRONMENT_LIST="${LOCKED_ENVIRONMENT_LIST}"
 
 # Consume up to the three leading positionals (whatever subset was supplied);

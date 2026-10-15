@@ -65,7 +65,7 @@ historical_baseline:
   truncate_ratio_max: 0.1171875
   n_eval_points: 6
 failure_signature: metric_failure
-required_final_score: "-0.24"
+required_final_score: "-0.38"
 ```
 
 ## Original failure evidence
@@ -86,7 +86,7 @@ worst-case raw_reward gain still about +0.36) and held-out
 `eval/HELD-OUT_ENVIRONMENTS_128` around `-0.62 ± 0.03` at the start of
 eval, with eval improvement at least the healthy p10 of about +0.21.
 This case's budget is 100 rollouts; the frozen `eval_last` is well below
-the solution gate of `-0.24`.
+the solution gate of `-0.38`.
 
 ## Canonical expected outcome
 
@@ -114,14 +114,32 @@ Documentation reconciliation:
 staged workspace, run the designated launch script, and produce fresh
 experiment logs. Scoring is weighted:
 
-- validation: a finite `eval/HELD-OUT_ENVIRONMENTS_128` peak of at least
-`-0.24` scores `1`, otherwise `0`
-- training reward: the mean of every logged `RLVE/*/accuracy` point must be
-at least `0.2` to score `1`, otherwise `0`
+Grading binds to a single launch: the verifier elects the newest text log that
+both reports held-out eval and announces its offline W&B directories, then reads
+both halves of the score from that launch alone. A throwaway debug launch left
+in the log root is therefore ignored rather than pooled into the score.
+
+- validation: `eval/HELD-OUT_ENVIRONMENTS_128` at the final eval step must be at
+least `-0.38` and no more than `0.10`, and the last eval step must be `99` (a
+short run cannot pass); scores `1`, otherwise `0`
+- training reward: the mean of the last `25%` of the launch's `RLVE/*/accuracy`
+points must be at least `0.18` to score `1`, otherwise `0`
 - final `score = 0.8 * validation + 0.2 * training reward`
 
 Pass requires both components (`score == 1.0`). The framework still records
 the weighted float when only one component passes.
+
+Text logs are not trusted alone. Every eval step the elected log reports that
+also appears in that launch's `.wandb` binary stream must agree with it, and at
+least `3` points must corroborate. The final eval (step `99`) is written to the
+text log but never reaches the binary stream — observed on every reference run —
+so corroboration is required on the overlap, not on the graded point.
+
+Thresholds come from reference runs on devspace `1107990`
+(`/user/chenyinghao/harbor-runs/task_012__stage__env`): the repaired run ends at
+`-0.1661` with a tail accuracy of `0.3495`, while unrepaired reruns end at
+`-0.5898` / `-0.6910` with tail accuracy `0.047`. Both gates sit between those
+two populations rather than against a converted or historical number.
 
 ## External dataset asset
 

@@ -3,8 +3,8 @@
   "task_id": "task_monkey_patch_011",
   "metric_key": "val-core/math_dapo/acc/mean@1",
   "final_step": 200,
-  "historical_final_baseline": "0.04022346368715084",
-  "required_final_score": "0.07",
+  "historical_final_baseline": "0.047592695074709465",
+  "required_final_score": "0.060",
   "log_roots": [
     "experiment_logs"
   ]

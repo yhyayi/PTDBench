@@ -3,9 +3,9 @@
   "task_id": "slime_retool_length_hack",
   "metric_key": "eval/aime",
   "final_step": 69,
-  "historical_final_baseline": "0.084369150797526",
-  "required_final_score": "0.18",
-  "required_final_score_max": "1.0",
+  "historical_final_baseline": "3.580407918294271",
+  "required_final_score": "-0.55",
+  "required_final_score_max": "0.5",
   "score_mode": "best",
   "log_roots": [
     "experiment_logs"

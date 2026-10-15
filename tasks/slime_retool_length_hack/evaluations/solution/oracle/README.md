@@ -40,9 +40,11 @@ truncate ratio.
 
 Because `eval/aime` is the mean of `reward_func`, the length term is inside
 the logged metric. Subtracting `5 * min(mean_effective_len / 16384, 1)`
-reconstructs decontaminated scores of about −0.417 (29.2% acc) at step 0 and
-−0.831 (8.4% acc) at step 99. Held-out accuracy collapses while the polluted
-metric rises.
+reconstructs decontaminated scores of about −0.417 at step 0 and −0.831 at
+step 99. `reward_func` floors an incorrect sample at `min(-0.6, …)` rather than
+`-1`, so those scores bound exact-match accuracy at no more than about 29.2%
+and 8.4%; the true values are lower. Either way the held-out signal collapses
+while the polluted metric rises.
 
 ## Why it is unhealthy
 
@@ -87,9 +89,48 @@ cause:
 - Runtime asset paths under `/root/…` fulfilled on the training host.
 - Rising logged `eval/aime` without subtracting the length bonus.
 
-Machine grading reads only the new experiment logs. The required held-out
-metric is `eval/aime` at step 99. New runs log that key as exact-match
-accuracy via `--eval-reward-key acc` (0/1 mean), not the length-polluted
-reward. The historical decontaminated accuracy is about 8.4%. The absolute
-pass line is `0.18` (18%). A healthy protocol reaches about 25% at the same
-horizon. Pass is score `1`; otherwise `0`.
+## Machine grading
+
+Machine grading reads only the new experiment logs under
+`$PTDBENCH_RESULTS/experiment_logs`. The required held-out metric is
+`eval/aime`, read in the math_dapo **score** space `[-1, 1]` — the space the
+frozen trace was logged in (`eval_reward_key: score`) and the space
+`slime_retool` grades the same recipe in. No `--eval-reward-key` is involved;
+the instruction fixes `--num-rollout 70` and `--eval-interval 10`, so the run
+has eval points 0, 9, …, 69.
+
+Grading the score channel is the discriminator, because that channel is where
+the defect lives:
+
+- the length term is still present → `eval/aime` leaves `[-1, 1]`
+  (historically `+0.822` at step 0 up to `+3.841` at step 99)
+- the length term is removed → `eval/aime` is the correctness signal, which
+  cannot exceed `+1`
+
+`score_mode` is `best` (highest finite point over the run; a single eval over
+30 AIME problems is noisy). That value must be at least `-0.55` and at most
+`0.5`. Pass is score `1`; otherwise `0`.
+
+Both bounds are calibrated on the repaired reference run — the canonical recipe
+with the length term removed, same image and assets, `--num-rollout 70`
+(`devspace 1177503:/user/chenyinghao/harbor-runs/manual-slime-retool`):
+
+| step | 0 | 9 | 19 | 29 | 39 | 49 | 59 | 69 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `eval/aime` | -0.5808 | -0.5706 | -0.5078 | -0.5035 | -0.5065 | -0.4373 | **-0.4246** | -0.4861 |
+
+The lower bound fails an untrained step 0 (`-0.5808`) while the best point
+(step 59, `-0.4246`) clears it by `0.125`. The upper bound sits below every
+eval point an unrepaired run can produce — the thinnest case is step 0, where
+the length bonus alone is `5 * 4042 / 16384 = +1.233` and the total lands near
+`+0.65` — yet `0.92` above the repaired run's best point, so it cannot fail a
+correct repair. `historical_final_baseline` in `grader_spec.json` is the
+*defective* run's step-69 value (`+3.580`): here a repaired run must come in
+below the baseline, not above it.
+
+Do not quote an accuracy threshold for this level. `reward_func` floors an
+incorrect sample at `min(-0.6, …)` rather than `-1`, so mean score does not
+convert to accuracy by `(score + 1) / 2`; `-0.4861` only bounds the repaired
+run's accuracy to `[7.1%, 25.7%]`, and no accuracy was ever measured for the
+repaired recipe. The score channel is what was measured, so the score channel
+is what is graded.

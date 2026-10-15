@@ -2,7 +2,6 @@
   "schema_version": 1,
   "evidence_kind": "historical_failure",
   "task_id": "task_019",
-  "source_run": "run_48_warmup_iters_2000_lr_warmup_decay=10000",
   "failure_signature": "metric_failure",
   "held_out_eval": {
     "metric_key": "eval/HELD-OUT_ENVIRONMENTS_128",

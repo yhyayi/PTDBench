@@ -69,8 +69,37 @@ cause:
   asset paths under `/root/…`.
 - Falling response length / truncation, or training `rollout/raw_reward`.
 
-Machine grading reads only the new experiment logs. The required held-out
-metric is `eval/nq_test`. The historical final baseline is `0.1647` (16.5%).
-The absolute pass line is `0.30` (30%) on the best finite value at any step.
-Pass is score `1`; otherwise `0`. A healthy masked protocol reaches about
-40.8% at the same 200-step horizon.
+## Machine grading
+
+Machine grading reads only the new experiment logs under
+`$PTDBENCH_RESULTS/experiment_logs`. The required held-out metric is
+`eval/nq_test`, exact-match accuracy in `[0, 1]` — the defect distorts the
+policy, not the metric, so no channel correction is needed.
+
+The instruction fixes `--num-rollout 100` / `--eval-interval 10`, giving eval
+points 0, 9, …, 99. `score_mode` is `best`; the graded value must land in
+`[0.28, 1.0]`. Pass is score `1`; otherwise `0`. `0.28` is the same bar the
+healthy twin `slime_search_r1` uses — same recipe, same metric, same horizon —
+so the threshold is not a tell for which side of the pair a task is on. The
+historical defective run's step-99 value is `0.1543`.
+
+Calibrated on four measured runs (devspace 1107990,
+`/user/chenyinghao/harbor-runs/`), best over steps `0..99`:
+
+| run | code | best `0..99` |
+| --- | --- | --- |
+| `slime_search_r1__stage__env` 2026-10-10 | repaired (`loss_mask += [0]`) | 0.3733 |
+| `slime_search_r1__stage__env` 2026-10-09 | repaired | 0.3570 |
+| `slime_search_r1_nomask__stage__env` 2026-10-09 | defect (`loss_mask += [1]`) | 0.2237 |
+| `slime_search_r1_nomask__stage__env` 2026-10-10 | defect (= the frozen evidence) | 0.1587 |
+
+Thinnest margin is `0.056`, on the defective side; an untrained step 0 (about
+`0.045`–`0.051`) fails by a wide margin.
+
+The frozen historical evidence runs to step 199, past the rerun horizon — that
+run simply used 200 rollouts. Grading is calibrated only on the `0..99` window
+every measured run reached. Do not move the graded horizon to 199: the defect
+is high-variance there, and the one defective run observed past step 99 was
+still climbing (`0.2713` at step 119) when it was killed, so its 200-step
+ceiling is unmeasured. A healthy masked protocol reaches about `0.3733` by step
+99 and about `0.4083` at step 199.

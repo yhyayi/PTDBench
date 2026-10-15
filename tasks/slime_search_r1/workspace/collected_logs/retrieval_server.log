@@ -1,198 +1,0 @@
-Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 4892.02it/s]
-INFO:     Started server process [105435]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s]Retrieval process: 100%|██████████| 1/1 [00:01<00:00,  1.70s/it]Retrieval process: 100%|██████████| 1/1 [00:01<00:00,  1.70s/it]
-INFO:     127.0.0.1:54948 - "POST /retrieve HTTP/1.1" 200 OK
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s]
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A
-
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A[A
-
-
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Retrieval process:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- ... (more hidden) ...[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A

@@ -57,7 +57,11 @@ buggy_keys: lr_warmup_iters
 decoy_keys: lr_decay_iters  # present in the script but inert under constant decay
 verify:
   num_gpus: 4
-  timeout_minutes: 180  # a correct 100-step rerun measured ~160 min wall-clock
+  # The source field said 180 (~160 min); the repaired rerun of this staged
+  # workspace measured 5h28m on 4xH100 (see "Measured reruns" below). This field
+  # is documentation only -- harbor_evaluator._write_task_config() emits no
+  # [agent] timeout_sec, so the agent phase is untimed in practice.
+  timeout_minutes: 330
   max_train_steps: 100
   eval_interval: 20
   eval_metric_key: eval/HELD-OUT_ENVIRONMENTS_128
@@ -68,7 +72,7 @@ historical_baseline:
   truncate_ratio_max: 0.1484375
   n_eval_points: 6
 failure_signature: metric_failure
-required_final_score: "-0.24"
+required_final_score: "-0.40"  # recalibrated 2026-10-15; the source value was "-0.24"
 ```
 
 ## Original failure evidence
@@ -88,7 +92,30 @@ worst-case raw_reward gain still about +0.36) and held-out
 `eval/HELD-OUT_ENVIRONMENTS_128` around `-0.62 ± 0.03` at the start of
 eval, with eval improvement at least the healthy p10 of about +0.21.
 This case's budget is 100 rollouts; the frozen `eval_last` is well below
-the solution gate of `-0.24`.
+the solution gate of `-0.40`.
+
+## Measured reruns
+
+Both arms of this exact staged workspace were rerun on 4xH100 (devspace
+`1177503`, `/user/chenyinghao/harbor-runs/task_019__stage__env`). The two trees
+differ only by the oracle repair in `rlve.sh`; every other tracked file matches
+by md5.
+
+| step | defect arm (`--lr-warmup-iters 2000`) | repaired arm (`--lr-warmup-iters 0`) |
+| ---: | ---: | ---: |
+| 0 | -0.6195 | -0.5767 |
+| 19 | -0.6149 | -0.2533 |
+| 39 | -0.5635 | -0.2384 |
+| 59 | -0.6305 | -0.1355 |
+| 79 | -0.6525 | -0.1419 |
+| **99** | **-0.5321** | **-0.1021** |
+| mean `train/lr-pg_0` | 5.05e-8 | 2.0e-6 |
+
+The defect arm's step-99 value (-0.5321) confirms the frozen full-scale
+`eval_last` (-0.5221) despite the staged downscaling, so the historical baseline
+remains usable. Both arms evaluate the same base checkpoint at step 0 and differ
+by 0.042, which puts one eval point's sigma at about 0.03. The repaired arm took
+5h28m wall-clock at a steady ~65 min per 20 steps.
 
 ## Canonical expected outcome
 
@@ -127,14 +154,97 @@ baseline learning rate.
 staged workspace, run the designated launch script, and produce fresh
 experiment logs. Scoring is weighted:
 
-- validation: a finite `eval/HELD-OUT_ENVIRONMENTS_128` peak of at least
-  `-0.24` scores `1`, otherwise `0`
-- learning rate: the mean `train/lr-pg_0` over training steps must be at
-  least `8e-7` to score `1`, otherwise `0`
+- validation: `eval/HELD-OUT_ENVIRONMENTS_128` **at step 99** (the last step of
+  the locked 100-rollout budget) must exist and fall in `[-0.40, 0.30]` to score
+  `1`, otherwise `0`
+- learning rate: `train/lr-pg_0` must be logged at step 99 across at least 95
+  steps, and its mean must be at least `8e-7` to score `1`, otherwise `0`
 - final `score = 0.8 * validation + 0.2 * learning rate`
 
 Pass requires both components (`score == 1.0`). The framework still records
 the weighted float when only one component passes.
+
+Recalibrated 2026-10-15 against the measured reruns above. What changed and why:
+
+- Grading moved from the peak at any step to the value at `final_step = 99`. The
+  old peak rule passed a repaired run truncated after `eval 39` with `1.0` (its
+  -0.2384 cleared the old `-0.24` bar by 0.0016), so 60% of the compute budget
+  was optional; peak also grew with `--num-rollout`, while a fixed step index
+  does not.
+- `final_step` went from `100` to `99`. Step 100 never appears in any log
+  (`--num-rollout 100` gives steps 0..99, `--eval-interval 20` gives
+  0/19/39/59/79/99), so the old value would have scored a perfect run as 0 the
+  moment anything keyed on it.
+- `required_final_score` -0.24 -> -0.40, between the defect arm's step-99 value
+  (-0.5321) and the repaired arm's worst post-training point (-0.2533 at step
+  19), whose midpoint is -0.393 -- ~0.13 of margin each way. The repaired arm's
+  post-training points swing by 0.15, so the bar is set against its weakest
+  checkpoint, not against its step-99 value. `-0.24` was a family constant
+  shared verbatim by `task_{001,012,019}` despite step-99 baselines of -0.639 /
+  -0.614 / -0.522, and it predates both reruns.
+- Added `required_final_score_max = 0.30`. RLVE reward is bounded to `[-1, 1]`
+  (`Gym/environment.py:183`), the repaired arm ended at -0.102, and the grader
+  otherwise accepts any line in any log file under `experiment_logs` -- a
+  fabricated `eval 99: {... 0.9}` used to pass.
+- Added budget coverage: the step-99 eval point and at least 95 logged
+  `train/lr-pg_0` steps are required.
+- `required_learning_rate` stays at `8e-7`; the measured means sit 16x below and
+  2.5x above it.
+
+Residual, accepted: eval and lr points are still merged per step across every
+log under `experiment_logs` with a per-step max, so repeated runs give
+best-of-N at step 99, and `oracle/task.yaml`'s `max_runs: 1` is not enforced in
+the container. The lr component can also be satisfied by raising `--lr` while
+leaving the warmup intact (mean lr is restored, the constant schedule is not);
+such a run still has to clear the step-99 eval bar. And a partial repair such as
+`--lr-warmup-iters 100` keeps mean lr at ~1e-6, clearing the lr component, and
+may land its step-99 eval between the two arms -- no partial arm has been
+measured, so where it falls relative to `-0.40` is unknown.
+
+## Task-name sanitization
+
+Audited 2026-10-15 for leaks of the task's own name into agent-visible surfaces.
+What the agent can actually read is `workspace/` plus `instruction.md` plus the
+`environment/` directory (mounted at `/ptdbench/environment` by the docker
+backend and at `/workspace/.ptdbench-environment` by the cybertron backend);
+`metadata.yaml`, this readme, `evaluations/*/oracle/` and
+`evaluations/*/verifier/` are not mounted for the agent stage, and
+`PTDBENCH_TASK_ID` is the leaf id only (`ptdbench/core/types.py:77`), not
+`rlve_hyper/task_019`.
+
+Fixed:
+
+- `environment/prepare.sh:2` opened with `# rlve_hyper/task_019`, which named
+  the case family -- i.e. "the defect is a hyperparameter" -- in a file the agent
+  can read. Now `__BENCH_TASK_ID__`, with a note that the file is agent-visible.
+  A cross-reference to a sibling task by name was also neutralized.
+- `workspace/historical_evidence/manifest.json` carried
+  `source_run: run_48_warmup_iters_2000_lr_warmup_decay=10000`, which spells out
+  both buggy keys and both values. The field is dropped from the agent-visible
+  copy (`convert_rlve_hyper.visible_manifest`) and kept in
+  `evaluations/solution/oracle/historical_evidence_manifest.json` for
+  provenance. The committed workspace copy now equals the generator's output.
+- `workspace/scripts/training/Qwen2.5-0.5B-Instruct/rlve.sh:14` defaulted
+  `RUN_NAME` to `rlve_task_019`, which labels the agent's own wandb group, run
+  directory and log paths. Now
+  `${2:-${BENCH_TASK_LEAF_ID:-__BENCH_TASK_ID__}}`, matching the convention used
+  by the verl tasks; no harness code sets `BENCH_TASK_LEAF_ID`, so a fresh run
+  emits the placeholder.
+
+Not a leak, deliberately kept: `lr_warmup_iters: 2000` in
+`historical_evidence/{manifest,hparams_effective}.json`. `rlve.sh` itself passes
+`--lr-warmup-iters 2000`, so the frozen hparams only restate a visible config
+value -- that is the evidence the issue level expects the agent to find.
+
+Open: `convert_rlve_hyper.py` re-copies `rlve.sh` and `environment/` from the
+upstream `Benchmark_Evaluation` tree, which is not in this repo. A full
+re-conversion will reintroduce the `RUN_NAME` default and the `prepare.sh`
+header; only the `source_run` drop is handled by the converter itself.
+Low-risk but worth knowing: `ptdbench/evaluation/harbor_evaluator.py` writes the
+`metadata.yaml` title (`rlve_hyper hyperparameter diagnosis: task_019`) into
+`task.toml`'s `[task] description`. Harbor builds the agent prompt from
+`instruction.md`, not from the description, so this was not treated as an
+in-container leak -- but it is a harness-level surface shared by every task.
 
 ## External dataset asset
 

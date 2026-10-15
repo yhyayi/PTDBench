@@ -19,5 +19,5 @@
   "killed_at_max_steps": false,
   "max_train_steps": 200,
   "training_continued_after_first_step": true,
-  "log_path": "/REDACTED/BENCH_HOME/Benchmark_Evaluation/tasks/task_llama_dapo_math_17k/task_monkey_patch_011/workspace/outputs/run_once.log"
+  "log_path": "/REDACTED/BENCH_HOME/Benchmark_Evaluation/tasks/task_llama_dapo_math_17k/__BENCH_TASK_ID__/workspace/outputs/run_once.log"
 }

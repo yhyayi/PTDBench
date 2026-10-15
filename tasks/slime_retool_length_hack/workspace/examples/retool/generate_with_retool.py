@@ -420,9 +420,6 @@ async def reward_func(args, sample, **kwargs):
 
     # use \\boxed{...} answer
     result = math_dapo_compute_score(solution_str, ground_truth, strict_box_verify=True)
-    # Keep a 0/1 exact-match accuracy that eval logs as eval/aime via --eval-reward-key acc.
-    # Training still reads result["score"], which may include shaping and length terms.
-    result["acc"] = 1.0 if result.get("acc") else 0.0
 
     # encourage model to call tools
     if result["score"] < 0:

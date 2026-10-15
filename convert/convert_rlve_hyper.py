@@ -291,6 +291,18 @@ def historical_evidence(
     }
 
 
+def visible_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
+    """Agent-visible copy of the frozen evidence manifest.
+
+    `source_run` is the experimenter's label for the source run and it is named
+    after the injected defect (`run_11_attention_dropout_0.5`), so shipping it
+    into `workspace/` hands over the root cause and its value before the agent
+    reads any config. The oracle copy keeps the field for provenance; nothing
+    reads it from the workspace side.
+    """
+    return {key: value for key, value in manifest.items() if key != "source_run"}
+
+
 def render_instruction(
     task_id: str,
     public: Dict[str, Any],
@@ -531,7 +543,7 @@ def materialize_one(
     )
     write_json(
         target / "workspace/historical_evidence/manifest.json",
-        manifest,
+        visible_manifest(manifest),
     )
     write_json(
         target / "workspace/historical_evidence/eval_scores.json",

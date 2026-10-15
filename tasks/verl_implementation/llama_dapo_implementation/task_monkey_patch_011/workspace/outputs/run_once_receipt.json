@@ -7,7 +7,7 @@
   "returncode": 0,
   "error": null,
   "attempt": 1,
-  "attempts_path": "/REDACTED/BENCH_HOME/Benchmark_Evaluation/tasks/task_llama_dapo_math_17k/task_monkey_patch_011/workspace/outputs/run_attempts.json",
+  "attempts_path": "/REDACTED/BENCH_HOME/Benchmark_Evaluation/tasks/task_llama_dapo_math_17k/__BENCH_TASK_ID__/workspace/outputs/run_attempts.json",
   "cuda_visible_devices": "0,1",
   "started_at": "2026-07-20T00:55:02.578602+00:00",
   "finished_at": "2026-07-20T02:07:19.374017+00:00",

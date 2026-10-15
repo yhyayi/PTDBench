@@ -197,7 +197,7 @@
   },
   "wandb_run": {
     "id": "jwszcocp",
-    "group": "qwen3-4B-retool-multi-turn-reward-hack"
+    "group": "qwen3-4B-retool-multi-turn"
   },
   "task_id": "slime_retool_length_hack",
   "held_out_accuracy_first": 0.29169459025065103,

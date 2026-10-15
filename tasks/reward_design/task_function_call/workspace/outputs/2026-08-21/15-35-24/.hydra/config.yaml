@@ -841,7 +841,7 @@ trainer:
   total_epochs: 15
   total_training_steps: 400
   project_name: verl_grpo_taco
-  experiment_name: taco_qwen2_5_1.5b_function_call
+  experiment_name: __BENCH_TASK_ID__
   logger:
   - console
   - wandb

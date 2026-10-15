@@ -34,6 +34,10 @@ WANDB_DIR=$PTDBENCH_RESULTS/experiment_logs
 WANDB_API_KEY=offline
 ```
 
+Keep the launch script's training-step budget and evaluation frequency at
+their defaults, so the run still produces a held-out evaluation at the final
+step. The run is scored from that final evaluation point.
+
 Create `$PTDBENCH_RESULTS/experiment_logs` first. Write the training and
 evaluation log into that directory. Offline W&B data must be created below
 `$PTDBENCH_RESULTS/experiment_logs/wandb`. The run is scored only from files

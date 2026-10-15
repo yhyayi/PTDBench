@@ -19,8 +19,8 @@ tasks using the same held-out protocol may intentionally share a name.
 ## Canonical failure reason
 
 Observation tokens are trained on (`loss_mask=1` on retrieved
-`<information>` text); frozen `eval/nq_test` reaches only 14.5% at the
-100-step horizon versus a healthy protocol baseline of 37.5%.
+`<information>` text); frozen `eval/nq_test` reaches only 16.5% at the
+200-step horizon versus a healthy protocol baseline of 40.8%.
 
 ## Workspace and hidden evaluations
 
@@ -42,22 +42,29 @@ packaging_ready: true
 healthy_control: tasks/slime_search_r1
 verify:
   num_gpus: 8
-  max_train_steps: 100
+  max_train_steps: 200
   eval_interval: 10
-  last_eval_step: 99
+  last_eval_step: 199
   eval_metric_key: eval/nq_test
 historical_run:
   metric_status: wandb_extracted
   wandb_run_id: wi4fh8cz
-  wandb_group: search-r1_qwen2.5-3B-nomask
-  eval_first: 0.043
-  eval_last: 0.145
-  eval_max: 0.15266666666666667
-  n_eval_points: 10
+  wandb_group: search-r1_qwen2.5-3B
+  eval_first: 0.048
+  eval_last: 0.16466666666666666
+  eval_max: 0.16566666666666666
+  n_eval_points: 21
   attempt: 1
 healthy_control_at_horizon:
-  wandb_eval_step: 99
-  eval/nq_test: 0.37533333333333335
+  wandb_eval_step: 199
+  eval/nq_test: 0.4083333333333333
+# The repair-and-rerun budget is shorter than the frozen run -- see
+# "Evaluation design" for why grading stops at step 99.
+solution_rerun:
+  max_train_steps: 100
+  last_eval_step: 99
+  historical_at_step_99: 0.15433333333333332
+  healthy_control_at_step_99: 0.37333333333333335
 ```
 
 The workspace preserves the launch script, the custom multi-turn search
@@ -68,14 +75,16 @@ summary; no `.wandb` binary history).
 
 ## Original failure evidence
 
-- ten reconstructed `eval/nq_test` points through `eval/step` 99 (the last
-  eval in `--eval-interval 10` before the 100-step horizon) rise from about
-  4.3% to 14.5% (`eval_last` 0.145; peak 15.3% at step 89)
+- twenty-one reconstructed `eval/nq_test` points through `eval/step` 199 (the
+  last eval in `--eval-interval 10` before the 200-step horizon) rise from
+  about 4.8% to 16.5% (`eval_last` 0.1647; peak 16.6% at step 189)
 - a healthy Qwen2.5-3B Search-R1 GRPO run (`tasks/slime_search_r1`) reaches
-  about **37.5%** at the same horizon (`eval/nq_test` 0.3753 at `eval/step` 99)
-- training `rollout/raw_reward` at step 99 is 0.1875 and does not establish
-  held-out health
-- truncation falls from ~39% at step 0 to ~0.1% by step 99, so the held-out
+  about **40.8%** at the same horizon, and about 37.3% by step 99
+- train response length collapses from about 1751 tokens at step 0 to about
+  9 tokens by step 100: trained-on observation tokens push the policy to stop
+  searching and answer immediately
+- training `rollout/raw_reward` does not establish held-out health
+- truncation falls from ~38% at step 0 to ~0% by step 100, so the held-out
   gap is not a truncation artifact
 - `examples/search-r1/generate_with_search.py` appends retrieved
   `<information>` tokens with `loss_mask=1` while `append_response_tokens`
@@ -91,8 +100,8 @@ logs under `$PTDBENCH_RESULTS/experiment_logs`.
 
 A healthy run of Qwen2.5-3B on Search-R1 nq_hotpotqa_train under the same
 slime/GRPO recipe, with observation tokens masked out of the loss, reaches
-about **37.5% at 100 steps**. This case's frozen `eval_last` 14.5% is well
-below that protocol baseline.
+about **40.8% at 200 steps** (about 37.3% by step 99). This case's frozen
+`eval_last` 16.5% is well below that protocol baseline.
 
 ## Canonical expected outcome
 
@@ -110,10 +119,8 @@ Required fix targets:
 
 Documentation reconciliation:
 
-- Frozen W&B reconstruction uses `eval/step` 99 as the 100-step horizon
-  because slime logs `eval/step = rollout_id` and evals at 0, 9, …, 99.
-- Eval 19 is missing from the captured `output.log` fragments; the ten
-  remaining points are enough to reconstruct the curve.
+- Frozen W&B reconstruction uses `eval/step` 199 as the 200-step horizon
+  because slime logs `eval/step = rollout_id` and evals at 0, 9, …, 199.
 - Naming the observation loss mask with the correct causal role is a
   complete attribution.
 
@@ -124,10 +131,28 @@ Documentation reconciliation:
 (weights 0.2 / 0.6 / 0.2). Pass is a weighted score of at least `0.8`.
 
 `solution` does not grade a structured diagnosis. The agent must edit the
-workspace, run `examples/search-r1/run_qwen2.5_3B.sh`, and produce a finite
-`eval/nq_test` of at least `0.28` (28%). Pass is score `1`; otherwise `0`.
-The historical final baseline is `0.145`; the healthy protocol is about
-37.5% at the same horizon.
+workspace and run `examples/search-r1/run_qwen2.5_3B.sh` at the fixed
+`--num-rollout 100` / `--eval-interval 10` budget, giving eval points 0, 9, …,
+99. `score_mode` is `best`; the highest finite `eval/nq_test` over the run must
+land in `[0.28, 1.0]`. Pass is score `1`; otherwise `0`. `0.28` is the same bar
+the healthy twin `slime_search_r1` uses, so the threshold is not a tell for
+which side of the pair a task is on.
+
+Both bounds are calibrated on four measured runs (devspace 1107990,
+`/user/chenyinghao/harbor-runs/`), best over steps `0..99`: repaired `0.3733`
+and `0.3570`, defective `0.2237` and `0.1587` (the latter is the frozen
+evidence), untrained step 0 about `0.045`–`0.051`. Thinnest margin is `0.056`,
+on the defective side.
+
+**The rerun budget is deliberately shorter than the 200-step frozen run.** The
+defect is high-variance, and the variance grows with steps: the two measured
+defective runs share identical code, args and retrieval server, yet one
+collapsed to ~9-token responses by step 20 and plateaued at `0.1657` while the
+other held ~650-token responses and was still climbing at `0.2713` when it was
+killed at step 119. At step 99 both are fully observed, so the gap
+`[0.2237, 0.3570]` is measured on both sides; at step 199 the defective side is
+censored and no threshold there can be shown to reject it. Do not extend the
+graded horizon to 199 without first running a defective 200-step run.
 
 ## Environment requirement
 

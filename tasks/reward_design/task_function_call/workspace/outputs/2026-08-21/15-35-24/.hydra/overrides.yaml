@@ -42,7 +42,7 @@
 - trainer.critic_warmup=0
 - trainer.logger=["console","wandb"]
 - trainer.project_name=verl_grpo_taco
-- trainer.experiment_name=taco_qwen2_5_1.5b_function_call
+- trainer.experiment_name=__BENCH_TASK_ID__
 - trainer.n_gpus_per_node=8
 - trainer.nnodes=1
 - trainer.save_freq=400

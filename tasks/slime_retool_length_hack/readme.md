@@ -54,7 +54,7 @@ verify:
 historical_run:
   metric_status: wandb_extracted
   wandb_run_id: jwszcocp
-  wandb_group: qwen3-4B-retool-multi-turn-reward-hack
+  wandb_group: qwen3-4B-retool-multi-turn
   eval_first_raw: 0.8217626190185547
   eval_last_raw: 3.8410780588785807
   eval_last_decontaminated: -0.831261698404948
@@ -78,8 +78,11 @@ through train step 100, config, summary; no `.wandb` binary history).
   from about 0.8% to 82.5%
 - train response length at step 100 is about 15159 tokens with a 78.5%
   truncate ratio
-- decontaminated held-out accuracy falls from about 29.2% at step 0 to 8.4%
-  at step 99
+- the decontaminated held-out score falls from about -0.417 at step 0 to -0.831
+  at step 99, bounding exact-match accuracy at no more than about 29.2% and
+  8.4% respectively (`reward_func` floors an incorrect sample at `min(-0.6, …)`
+  rather than `-1`, so mean score does not convert to accuracy by
+  `(score + 1) / 2`; these are ceilings, not point estimates)
 
 The preserved source metric is `eval/aime`. Because that metric is the mean of
 `reward_func`, it includes `5 * length_ratio`. The frozen workspace remains the
@@ -143,11 +146,28 @@ unusual-but-benign setting instead of the length-reward term, is wrong.
 (weights 0.2 / 0.6 / 0.2). Pass is a weighted score of at least `0.8`.
 
 `solution` does not grade a structured diagnosis. The agent must edit the
-workspace, run `examples/retool/retool_qwen3_4b_rl.sh`, and produce a finite
-`eval/aime` at step 99 of at least `0.18` (18%). Pass is score `1`; otherwise
-`0`. New runs log `eval/aime` as exact-match accuracy (`--eval-reward-key acc`).
-The historical decontaminated accuracy is about 8.4%; a healthy protocol
-reaches about 25% at the same horizon.
+workspace and run `examples/retool/retool_qwen3_4b_rl.sh` at the fixed
+`--num-rollout 70` / `--eval-interval 10` budget, giving eval points 0, 9, …,
+69. The verifier reads `eval/aime` from the new logs in the math_dapo **score**
+space `[-1, 1]` — the space the frozen trace was logged in
+(`eval_reward_key: score`) and the space `slime_retool` grades the same recipe
+in. The best finite point over the run must fall within `[-0.55, 0.5]`. Pass is
+score `1`; otherwise `0`.
+
+Grading that channel is the discriminator, because the defect lives in it: with
+the length bonus still present `eval/aime` leaves `[-1, 1]` (historically
+`+0.822` at step 0 up to `+3.841` at step 99) and trips the upper bound at every
+eval point; with the term removed it is the correctness signal, which cannot
+exceed `+1`. Both bounds are calibrated on the repaired reference run — the same
+recipe with the length term removed, same image and assets, `--num-rollout 70`
+(`devspace 1177503:/user/chenyinghao/harbor-runs/manual-slime-retool`): step 0
+is `-0.5808` and fails the lower bound, the best point is step 59 at `-0.4246`
+(`0.125` clear) and the last eval (step 69) is `-0.4861`.
+
+No accuracy threshold is used. `reward_func` floors an incorrect sample at
+`min(-0.6, …)` rather than `-1`, so mean score does not convert to accuracy by
+`(score + 1) / 2`, and no accuracy was ever measured for the repaired recipe.
+The score channel is what was measured, so the score channel is what is graded.
 
 ## Environment requirement
 
@@ -161,5 +181,27 @@ jsonl, AIME-2024 jsonl, the SFT'd HF checkpoint, and the torch_dist conversion
 of it. The two files are deliberately kept identical: this task is the
 bug-injected twin of `slime_retool`, so the only difference between them must
 be the injected defect. Edit one, edit both.
+
+The same rule holds for the recipe itself. `workspace/examples/retool/` differs
+from `slime_retool`'s copy by exactly the two-line length bonus in
+`generate_with_retool.py::reward_func`; `retool_qwen3_4b_rl.sh` is byte-identical
+to the twin's. Nothing else may diverge: any extra edit either leaks the defect
+to the agent or breaks the one-curve comparison the pair exists for.
+
+The same goes for the frozen evidence under `workspace/wandb/` and
+`workspace/outputs/`, which the agent reads. It is scrubbed of defect
+giveaways: the W&B group is `qwen3-4B-retool-multi-turn` (not
+`…-reward-hack`), the recorded `--save` target is `qwen3-4b-sft-multi-turn`
+(not `…-hack`, which also contradicted `config.yaml`'s own `save:` value), and
+the recorded host paths and receipt `task_id` say `slime_retool` rather than
+`slime_retool_length_hack`. Only the hidden `evaluations/` tree and this file
+name the task as the defect twin.
+
+`evaluations/solution/solution/solve.sh` is the reference run for
+`harbor run -a oracle`: it deletes the length bonus, applies the instruction's
+budget (70 rollouts, no checkpoint saves), and tees the log into
+`experiment_logs/`. After the deletion `generate_with_retool.py` is
+byte-identical to `slime_retool`'s, which is why that task's run doubles as this
+task's calibration reference.
 
 The workspace code and the ReTool recipe are distributed under Apache-2.0.

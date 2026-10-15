@@ -242,22 +242,19 @@ class RetrievalGuardParityTest(unittest.TestCase):
         blocks = {task: extract_block(REPO_ROOT / task / RECIPE) for task in TASKS}
         self.assertEqual(*blocks.values())
 
-    def test_launch_scripts_differ_only_in_the_run_identity(self) -> None:
-        """只允许两处不同：checkpoint 存哪、wandb group 叫什么。"""
+    def test_launch_scripts_are_identical(self) -> None:
+        """一字不差，连 checkpoint 存哪、wandb group 叫什么都一样。
+
+        这两处以前分别是 Qwen2.5-3B_slime_nomask 和 search-r1_qwen2.5-3B-nomask，
+        在 agent 能读到的启动脚本里把任务名写成了「nomask」——缺陷的名字。注入的
+        差异只能待在 generate_with_search.py 的 loss_mask 那一行；启动脚本里任何
+        带 nomask 的字样都是在白送答案。两个任务跑在各自的容器和 workspace 里，
+        名字相同不会撞车。
+        """
         left, right = (
-            (REPO_ROOT / task / RECIPE).read_text().splitlines() for task in TASKS
+            (REPO_ROOT / task / RECIPE).read_text() for task in TASKS
         )
-        self.assertEqual(len(left), len(right))
-        differing = [(a, b) for a, b in zip(left, right) if a != b]
-        self.assertEqual(
-            differing,
-            [
-                ('   --save "$MODEL_DIR/Qwen2.5-3B_slime/"',
-                 '   --save "$MODEL_DIR/Qwen2.5-3B_slime_nomask/"'),
-                ("   --wandb-group search-r1_qwen2.5-3B",
-                 "   --wandb-group search-r1_qwen2.5-3B-nomask"),
-            ],
-        )
+        self.assertEqual(left, right)
 
     def test_prepare_scripts_differ_only_in_their_own_names(self) -> None:
         """prepare.sh 的 body 是逐字节一致的，只有头两行注释提到各自的任务名。"""

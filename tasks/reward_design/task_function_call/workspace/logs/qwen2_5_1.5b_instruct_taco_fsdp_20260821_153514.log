@@ -97,7 +97,7 @@
 [36m(TaskRunner pid=6919)[0m wandb: Tracking run with wandb version 0.25.0
 [36m(TaskRunner pid=6919)[0m wandb: Run data is saved locally in /workspace/logs/wandb/run-20260821_153903-js8e27l6
 [36m(TaskRunner pid=6919)[0m wandb: Run `wandb offline` to turn off syncing.
-[36m(TaskRunner pid=6919)[0m wandb: Syncing run taco_qwen2_5_1.5b_function_call
+[36m(TaskRunner pid=6919)[0m wandb: Syncing run __BENCH_TASK_ID__
 [36m(TaskRunner pid=6919)[0m wandb: ⭐️ View project at https://wandb.ai/jimmylai20001014-tsinghua-university/verl_grpo_taco
 [36m(TaskRunner pid=6919)[0m wandb: 🚀 View run at https://wandb.ai/jimmylai20001014-tsinghua-university/verl_grpo_taco/runs/js8e27l6
 [36m(TaskRunner pid=6919)[0m wandb: Detected [openai] in use.
@@ -985,17 +985,17 @@
 [36m(TaskRunner pid=6919)[0m Training Progress: 100%|█████████▉| 398/400 [9:18:42<03:02, 91.30s/it] 
 [36m(WorkerDict pid=7879)[0m INFO:2026-08-22 01:02:35,011:update_weights done, time cost: 1.03s
 [36m(TaskRunner pid=6919)[0m Training Progress: 100%|█████████▉| 399/400 [9:20:55<01:43, 103.64s/it]
-[36m(WorkerDict pid=7881)[0m INFO:2026-08-22 01:03:02,245:[Rank 2] Saved model to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_function_call/global_step_400/actor/model_world_size_8_rank_2.pt
-[36m(WorkerDict pid=7881)[0m INFO:2026-08-22 01:03:03,836:[Rank 2] Saved optim to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_function_call/global_step_400/actor/optim_world_size_8_rank_2.pt
-[36m(WorkerDict pid=7881)[0m INFO:2026-08-22 01:03:03,838:[Rank 2] Saved extra_state to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_function_call/global_step_400/actor/extra_state_world_size_8_rank_2.pt
-[36m(WorkerDict pid=7879)[0m INFO:2026-08-22 01:03:04,657:[Rank 0] Saved model config and tokenizer class to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_function_call/global_step_400/actor/huggingface
+[36m(WorkerDict pid=7881)[0m INFO:2026-08-22 01:03:02,245:[Rank 2] Saved model to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/model_world_size_8_rank_2.pt
+[36m(WorkerDict pid=7881)[0m INFO:2026-08-22 01:03:03,836:[Rank 2] Saved optim to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/optim_world_size_8_rank_2.pt
+[36m(WorkerDict pid=7881)[0m INFO:2026-08-22 01:03:03,838:[Rank 2] Saved extra_state to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/extra_state_world_size_8_rank_2.pt
+[36m(WorkerDict pid=7879)[0m INFO:2026-08-22 01:03:04,657:[Rank 0] Saved model config and tokenizer class to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/huggingface
 [36m(WorkerDict pid=7879)[0m /workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=7879)[0m   torch.cuda.memory._set_allocator_settings(settings)
 [36m(WorkerDict pid=7879)[0m INFO:2026-08-22 01:03:05,894:update_weights done, time cost: 0.97s
 [36m(TaskRunner pid=6919)[0m Training Progress: 100%|██████████| 400/400 [9:23:30<00:00, 118.97s/it]Training Progress: 100%|██████████| 400/400 [9:23:30<00:00, 84.53s/it] 
-[36m(WorkerDict pid=7886)[0m INFO:2026-08-22 01:03:02,458:[Rank 7] Saved model to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_function_call/global_step_400/actor/model_world_size_8_rank_7.pt[32m [repeated 7x across cluster][0m
-[36m(WorkerDict pid=7882)[0m INFO:2026-08-22 01:03:04,423:[Rank 3] Saved optim to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_function_call/global_step_400/actor/optim_world_size_8_rank_3.pt[32m [repeated 7x across cluster][0m
-[36m(WorkerDict pid=7882)[0m INFO:2026-08-22 01:03:04,426:[Rank 3] Saved extra_state to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_function_call/global_step_400/actor/extra_state_world_size_8_rank_3.pt[32m [repeated 7x across cluster][0m
+[36m(WorkerDict pid=7886)[0m INFO:2026-08-22 01:03:02,458:[Rank 7] Saved model to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/model_world_size_8_rank_7.pt[32m [repeated 7x across cluster][0m
+[36m(WorkerDict pid=7882)[0m INFO:2026-08-22 01:03:04,423:[Rank 3] Saved optim to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/optim_world_size_8_rank_3.pt[32m [repeated 7x across cluster][0m
+[36m(WorkerDict pid=7882)[0m INFO:2026-08-22 01:03:04,426:[Rank 3] Saved extra_state to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/extra_state_world_size_8_rank_3.pt[32m [repeated 7x across cluster][0m
 [36m(WorkerDict pid=7884)[0m /workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.[32m [repeated 7x across cluster][0m
 [36m(WorkerDict pid=7884)[0m   torch.cuda.memory._set_allocator_settings(settings)[32m [repeated 7x across cluster][0m
 [36m(TaskRunner pid=6919)[0m wandb: updating run metadata
@@ -1394,7 +1394,7 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'TOKENIZERS_PAR
 [36m(TaskRunner pid=6919)[0m                                    'top_p': 1,
 [36m(TaskRunner pid=6919)[0m                                    'trace': {'_target_': 'verl.workers.config.TraceConfig',
 [36m(TaskRunner pid=6919)[0m                                              'backend': None,
-[36m(TaskRunner pid=6919)[0m                                              'experiment_name': 'taco_qwen2_5_1.5b_function_call',
+[36m(TaskRunner pid=6919)[0m                                              'experiment_name': '__BENCH_TASK_ID__',
 [36m(TaskRunner pid=6919)[0m                                              'max_samples_per_step_per_worker': None,
 [36m(TaskRunner pid=6919)[0m                                              'project_name': 'verl_grpo_taco',
 [36m(TaskRunner pid=6919)[0m                                              'token2text': False},
@@ -1794,11 +1794,11 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'TOKENIZERS_PAR
 [36m(TaskRunner pid=6919)[0m  'trainer': {'balance_batch': True,
 [36m(TaskRunner pid=6919)[0m              'critic_warmup': 0,
 [36m(TaskRunner pid=6919)[0m              'default_hdfs_dir': None,
-[36m(TaskRunner pid=6919)[0m              'default_local_dir': 'checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_function_call',
+[36m(TaskRunner pid=6919)[0m              'default_local_dir': 'checkpoints/verl_grpo_taco/__BENCH_TASK_ID__',
 [36m(TaskRunner pid=6919)[0m              'del_local_ckpt_after_load': False,
 [36m(TaskRunner pid=6919)[0m              'device': 'cuda',
 [36m(TaskRunner pid=6919)[0m              'esi_redundant_time': 0,
-[36m(TaskRunner pid=6919)[0m              'experiment_name': 'taco_qwen2_5_1.5b_function_call',
+[36m(TaskRunner pid=6919)[0m              'experiment_name': '__BENCH_TASK_ID__',
 [36m(TaskRunner pid=6919)[0m              'log_val_generations': 0,
 [36m(TaskRunner pid=6919)[0m              'logger': ['console', 'wandb'],
 [36m(TaskRunner pid=6919)[0m              'max_actor_ckpt_to_keep': None,
@@ -1912,7 +1912,7 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'TOKENIZERS_PAR
 [36m(vLLMHttpServer pid=11234)[0m WARNING 08-21 15:39:00 [api_router.py:30] LoRA dynamic loading & unloading is enabled in the API server. This should ONLY be used for local development![32m [repeated 7x across cluster][0m
 [36m(TaskRunner pid=6919)[0m LLMServerManager: ['172.17.0.3:35282', '172.17.0.3:39547', '172.17.0.3:43805', '172.17.0.3:33098', '172.17.0.3:45348', '172.17.0.3:44930', '172.17.0.3:36320', '172.17.0.3:44587']
 [36m(vLLMHttpServer pid=11234)[0m WARNING 08-21 15:39:00 [model.py:1355] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'repetition_penalty': 1.0, 'temperature': 1.0, 'top_k': -1, 'top_p': 1, 'max_tokens': 4096}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.[32m [repeated 7x across cluster][0m
-[36m(TaskRunner pid=6919)[0m Checkpoint tracker file does not exist: /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_function_call/latest_checkpointed_iteration.txt
+[36m(TaskRunner pid=6919)[0m Checkpoint tracker file does not exist: /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/latest_checkpointed_iteration.txt
 [36m(TaskRunner pid=6919)[0m Training from scratch
 [36m(vLLMHttpServer pid=11216)[0m (EngineCore_DP0 pid=12381) WARNING 08-21 15:39:06 [scheduler.py:1834] reset_connector called but no KV connector is configured.
 [36m(AgentLoopWorker pid=14731)[0m Using dataset class: RLHFDataset
@@ -40750,7 +40750,7 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'TOKENIZERS_PAR
 [36m(TaskRunner pid=6919)[0m [output] None
 [36m(TaskRunner pid=6919)[0m ========================================================================
 [36m(vLLMHttpServer pid=11238)[0m (EngineCore_DP0 pid=12367) WARNING 08-22 01:02:35 [scheduler.py:1834] reset_connector called but no KV connector is configured.[32m [repeated 22x across cluster][0m
-[36m(TaskRunner pid=6919)[0m local_global_step_folder: checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_function_call/global_step_400
+[36m(TaskRunner pid=6919)[0m local_global_step_folder: checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400
 [36m(vLLMHttpServer pid=11219)[0m (EngineCore_DP0 pid=12405) WARNING 08-22 01:03:04 [scheduler.py:1834] reset_connector called but no KV connector is configured.
 [36m(TaskRunner pid=6919)[0m test_gen_batch meta info: {'eos_token_id': 151645, 'pad_token_id': 151643, 'recompute_log_prob': False, 'do_sample': True, 'validate': True, 'global_steps': 400}
 [36m(TaskRunner pid=6919)[0m validation generation end
@@ -40893,7 +40893,7 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'TOKENIZERS_PAR
 [36m(TaskRunner pid=6919)[0m wandb:                      actor/pg_loss 0.0023
 [36m(TaskRunner pid=6919)[0m wandb:                                +99 ...
 [36m(TaskRunner pid=6919)[0m wandb: 
-[36m(TaskRunner pid=6919)[0m wandb: 🚀 View run taco_qwen2_5_1.5b_function_call at: https://wandb.ai/jimmylai20001014-tsinghua-university/verl_grpo_taco/runs/js8e27l6
+[36m(TaskRunner pid=6919)[0m wandb: 🚀 View run __BENCH_TASK_ID__ at: https://wandb.ai/jimmylai20001014-tsinghua-university/verl_grpo_taco/runs/js8e27l6
 [36m(TaskRunner pid=6919)[0m wandb: ⭐️ View project at: https://wandb.ai/jimmylai20001014-tsinghua-university/verl_grpo_taco
 [36m(TaskRunner pid=6919)[0m wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
 [36m(TaskRunner pid=6919)[0m wandb: Find logs at: ./logs/wandb/run-20260821_153903-js8e27l6/logs

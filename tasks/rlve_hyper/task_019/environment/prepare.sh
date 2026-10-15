@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# rlve_hyper/task_019 — 训练前要准备的东西。
+# __BENCH_TASK_ID__ — 训练前要准备的东西。
 #
 # 由 environment/Dockerfile 的 MODEL_* ARG 和 environment/assets.yaml 迁移而来。
 # 跑在独立的 prepare 阶段容器里：root、已激活 `slime` 环境、**唯一有网的阶段**。
@@ -44,7 +44,7 @@ ptdbench_fetch_hf \
 # 去找，找不到就退回默认值 /workspace/<name>，然后把这个不存在的路径直接交给
 # megatron，报错出现在 slime/utils/arguments.py:971，离原因很远。
 #
-# 和 slime_retool 那份不同，**这里没有兜底**。retool 的训练脚本自己带
+# 和本仓另一个 RL 任务的那份不同，**这里没有兜底**。那边的训练脚本自己带
 # `if [ ! -d "$DIST_MODEL_DIR" ]` 守卫，prepare 少做一次只是慢；
 # rlve.sh 没有这个守卫（见 :79-92，拿到路径就直接进 CKPT_ARGS），所以这一步在
 # prepare 阶段做不成，agent 阶段就没有第二次机会。下面的 else 分支因此写成显式

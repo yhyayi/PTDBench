@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# rlve_hyper/task_012 — 训练前要准备的东西。
+# 训练前要准备的东西。
+#
+# 这个文件会被只读挂进 agent 容器（docker 后端是 /ptdbench/environment，
+# devspace 后端是 /workspace/.ptdbench-environment），所以注释里不要出现任务
+# 所属的目录名、分类名或同目录其它任务的名字——那等于直接告诉 agent 该往哪看。
 #
 # 由 environment/Dockerfile 的 MODEL_* ARG 和 environment/assets.yaml 迁移而来。
 # 跑在独立的 prepare 阶段容器里：root、已激活 `slime` 环境、**唯一有网的阶段**。
@@ -44,18 +48,17 @@ ptdbench_fetch_hf \
 # 去找，找不到就退回默认值 /workspace/<name>，然后把这个不存在的路径直接交给
 # megatron，报错出现在 slime/utils/arguments.py:971，离原因很远。
 #
-# 和 slime_retool 那份不同，**这里没有兜底**。retool 的训练脚本自己带
-# `if [ ! -d "$DIST_MODEL_DIR" ]` 守卫，prepare 少做一次只是慢；
-# rlve.sh 没有这个守卫（见 :79-92，拿到路径就直接进 CKPT_ARGS），所以这一步在
-# prepare 阶段做不成，agent 阶段就没有第二次机会。下面的 else 分支因此写成显式
-# 警告而不是静默跳过。
+# **这里没有兜底**：有的训练脚本自己带 `if [ ! -d "$DIST_MODEL_DIR" ]` 守卫，
+# prepare 少做一次只是慢；rlve.sh 没有这个守卫（见 :79-92，拿到路径就直接进
+# CKPT_ARGS），所以这一步在 prepare 阶段做不成，agent 阶段就没有第二次机会。
+# 下面的 else 分支因此写成显式警告而不是静默跳过。
 #
 # 产物不保证逐字节可复现：dist-checkpoint 的分片布局跟 world size 走，
 # WORLD_SIZE 钉死成 1 得到 pp=1 的单一布局，换机器换卡数也不会变形状
 # （convert_hf_to_torch_dist.py 用 WORLD_SIZE 推 pp size）。0.5B 的权重不到 1GB。
 #
-# rotary-base 不在这里覆盖：retool 那边要显式写 5000000，是因为它的 RL 脚本在
-# MODEL_ARGS 之后又传了一次；rlve.sh 全程没有第二个 --rotary-base，
+# rotary-base 不在这里覆盖：需要显式写死它的，是那种 RL 脚本在 MODEL_ARGS 之后
+# 又传了一次 --rotary-base 的配置；rlve.sh 全程没有第二个 --rotary-base，
 # scripts/models/qwen2.5-0.5B.sh 里的 1000000 就是训练实际用的值。source 同一份
 # MODEL_ARGS 就够了，抄一遍反而会和 recipe 漂移。
 #

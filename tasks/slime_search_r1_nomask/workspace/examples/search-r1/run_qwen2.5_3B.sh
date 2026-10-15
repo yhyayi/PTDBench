@@ -112,7 +112,7 @@ CKPT_ARGS=(
    --hf-checkpoint "$HF_MODEL_DIR"
    --ref-load "$DIST_MODEL_DIR"
    # --load "$MODEL_DIR/Qwen2.5-3B_slime/"
-   --save "$MODEL_DIR/Qwen2.5-3B_slime_nomask/"
+   --save "$MODEL_DIR/Qwen2.5-3B_slime/"
    --save-interval 10
 )
 
@@ -290,7 +290,7 @@ OPTIMIZER_ARGS=(
 WANDB_ARGS=(
    --use-wandb
    --wandb-project slime-search-r1
-   --wandb-group search-r1_qwen2.5-3B-nomask
+   --wandb-group search-r1_qwen2.5-3B
    # wandb runs offline here, so no real key is ever used; --wandb-key still
    # needs *an* argument or argparse aborts with "expected one argument" when
    # WANDB_API_KEY is unset. The literal EMPTY is the placeholder slime accepts.

@@ -7,11 +7,11 @@
 # (ENVIRONMENT_LIST) is a dummy token — the task set is locked below and the
 # argument is intentionally ignored. All positionals are optional.
 
-# BENCH: locked training task types for this workspace — do not change names.
+# Locked training task types for this workspace — do not change names.
 LOCKED_ENVIRONMENT_LIST="Division EuclidGame GCDOne_Counting HamiltonianPath LampChanging LargestConvexPolygon Multiplication PCPPermutation Path_NoGoingBack_Counting SAT ShortestPath Sorting SpiralMatrix SubsequenceReversalLNDS UndamagedSubmatrixCounting WYRLevelingGround"
 
 WANDB_PROJECT="${1:-ptdbench}"
-RUN_NAME="${2:-rlve_task_012}"
+RUN_NAME="${2:-rlve_qwen2.5_0.5b}"
 ENVIRONMENT_LIST="${LOCKED_ENVIRONMENT_LIST}"
 
 # Consume up to the three leading positionals (whatever subset was supplied);

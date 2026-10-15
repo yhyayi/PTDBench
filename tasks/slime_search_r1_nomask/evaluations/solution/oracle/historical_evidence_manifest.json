@@ -311,7 +311,7 @@
   },
   "wandb_run": {
     "id": "wi4fh8cz",
-    "group": "search-r1_qwen2.5-3B-nomask"
+    "group": "search-r1_qwen2.5-3B"
   },
   "task_id": "slime_search_r1_nomask",
   "held_out_accuracy_first": 0.048,
