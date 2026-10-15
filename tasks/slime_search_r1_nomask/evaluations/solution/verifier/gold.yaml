@@ -11,8 +11,8 @@ evidence_metrics:
 - generate appends retrieved <information> tokens with loss_mask=1 and assigns that list to sample.loss_mask (examples/search-r1/generate_with_search.py::generate)
 - append_response_tokens(..., trainable=False) still marks those tokens non-trainable, but the local list wins so observations are trained on
 - dummy rollout_log_probs of 0.0 on observation tokens mean loss_mask=1 optimizes against meaningless reference log probs
-- historical eval/nq_test rises only from 4.3% at step 0 to 14.5% at step 99 (peak 15.3% at step 89); a healthy masked run reaches about 37.5% at the same horizon
-- truncation falls from ~39% to ~0.1%, so the held-out gap is not a truncation artifact
+- historical eval/nq_test rises only from 4.8% at step 0 to 16.5% at step 199 (peak 16.6% at step 189); a healthy masked run reaches about 40.8% at the same horizon
+- truncation falls from ~38% to ~0%, so the held-out gap is not a truncation artifact
 - the exact-match reward and GRPO config are otherwise correct; the observation loss mask is the injected defect
 fix:
   must:
@@ -20,7 +20,7 @@ fix:
     direction: set
 solution_metric:
   key: eval/nq_test
-  final_step: 99
-  historical_final_baseline: 0.145
-  required_final_score: 0.28
-  note: Machine grading reads only the new experiment logs. Pass is score 1 if the best finite eval/nq_test is at least 0.28; otherwise 0.
+  final_step: 199
+  historical_final_baseline: 0.1647
+  required_final_score: 0.30
+  note: Machine grading reads only the new experiment logs. Pass is score 1 if the best finite eval/nq_test is at least 0.30; otherwise 0.

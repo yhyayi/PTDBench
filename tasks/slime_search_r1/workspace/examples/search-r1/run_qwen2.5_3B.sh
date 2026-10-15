@@ -230,7 +230,7 @@ ROLLOUT_ARGS=(
    --label-key reward_model
    --apply-chat-template
    --rollout-shuffle
-   --num-rollout 3000
+   --num-rollout 200
    --rollout-batch-size 32
    --n-samples-per-prompt 8
    --rollout-max-context-len 8129

@@ -17,17 +17,16 @@ Do not require additional causes.
 ## Observable impact
 
 - Primary source evaluation metric: `eval/nq_test`.
-- Historical cutoff is train step 100. Eval interval is 10; the last held-out
-  point in the frozen snapshot is step 99.
-- Frozen `eval/nq_test` reconstructs ten held-out points that rise from 4.3%
-  at step 0 to 14.5% (`eval_last` 0.145; peak 15.3% at step 89). Eval step 19
-  is missing from captured stdout; do not invent it.
+- Historical cutoff is train step 200. Eval interval is 10; the last held-out
+  point in the frozen snapshot is step 199.
+- Frozen `eval/nq_test` reconstructs 21 held-out points that rise from 4.8%
+  at step 0 to 16.5% (`eval_last` 0.1647; peak 16.6% at step 189).
 - A healthy Qwen2.5-3B Search-R1 GRPO run under the same recipe, with
-  observation tokens masked (`loss_mask=0`), reaches about **37.5%**
-  (`eval/nq_test` 0.3753) at the same 100-step horizon.
-- Training `rollout/raw_reward` at step 99 is 0.1875 and is not a substitute
-  for held-out health. Truncation falls from ~39% at step 0 to ~0.1% by
-  step 99 while held-out accuracy stays far below the healthy protocol.
+  observation tokens masked (`loss_mask=0`), reaches about **40.8%**
+  (`eval/nq_test` 0.4083) at the same 200-step horizon.
+- Training `rollout/raw_reward` at step 199 is 0.168 and is not a substitute
+  for held-out health. Truncation falls from ~38% at step 0 to ~0% by
+  step 199 while held-out accuracy stays far below the healthy protocol.
 - Observation tokens also carry dummy `rollout_log_probs` of `0.0`, so
   `loss_mask=1` on those tokens optimizes against meaningless reference log
   probs and corrupts the GRPO objective.

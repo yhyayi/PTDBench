@@ -8,24 +8,24 @@ algo: grpo
 recipe: examples/search-r1
 expected_verdict: unhealthy
 evidence_kind: historical_run
-historical_cutoff_train_step: 100
-last_eval_step: 99
+historical_cutoff_train_step: 200
+last_eval_step: 199
 eval_interval: 10
 eval_metric_key: eval/nq_test
-eval_first: 0.043
-eval_last: 0.145
-eval_max: 0.15266666666666667
-held_out_accuracy_last: 0.145
-healthy_eval_nq_test_at_step_99: 0.37533333333333335
+eval_first: 0.048
+eval_last: 0.16466666666666666
+eval_max: 0.16566666666666666
+held_out_accuracy_last: 0.16466666666666666
+healthy_eval_nq_test_at_step_199: 0.4083333333333333
 note: >-
   Defect task. The workspace is an upstream slime snapshot plus the in-tree
   examples/search-r1 recipe (multi-turn retrieval-augmented GRPO), with a
   single injected defect: generate_with_search.py::generate appends retrieved
   <information> tokens with loss_mask=1 so search-engine results are trained
-  on. Frozen historical evidence covers train step 100 / last eval step 99
-  (eval_interval 10; eval 19 missing from captured stdout). Solution grading
-  is metric-only after a repair-and-rerun: best eval/nq_test must be at
-  least 0.28 (historical 0.145; healthy protocol about 0.375).
+  on. Frozen historical evidence covers train step 200 / last eval step 199
+  (eval_interval 10). Solution grading is metric-only after a repair-and-rerun:
+  best eval/nq_test must be at least 0.30 (historical 0.1647; healthy protocol
+  about 0.408).
 key_files:
 - examples/search-r1/generate_with_search.py
 - examples/search-r1/run_qwen2.5_3B.sh

@@ -9,10 +9,5 @@ __pycache__/
 models/
 datasets/
 
-# Download caches left over from the retired unified image (docker/wheels,
-# docker/gitmirror). Nothing reads them any more; once they are deleted from
-# disk these two lines can go too.
-docker/wheels/
-docker/gitmirror/
-
-tasks/PTDBench_candidate_bundle_20260821
+raw_tasks/
+task_construct/

@@ -4,18 +4,18 @@ BENCHMARK_GROUP: B-slime-implementation
 EXPECTED_VERDICT: unhealthy
 EXPECTED_ATTRIBUTION: observation_loss_mask — examples/search-r1/generate_with_search.py::generate appends retrieved <information> tokens with loss_mask=1 and assigns that list to sample.loss_mask, so search-engine results are trained on.
 EVIDENCE_KIND: historical_run
-HISTORICAL_CUTOFF: train step 100; last eval step 99
+HISTORICAL_CUTOFF: train step 200; last eval step 199
 PRIMARY_METRIC: eval/nq_test
-EVAL_LAST: 0.145 (14.5% accuracy)
-HEALTHY_PROTOCOL_AT_HORIZON: 0.37533333333333335 (about 37.5%)
+EVAL_LAST: 0.1647 (16.5% accuracy)
+HEALTHY_PROTOCOL_AT_HORIZON: 0.4083333333333333 (about 40.8%)
 
 REQUIRED_ALL:
 - Classify the run as unhealthy.
 - Attribute the root cause to the observation loss mask in generate
   (loss_mask += [1] on retrieved <information> tokens), not to a benign
   setting.
-- Connect the defect to the frozen step-100 evidence: eval/nq_test reaches
-  only 14.5% versus a healthy masked protocol of about 37.5%; do not treat
+- Connect the defect to the frozen step-200 evidence: eval/nq_test reaches
+  only 16.5% versus a healthy masked protocol of about 40.8%; do not treat
   training rollout/raw_reward or falling truncation as held-out health.
 - Propose setting observation tokens out of the loss
   (loss_mask += [0] * len(obs_tokens_ids)).
@@ -30,7 +30,7 @@ GLOBAL_JUDGE_POLICY:
   format_score=0.2, commented eval/W&B blocks, the local retrieval server
   address, or the runtime asset paths under /root/) instead of the
   observation loss mask is a wrong attribution and forces score 0.
-- Treating training reward or a missing eval-19 row as the defect is a
+- Treating training reward or falling truncation as the defect is a
   wrong attribution and forces score 0.
 - Equivalent technical wording in any language is acceptable.
 - task.yaml may clarify targets and aliases but may not relax REQUIRED_ALL.

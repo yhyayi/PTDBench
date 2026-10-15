@@ -25,8 +25,8 @@ should carry `loss_mask=1`. Do not leave observations trainable.
 
 ## Historical evidence
 
-Evidence kind: `historical_run`. The frozen window is train step 100; the last
-held-out eval is step 99 (`eval_interval=10`). Machine-readable copies:
+Evidence kind: `historical_run`. The frozen window is train step 200; the last
+held-out eval is step 199 (`eval_interval=10`). Machine-readable copies:
 
 - `oracle/historical_evidence_manifest.json`
 - `oracle/dirty_reference/historical_metrics.json`
@@ -34,13 +34,12 @@ held-out eval is step 99 (`eval_interval=10`). Machine-readable copies:
   `workspace/outputs/historical_eval_trace.log`, and the slimmed W&B
   `workspace/wandb/*/files/output.log`
 
-Primary metric `eval/nq_test` at step 99 is `0.145` (14.5%), up from
-`0.043` (4.3%) at step 0, with a peak of `0.1527` (15.3%) at step 89. Ten
-eval points are frozen; eval step 19 is missing from captured stdout. A
-healthy masked run reaches about 37.5% (`0.3753`) at the same horizon.
-Train response length at step 100 is about 14 tokens with a 0% truncate
-ratio. Training `rollout/raw_reward` at step 99 is 0.1875 and does not
-establish held-out health.
+Primary metric `eval/nq_test` at step 199 is `0.1647` (16.5%), up from
+`0.048` (4.8%) at step 0, with a peak of `0.1657` (16.6%) at step 189. 21
+eval points are frozen. A healthy masked run reaches about 40.8% (`0.4083`)
+at the same horizon. Train response length at step 190 is about 10 tokens
+with a 0% truncate ratio. Training `rollout/raw_reward` at step 199 is
+0.168 and does not establish held-out health.
 
 ## Why it is unhealthy
 
@@ -69,10 +68,9 @@ cause:
 - Local retrieval server address `http://127.0.0.1:8000/retrieve` and runtime
   asset paths under `/root/…`.
 - Falling response length / truncation, or training `rollout/raw_reward`.
-- A missing eval-19 row in the frozen log.
 
 Machine grading reads only the new experiment logs. The required held-out
-metric is `eval/nq_test`. The historical final baseline is `0.145` (14.5%).
-The absolute pass line is `0.28` (28%) on the best finite value at any step.
+metric is `eval/nq_test`. The historical final baseline is `0.1647` (16.5%).
+The absolute pass line is `0.30` (30%) on the best finite value at any step.
 Pass is score `1`; otherwise `0`. A healthy masked protocol reaches about
-37.5% at the same 100-step horizon.
+40.8% at the same 200-step horizon.
