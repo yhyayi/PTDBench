@@ -45,21 +45,37 @@ from typing import Any
 # Import siblings whether invoked as `python scripts/cybertron_stage.py` (script
 # dir on sys.path) or `python -m scripts.cybertron_stage`.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from cybertron_preheat import hf_export, proxy_export  # noqa: E402
 
-_DEFAULT_HTTP_PROXY = "http://whitelist-proxy.cybertron.svc.cluster.local:7891"
-_DEFAULT_HF_ENDPOINT = "https://hf-mirror.com"
-
-# Stable in-container paths the backend's _setup_devspace symlinks/creates:
-# /workspace -> per-run workspace on the persistent fs; /ptdbench/{models,datasets}
-# -> the shared read-only cluster cache. prepare writes weights into /workspace
-# and reads the cache from /ptdbench/*.
-_REMOTE_WORKSPACE = "/workspace"
-_REMOTE_MODELS = "/ptdbench/models"
-_REMOTE_DATASETS = "/ptdbench/datasets"
-_REMOTE_PREPARED = "/workspace/.ptdbench-prepared"
-_REMOTE_ENVIRONMENT = "/workspace/.ptdbench-environment"
-_REMOTE_TOOLING = "/ptdbench/tooling"
+# The recipe and the remote layout are shared with CybertronEnvironment, which
+# runs the same prepare step as part of start() for the eval path; they live in
+# the package so the backend does not have to import from scripts/.
+from harbor.environments.ptdbench_prepare import (
+    DEFAULT_HF_ENDPOINT as _DEFAULT_HF_ENDPOINT,
+)
+from harbor.environments.ptdbench_prepare import (
+    DEFAULT_HTTP_PROXY as _DEFAULT_HTTP_PROXY,
+)
+from harbor.environments.ptdbench_prepare import (
+    REMOTE_DATASETS as _REMOTE_DATASETS,
+)
+from harbor.environments.ptdbench_prepare import (
+    REMOTE_ENVIRONMENT as _REMOTE_ENVIRONMENT,
+)
+from harbor.environments.ptdbench_prepare import (
+    REMOTE_MODELS as _REMOTE_MODELS,
+)
+from harbor.environments.ptdbench_prepare import (
+    REMOTE_PREPARED as _REMOTE_PREPARED,
+)
+from harbor.environments.ptdbench_prepare import (
+    REMOTE_TOOLING as _REMOTE_TOOLING,
+)
+from harbor.environments.ptdbench_prepare import (
+    REMOTE_WORKSPACE as _REMOTE_WORKSPACE,
+)
+from harbor.environments.ptdbench_prepare import (
+    build_prepare_recipe,
+)
 
 # Constructor kwargs that are ints (everything else from --environment-kwarg is a
 # str). Coerced so `cpu=16` from the CLI reaches CybertronEnvironment as an int.
@@ -148,28 +164,19 @@ def build_stage_recipe(
 ) -> str:
     """Shell that installs the tooling then runs the uploaded task's prepare.sh.
 
-    Reuses cybertron_preheat's proxy / HF exports so egress + mirror are set
-    identically to the preheat and eval paths. Runs on the devspace, against the
-    shared cache mounted at /ptdbench/{models,datasets}. Weights land in
-    $PTDBENCH_WORKSPACE (=/workspace); prepared/env (tiny) under it.
+    Thin wrapper kept for this script's CLI; the implementation is shared with
+    CybertronEnvironment via harbor.environments.ptdbench_prepare so the manual
+    staging path and the eval path run byte-identical prepare shells.
     """
-    installer = f"{tooling}/install-ptdbench-tooling.sh"
-    return (
-        "set -euo pipefail; "
-        "export PTDBENCH_STAGE=prepare WANDB_MODE=offline WANDB_SILENT=true; "
-        f"{proxy_export(http_proxy)}"
-        f"{hf_export(hf_endpoint)}"
-        f"export PTDBENCH_WORKSPACE={shlex.quote(workspace)} "
-        f"PTDBENCH_PREPARED={shlex.quote(prepared)} "
-        f"PTDBENCH_MODELS={shlex.quote(models)} "
-        f"PTDBENCH_DATASETS={shlex.quote(datasets)}; "
-        f"mkdir -p {shlex.quote(prepared)}; "
-        # Install the repo's CURRENT fetch/dataset tooling (the Dockerfiles no
-        # longer bake it); no-op if the installer wasn't uploaded.
-        f"if [ -f {shlex.quote(installer)} ]; then "
-        f"bash {shlex.quote(installer)}; fi; "
-        f"cd {shlex.quote(environment)}; "
-        "bash prepare.sh"
+    return build_prepare_recipe(
+        workspace=workspace,
+        models=models,
+        datasets=datasets,
+        prepared=prepared,
+        environment=environment,
+        tooling=tooling,
+        http_proxy=http_proxy,
+        hf_endpoint=hf_endpoint,
     )
 
 

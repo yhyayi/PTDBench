@@ -95,6 +95,10 @@ def _parse_mapping(lines: Sequence[_Line], index: int, indent: int) -> Tuple[dic
         key, value, has_value = _split_key_value(line.content, line.number)
         index += 1
         if has_value:
+            if value in (">-", ">", "|-", "|"):
+                scalar, index = _parse_block_scalar(lines, index, indent, value)
+                result[key] = scalar
+                continue
             result[key] = _parse_scalar(value, line.number)
             continue
         if index < len(lines) and lines[index].indent > indent:
@@ -103,6 +107,54 @@ def _parse_mapping(lines: Sequence[_Line], index: int, indent: int) -> Tuple[dic
         else:
             result[key] = None
     return result, index
+
+
+def _parse_block_scalar(
+    lines: Sequence[_Line], index: int, mapping_indent: int, indicator: str
+) -> Tuple[str, int]:
+    """Consume the indented continuation lines of a block scalar.
+
+    Supports the four YAML block-scalar indicators:
+      ``>-`` folded, strip trailing newlines (most common in PTDBench metadata)
+      ``>``  folded, keep one final newline
+      ``|-`` literal, strip trailing newlines
+      ``|``  literal, keep one final newline
+
+    The content indent is determined by the first non-empty continuation line.
+    All content lines are collected until a line whose indent falls back to
+    ``mapping_indent`` or below, which belongs to the surrounding mapping.
+    """
+    folded = indicator.startswith(">")
+    strip = indicator.endswith("-")
+
+    # Determine the content indent from the first non-empty line.
+    content_indent: int | None = None
+    parts: list[str] = []
+    while index < len(lines):
+        cur = lines[index]
+        if content_indent is None:
+            if cur.indent <= mapping_indent:
+                # Block scalar body is empty.
+                break
+            content_indent = cur.indent
+        if cur.indent < content_indent:
+            break
+        # Preserve extra indentation relative to the content indent.
+        extra = " " * (cur.indent - content_indent)
+        parts.append(extra + cur.content)
+        index += 1
+
+    if folded:
+        text = " ".join(parts)
+    else:
+        text = "\n".join(parts)
+
+    if strip:
+        text = text.rstrip("\n").rstrip()
+    else:
+        text = text.rstrip("\n") + "\n"
+
+    return text, index
 
 
 def _parse_list(lines: Sequence[_Line], index: int, indent: int) -> Tuple[list, int]:

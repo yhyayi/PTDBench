@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import contextvars
 import logging
+import os
 import shlex
 import tarfile
 import tempfile
@@ -51,6 +52,13 @@ EnvironmentPath = str | PurePath
 _TRANSFER_TAR_TEMPLATE = ".hb-transfer-{uuid}.tar.gz"
 _TRANSFER_LIST_TEMPLATE = ".hb-transfer-{uuid}.list"
 _ENV_TRANSFER_TAR_DIR = PurePosixPath("/tmp")
+# Building a transfer archive is `tar czf` across the whole source tree, so how
+# long it takes is set by the workspace, not by the task. A workspace holding a
+# staged dataset or a checkpoint takes many minutes to compress, and when the
+# timeout hits, the trial is reported as an infrastructure failure and its
+# already-computed score is discarded -- a lost result, not just a lost
+# artifact. Generous by default because waiting longer is never incorrect here.
+_TRANSFER_TIMEOUT_SEC = int(os.environ.get("HARBOR_TRANSFER_TIMEOUT_SEC") or 900)
 
 OutputStream = Literal["stdout", "stderr"]
 OutputCallback = Callable[[str, OutputStream], Awaitable[None]]
@@ -1015,7 +1023,7 @@ class BaseEnvironment(ABC):
         result = await self.service_exec(
             f"tar czf {shlex.quote(env_tar_path)} {exclude_flags} -C {source_path} .",
             service=service,
-            timeout_sec=120,
+            timeout_sec=_TRANSFER_TIMEOUT_SEC,
             user="root",
         )
         if result.return_code != 0:
@@ -1072,7 +1080,7 @@ class BaseEnvironment(ABC):
         source_path = shlex.quote(source_dir)
         list_result = await self.exec(
             f"cd {source_path} && find . -type f",
-            timeout_sec=120,
+            timeout_sec=_TRANSFER_TIMEOUT_SEC,
             user="root",
         )
         if list_result.return_code != 0:
@@ -1117,7 +1125,7 @@ class BaseEnvironment(ABC):
                 result = await self.exec(
                     f"tar czf {shlex.quote(env_tar_path)} -C {source_path} "
                     f"-T {shlex.quote(env_list_path)}",
-                    timeout_sec=120,
+                    timeout_sec=_TRANSFER_TIMEOUT_SEC,
                     user="root",
                 )
                 if result.return_code != 0:

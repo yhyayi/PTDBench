@@ -7,6 +7,13 @@ _SENSITIVE_KEY_RE = re.compile(
 )
 _TRUE_BOOL_VALUES = frozenset({"true", "1", "yes"})
 _FALSE_BOOL_VALUES = frozenset({"false", "0", "no"})
+# Values that occur as ordinary content everywhere, so replacing them hides
+# nothing and breaks whatever they appear in. See is_scrubbable_secret.
+_NON_SECRET_VALUES = (
+    _TRUE_BOOL_VALUES
+    | _FALSE_BOOL_VALUES
+    | frozenset({"", "on", "off", "none", "null"})
+)
 
 
 def parse_bool_env_value(
@@ -53,6 +60,25 @@ def redact_sensitive_value(value: str) -> str:
     if len(value) <= 8:
         return "****"
     return value[:4] + "****" + value[-3:]
+
+
+def is_scrubbable_secret(value: str) -> bool:
+    """Return True if ``value`` is distinctive enough to search-and-replace.
+
+    Scrubbing a trial directory works by substring replacement across every
+    text file in it, so a value that also occurs as ordinary content corrupts
+    the file rather than protecting anything. ``is_sensitive_env_key`` matches
+    on substrings, so ``TOKENIZERS_PARALLELISM="false"`` reads as a credential
+    named ``...TOKEN...``; replacing its value rewrites every bare ``false``
+    literal in the trial's own JSON results and leaves them unparseable.
+
+    Real credentials are long and high-entropy. Anything boolean-shaped or
+    shorter than ``redact_sensitive_value``'s own "too short to partly show"
+    threshold is neither secret nor safe to replace blindly.
+    """
+    if value.strip().lower() in _NON_SECRET_VALUES:
+        return False
+    return len(value) > 8
 
 
 def templatize_sensitive_env(env: dict[str, str]) -> dict[str, str]:

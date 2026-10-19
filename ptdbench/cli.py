@@ -230,6 +230,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Hugging Face mirror base URL, passed to the prepare stage as HF_ENDPOINT",
     )
     h.add_argument(
+        "--gpus",
+        type=int,
+        default=None,
+        help=(
+            "remote backends (--env cybertron): GPU count for the devspace, "
+            "written to the generated task.toml as [environment].gpus "
+            "(default: the number of entries in the task's CUDA_VISIBLE_DEVICES)"
+        ),
+    )
+    h.add_argument(
         "--models-dir",
         default=os.environ.get("PTDBENCH_MODELS_DIR"),
         help=(
@@ -601,6 +611,7 @@ def main(argv=None) -> int:
                 ),
                 harbor_command=harbor_command,
                 harbor_args=tuple(harbor_args),
+                gpus=args.gpus,
             ),
         )
         result = (

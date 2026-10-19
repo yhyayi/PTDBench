@@ -26,6 +26,7 @@ from ..core.harbor_types import (
 )
 from ..core.types import (
     DATASETS_DIR,
+    DOCKER_DIR,
     MODELS_DIR,
     PREPARED_DIR,
     PTDBENCH_ENVIRONMENT_DIR,
@@ -43,6 +44,20 @@ from ..utils.filesystem import copy_tree, ensure_dir, tree_digest, write_text
 
 # 镜像里 activate hook 的位置；见 docker/images/*.Dockerfile 的工具层。
 ACTIVATE_HOOK = "/etc/profile.d/ptdbench-activate.sh"
+
+# 不在本机跑容器的 Harbor 后端。prepare 阶段要的是任务镜像（x86-64 CUDA）里的
+# slime / verl / Megatron 环境，而这些后端的算力在远端：prepare 由后端在远端执行
+# （见 harbor.environments.ptdbench_prepare），本地既不跑 prepare 也不挂载。
+_REMOTE_BACKENDS = frozenset({"cybertron"})
+
+
+def _is_remote_backend(harbor_args: Sequence[str]) -> bool:
+    """`-e/--env` 选中的后端是否在远端自己跑 prepare。
+
+    `harbor run` 的参数是整体透传的，PTDBench 本来不解析它们；这里只窥探后端名，
+    因为「prepare 在哪跑」「要不要挂载」「GPU 数从哪来」三件事都取决于它。
+    """
+    return HarborRunner._option_value(harbor_args, "-e", "--env") in _REMOTE_BACKENDS
 
 
 class HarborAdapterError(RuntimeError):
@@ -235,6 +250,16 @@ exit "$verifier_status"
         "*.distcp",
         "*.gguf",
         "__pycache__",
+        # prepare.sh stages retrieval corpora and their arrow caches straight
+        # into /workspace (search_r1 lands ~74GB of wiki-18 plus a 21M-row
+        # arrow cache there). None of it is evidence about the run, and gzipping
+        # it is what pushed the artifact download past its timeout -- which
+        # discards the trial's score, not just its artifact.
+        "*.arrow",
+        ".hf_datasets_cache",
+        "wiki-18",
+        "*.index",
+        "*.faiss",
     )
 
     def _write_task_config(
@@ -316,7 +341,7 @@ network_mode = {self._toml_string(config.verifier_network)}
 docker_image = {self._toml_string(docker_image)}
 workdir = "/workspace"
 build_timeout_sec = {self._environment_start_timeout(task_dir / "environment")}
-
+{self._toml_gpus(package, config)}
 [environment.env]
 {self._toml_env(agent_env)}
 
@@ -324,6 +349,26 @@ build_timeout_sec = {self._environment_start_timeout(task_dir / "environment")}
 {self._toml_env(verifier_env)}
 '''
         write_text(task_dir / "task.toml", task_toml)
+
+    @staticmethod
+    def _toml_gpus(package: TaskPackage, config: HarborEvaluationConfig) -> str:
+        """`[environment].gpus` —— 远端后端唯一能拿到 GPU 数的地方。
+
+        docker 后端拒收 task.toml 里的 `gpus`，它的设备预留走 compose overlay；但
+        远端后端（cybertron）恰恰只读 task_env_config.gpus，devspace 的 `--gpu` 和
+        CPU/内存配比都由它推出来，不写就会开出 0 卡的机器。
+
+        取值优先级：显式 --gpus > 任务 metadata 里 CUDA_VISIBLE_DEVICES 的条目数。
+        两者都没有就不写这一行，交给 Harbor 的默认值。
+        """
+        if not _is_remote_backend(config.harbor_args):
+            return ""
+        gpus = config.gpus
+        if gpus is None:
+            visible = (package.environment.env or {}).get("CUDA_VISIBLE_DEVICES")
+            if visible:
+                gpus = len([part for part in str(visible).split(",") if part.strip()])
+        return "" if not gpus else f"gpus = {int(gpus)}\n"
 
     # Harbor 的默认值；预构建镜像不 build，这段时间几乎全花在上传 workspace 上。
     _ENVIRONMENT_START_BASE_SEC = 600
@@ -411,6 +456,8 @@ class HarborRunner:
                 jobs_dir_value = "jobs"
                 injected_args.extend(["--jobs-dir", jobs_dir_value])
 
+        injected_args.extend(self._remote_prepare_args(prepared, harbor_args))
+
         caller_cwd = Path.cwd().resolve()
         argv = [
             *config.harbor_command,
@@ -420,7 +467,7 @@ class HarborRunner:
             *injected_args,
             "--mounts-json",
             json.dumps(mounts),
-            *self._compose_overlay_args(prepared),
+            *self._compose_overlay_args(prepared, harbor_args),
             *harbor_args,
         ]
 
@@ -531,11 +578,18 @@ class HarborRunner:
 
         与 docker 评测里 agent / verifier 看到的挂载一致；可写的只有 Harbor 上传
         的 /workspace。
+
+        远端后端（cybertron）没有挂载这回事：它声明 capabilities.mounted=False，
+        这几个路径由后端在 devspace 上自己建——/ptdbench/{models,datasets} 软链到
+        集群共享缓存，prepared 由远端 prepare 写在持久化 workspace 里。这里的
+        source 又都是本机绝对路径，送过去没有意义，所以整组略过。
         """
         if len(prepared.units) != 1:
             raise HarborAdapterError(
                 "Harbor mounts apply to the whole job; run one PTDBench task per job"
             )
+        if _is_remote_backend(config.harbor_args):
+            return []
         unit = prepared.units[0]
         pairs = []
         if unit.prepared is not None:
@@ -555,14 +609,58 @@ class HarborRunner:
         ]
 
     @staticmethod
-    def _compose_overlay_args(prepared: PreparedHarborTask) -> list[str]:
+    def _remote_prepare_args(
+        prepared: PreparedHarborTask,
+        harbor_args: Sequence[str],
+    ) -> list[str]:
+        """远端后端跑 prepare 所需的两个路径，作为 environment kwarg 注入。
+
+        后端要自己把 prepare.sh 和 fetch/dataset 工具送上 devspace，但物化出来的
+        Harbor task 里并没有任务原本的 environment/（那个目录名在 Harbor 语义下装
+        的是要上传到 workdir 的 workspace 树），docker 路径是靠 bind mount 补的。
+        远端没有挂载，所以这里把宿主机上的两个源目录显式告诉后端。
+
+        用户显式给过同名 kwarg 时不覆盖——调试时可以指到别处。
+        """
+        if not _is_remote_backend(harbor_args):
+            return []
+        if len(prepared.units) != 1:
+            raise HarborAdapterError(
+                "remote prepare applies to the whole job; run one PTDBench task per job"
+            )
+        existing = {
+            value.split("=", 1)[0]
+            for value in HarborRunner._option_values(harbor_args, "--environment-kwarg")
+            if "=" in value
+        }
+        package = prepared.units[0].package
+        args: list[str] = []
+        if "prepare_dir" not in existing and package.paths.environment.is_dir():
+            args.extend(
+                ["--environment-kwarg", f"prepare_dir={package.paths.environment.resolve()}"]
+            )
+        if "tooling_dir" not in existing and DOCKER_DIR.is_dir():
+            args.extend(["--environment-kwarg", f"tooling_dir={DOCKER_DIR.resolve()}"])
+        return args
+
+    @staticmethod
+    def _compose_overlay_args(
+        prepared: PreparedHarborTask,
+        harbor_args: Sequence[str] = (),
+    ) -> list[str]:
         """任务的 environment/docker-compose.yaml 作为 compose overlay 交给 Harbor。
 
         GPU 任务靠它拿到设备预留和 shm_size：Harbor 的 docker 环境声明不支持
         GPU，task.toml 里写 `gpus` 会被拒，能生效的只有 `main` 服务上的 compose
         覆盖。它不能放进生成 task 的 environment/——那里有 compose 文件时 Harbor
         就不再上传 workspace——所以走 `--extra-docker-compose`，与 job 一一对应。
+
+        远端后端没有 compose 这一层（devspace 本身就是容器，GPU 由 devspace 的
+        `--gpu` 决定、读的是 task.toml 的 `gpus`），所以不注入；否则会把一个只有
+        docker 才懂的参数塞给它。
         """
+        if _is_remote_backend(harbor_args):
+            return []
         overlays = []
         for unit in prepared.units:
             compose = unit.package.paths.environment / "docker-compose.yaml"
@@ -599,6 +697,24 @@ class HarborRunner:
                 elif arg.startswith(name + "="):
                     value = arg.split("=", 1)[1]
         return value
+
+    @staticmethod
+    def _option_values(args: Sequence[str], *names: str) -> list[str]:
+        """_option_value 的可重复版：收集某个选项出现过的全部取值。
+
+        `--environment-kwarg` 这类选项会被给很多次，判断「用户是否已经自己指定过
+        某个 key」要看全部取值，只取最后一个会漏。
+        """
+        values: list[str] = []
+        for index, arg in enumerate(args):
+            for name in names:
+                if arg == name:
+                    if index + 1 >= len(args):
+                        raise ValueError(f"missing value for Harbor argument {name}")
+                    values.append(args[index + 1])
+                elif arg.startswith(name + "="):
+                    values.append(arg.split("=", 1)[1])
+        return values
 
     @staticmethod
     def _redact_argv(argv: Sequence[str]) -> list[str]:
@@ -1187,7 +1303,20 @@ class HarborEvaluator:
     ) -> HarborEvaluationReport:
         root = self._make_run_dir([unit], config.temp_dir)
         try:
-            unit = self.preparer.prepare(unit, ensure_dir(root / "prep"), config)
+            if _is_remote_backend(config.harbor_args):
+                # 远端后端自己在 devspace 上跑 prepare（权重落在集群共享缓存 +
+                # 该 trial 的持久 workspace，转换用 trial 自己的 GPU），所以这里
+                # 不跑本地 prepare。unit.workspace / unit.prepared 保持 None：
+                # 物化时 environment/ 退回任务自带的 workspace/ 树（git 里那份，
+                # 小且正是要上传的内容），_mounts 也不会再发本机路径。
+                print(
+                    f"[ptdbench] Skipping local prepare for {unit.package.task_id}; "
+                    "the remote backend runs prepare.sh on the devspace",
+                    file=sys.stderr,
+                    flush=True,
+                )
+            else:
+                unit = self.preparer.prepare(unit, ensure_dir(root / "prep"), config)
             print(
                 f"[ptdbench] Materializing {unit.package.task_id}:{unit.evaluation.level}",
                 file=sys.stderr,

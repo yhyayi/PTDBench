@@ -43,6 +43,9 @@ class HarborEvaluationConfig:
     datasets_dir: Optional[Path] = None
     harbor_command: Sequence[str] = field(default_factory=lambda: ("harbor",))
     harbor_args: Sequence[str] = field(default_factory=tuple)
+    # 远端后端（cybertron）要开几张卡。留空则按任务 metadata 的
+    # CUDA_VISIBLE_DEVICES 条目数推断；docker 后端忽略此项（设备预留走 compose）。
+    gpus: Optional[int] = None
 
     def __post_init__(self) -> None:
         if self.evaluation_level not in {"issue", "solution"}:
@@ -62,6 +65,8 @@ class HarborEvaluationConfig:
             raise ValueError("harbor_args must contain non-empty strings")
         if isinstance(self.temp_dir, str) and not self.temp_dir.strip():
             raise ValueError("temp_dir must not be empty")
+        if self.gpus is not None and self.gpus < 0:
+            raise ValueError("gpus must not be negative")
         if self.huggingface_mirror is not None:
             object.__setattr__(
                 self, "huggingface_mirror", _normalize_plain_url(self.huggingface_mirror)

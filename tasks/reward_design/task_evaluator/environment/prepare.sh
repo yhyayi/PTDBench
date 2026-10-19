@@ -161,7 +161,9 @@ if [ ! -d "$PYEXT_MARKER" ]; then
     echo "[prepare] installing patched pyext==0.7 into $PYEXT_SITE"
     # --no-build-isolation：pyext 的 setup.py 起手就 `import pyext`，隔离出来的构建
     # 环境里没有刚打好补丁的那份，会重新拿到未打补丁的语义。
-    python3 -m pip install --no-cache-dir --no-deps --no-build-isolation \
+    # --no-user：有些环境有 PIP_USER=1 或 pip.conf [install] user=true，它与
+    # --target 互斥（pip 报 "Can not combine '--user' and '--target'"）。
+    python3 -m pip install --no-cache-dir --no-deps --no-build-isolation --no-user \
         --target "$PYEXT_SITE" "$PYEXT_SRC"
     rm -rf "$PYEXT_SRC"
 else

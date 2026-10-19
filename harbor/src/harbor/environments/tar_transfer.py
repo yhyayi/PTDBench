@@ -26,6 +26,20 @@ from pathlib import Path
 from typing import BinaryIO
 
 
+def _safe_tar_filter(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo | None:
+    """Drop members with absolute link targets rather than letting tarfile raise.
+
+    Python 3.12 added ``AbsoluteLinkError`` for symlinks whose ``linkname`` is
+    an absolute path. The cybertron backend creates ``/workspace`` as an absolute
+    symlink (``/user/<user>/harbor-runs/<session>/workspace``) and that symlink
+    can end up in the materialized task tree when a trial dir is packaged.
+    Dropping it is safe: the remote ``_setup_devspace`` re-creates it.
+    """
+    if tarinfo.issym() and tarinfo.linkname.startswith("/"):
+        return None
+    return tarinfo
+
+
 def pack_dir(
     source_dir: Path | str, fileobj: BinaryIO, *, compress: bool = True
 ) -> None:
@@ -40,7 +54,7 @@ def pack_dir(
         raise FileNotFoundError(f"Source directory {source_dir} does not exist")
     mode = "w:gz" if compress else "w"
     with tarfile.open(fileobj=fileobj, mode=mode) as tar:
-        tar.add(source_path, arcname=".")
+        tar.add(source_path, arcname=".", filter=_safe_tar_filter)
 
 
 def pack_dir_to_file(

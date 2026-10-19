@@ -4,6 +4,7 @@ import pytest
 
 from harbor.utils.env import (
     get_required_host_vars,
+    is_scrubbable_secret,
     parse_bool_env_value,
     resolve_env_vars,
 )
@@ -212,3 +213,21 @@ class TestGetRequiredHostVars:
         env_dict = {"A": "${VAR:-}"}
         result = get_required_host_vars(env_dict)
         assert result == [("VAR", "")]
+
+
+class TestIsScrubbableSecret:
+    def test_rejects_boolean_shaped_values(self):
+        # TOKENIZERS_PARALLELISM="false" reads as sensitive to
+        # is_sensitive_env_key (substring "TOKEN"), and scrubbing is substring
+        # replacement, so accepting "false" rewrites every bare false literal
+        # in a trial's own result.json and leaves it unparseable.
+        for value in ("false", "true", "0", "1", "no", "yes", "on", "off", ""):
+            assert is_scrubbable_secret(value) is False
+
+    def test_rejects_short_values(self):
+        assert is_scrubbable_secret("abc") is False
+        assert is_scrubbable_secret("12345678") is False
+
+    def test_accepts_credential_shaped_values(self):
+        assert is_scrubbable_secret("sk-26c7072f569b7ef95b32435b749f03e6") is True
+        assert is_scrubbable_secret("ptdbench-offline") is True

@@ -20,6 +20,7 @@ from ptdbench.core.harbor_types import (
 )
 from ptdbench.core.types import (
     DATASETS_DIR,
+    DOCKER_DIR,
     MODELS_DIR,
     PREPARED_DIR,
     PTDBENCH_ENVIRONMENT_DIR,
@@ -34,6 +35,7 @@ from ptdbench.evaluation.harbor_evaluator import (
     HarborResultMapper,
     HarborRunner,
     HarborTaskMaterializer,
+    _is_remote_backend,
 )
 from ptdbench.tasks import load_task_package
 
@@ -1086,6 +1088,131 @@ def _trial(task_id: str, report_dir: Path):
         agent=None, verifier=None, workspace_before_hash="b",
         workspace_after_hash="a", metadata={},
     )
+
+
+class RemoteBackendTests(FixtureTestCase):
+    """`--env cybertron`：prepare 在 devspace 上跑，本地既不 prepare 也不挂载。
+
+    这条路以前从没端到端通过：本地 prepare 要 x86-64 CUDA 镜像（arm64 机器上根本
+    起不来），而 _mounts / compose overlay 发的都是本机路径、后端又声明
+    mounted=False，GPU 数更是没人写进 task.toml，devspace 会开成 0 卡。
+    """
+
+    def _prepared(self, package=None) -> PreparedHarborTask:
+        unit = make_unit(package or self.package, "solution")
+        return PreparedHarborTask(
+            root=self.root / "harbor",
+            tasks_dir=self.root / "harbor" / "tasks",
+            units=[unit],
+        )
+
+    @staticmethod
+    def _config(*harbor_args: str, **kwargs) -> HarborEvaluationConfig:
+        return HarborEvaluationConfig(harbor_args=harbor_args, **kwargs)
+
+    def test_detects_the_backend_from_either_option_spelling(self) -> None:
+        for args in (("-e", "cybertron"), ("--env", "cybertron"), ("--env=cybertron",)):
+            with self.subTest(args=args):
+                self.assertTrue(_is_remote_backend(args))
+        for args in ((), ("-e", "docker"), ("--env", "daytona")):
+            with self.subTest(args=args):
+                self.assertFalse(_is_remote_backend(args))
+
+    def test_no_mounts_are_sent_to_a_remote_backend(self) -> None:
+        prepared = self._prepared()
+        self.assertEqual(HarborRunner._mounts(prepared, self._config("-e", "cybertron")), [])
+        # docker 这条路一个挂载都不能少。
+        self.assertEqual(
+            {mount["target"] for mount in HarborRunner._mounts(prepared, self._config("-e", "docker"))},
+            {PTDBENCH_ENVIRONMENT_DIR, MODELS_DIR, DATASETS_DIR},
+        )
+
+    def test_no_compose_overlay_is_sent_to_a_remote_backend(self) -> None:
+        compose = self.package.paths.environment / "docker-compose.yaml"
+        compose.write_text("services: {}\n", encoding="utf-8")
+        prepared = self._prepared(load_task_package(self.task_root))
+        self.assertEqual(
+            HarborRunner._compose_overlay_args(prepared, ("-e", "cybertron")), []
+        )
+        self.assertEqual(
+            HarborRunner._compose_overlay_args(prepared, ("-e", "docker")),
+            ["--extra-docker-compose", str(compose.resolve())],
+        )
+
+    def test_remote_prepare_paths_are_injected_as_environment_kwargs(self) -> None:
+        args = HarborRunner._remote_prepare_args(self._prepared(), ("-e", "cybertron"))
+        self.assertEqual(
+            args,
+            [
+                "--environment-kwarg",
+                f"prepare_dir={self.package.paths.environment.resolve()}",
+                "--environment-kwarg",
+                f"tooling_dir={DOCKER_DIR.resolve()}",
+            ],
+        )
+        self.assertEqual(HarborRunner._remote_prepare_args(self._prepared(), ("-e", "docker")), [])
+
+    def test_an_explicit_prepare_dir_is_not_overridden(self) -> None:
+        """重复选项要看全部取值，只看最后一个会把用户给的覆盖掉。"""
+        args = HarborRunner._remote_prepare_args(
+            self._prepared(),
+            ("-e", "cybertron", "--environment-kwarg", "prepare_dir=/custom"),
+        )
+        self.assertNotIn("prepare_dir=/custom", args)
+        self.assertEqual(
+            args, ["--environment-kwarg", f"tooling_dir={DOCKER_DIR.resolve()}"]
+        )
+
+    def test_gpus_reaches_the_task_toml_for_a_remote_backend(self) -> None:
+        """后端只认 task.toml 的 gpus；不写就会开出 0 卡的 devspace。"""
+        # fixture 的 CUDA_VISIBLE_DEVICES 是 "0" -> 1 张。
+        self.assertEqual(
+            HarborTaskMaterializer._toml_gpus(self.package, self._config("-e", "cybertron")),
+            "gpus = 1\n",
+        )
+        self.assertEqual(
+            HarborTaskMaterializer._toml_gpus(
+                self.package, self._config("-e", "cybertron", gpus=4)
+            ),
+            "gpus = 4\n",
+        )
+        # docker 后端拒收 task.toml 里的 gpus，一行都不能写。
+        self.assertEqual(
+            HarborTaskMaterializer._toml_gpus(self.package, self._config("-e", "docker")), ""
+        )
+
+    def test_materialized_task_toml_declares_gpus(self) -> None:
+        destination = self.root / "materialized"
+        config = self._config("-e", "cybertron")
+        prepared = HarborTaskMaterializer().materialize(
+            [make_unit(self.package, "solution")], destination, config
+        )
+        task_toml = (prepared.task_dir(prepared.units[0]) / "task.toml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("gpus = 1", task_toml)
+
+    def test_local_prepare_is_skipped_for_a_remote_backend(self) -> None:
+        """本地 prepare 要 x86-64 CUDA 镜像，远端后端上不该被调用。"""
+        preparer = MagicMock(spec=HarborPreparer)
+        runner = MagicMock(spec=HarborRunner)
+        runner.run.return_value = HarborRun(command=_command(), job_dir=self.root / "jobs")
+        mapper = MagicMock(spec=HarborResultMapper)
+        mapper.map.return_value = HarborEvaluationReport(
+            task_ids=["harbor_fixture"], evaluation_level="solution",
+            trials=[], report_dir=self.root / "jobs", command=_command(),
+        )
+        evaluator = HarborEvaluator(
+            materializer=HarborTaskMaterializer(), runner=runner,
+            result_mapper=mapper, preparer=preparer,
+        )
+        with redirect_stdout(io.StringIO()):
+            evaluator.evaluate([self.task_root], self._config("-e", "cybertron"))
+        preparer.prepare.assert_not_called()
+        # 没有本地 prepare，上传的 workspace 就是任务自带那棵树。
+        unit = runner.run.call_args.args[0].units[0]
+        self.assertIsNone(unit.workspace)
+        self.assertIsNone(unit.prepared)
 
 
 if __name__ == "__main__":

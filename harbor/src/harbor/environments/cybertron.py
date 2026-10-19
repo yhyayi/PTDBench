@@ -35,6 +35,17 @@ from harbor.environments.capabilities import (
     EnvironmentCapabilities,
     EnvironmentResourceCapabilities,
 )
+from harbor.environments.ptdbench_prepare import (
+    DEFAULT_HF_ENDPOINT as _DEFAULT_HF_ENDPOINT,
+)
+from harbor.environments.ptdbench_prepare import (
+    DEFAULT_HTTP_PROXY as _DEFAULT_HTTP_PROXY,
+)
+from harbor.environments.ptdbench_prepare import (
+    REMOTE_ENVIRONMENT,
+    REMOTE_TOOLING,
+    build_prepare_recipe,
+)
 from harbor.environments.tar_transfer import extract_dir_from_bytes, pack_dir_to_bytes
 from harbor.models.environment_type import EnvironmentType
 from harbor.models.task.config import EnvironmentConfig
@@ -434,8 +445,30 @@ class CybertronEnvironment(BaseEnvironment):
         ssh_config_path: str | Path | None = None,
         cctl_profile: str | None = None,
         sandbox_ro_tool_dirs: list[str] | tuple[str, ...] | None = None,
+        prepare_dir: str | Path | None = None,
+        tooling_dir: str | Path | None = None,
+        prepare_script: str = "prepare.sh",
+        prepare_env: dict[str, str] | None = None,
+        http_proxy: str | None = _DEFAULT_HTTP_PROXY,
+        hf_endpoint: str | None = _DEFAULT_HF_ENDPOINT,
         **kwargs: Any,
     ) -> None:
+        # PTDBench prepare stage. ``prepare_dir`` is the task's own
+        # ``environment/`` dir (the one holding ``prepare.sh``); when it is set,
+        # start() uploads it plus ``tooling_dir`` (the repo's ``docker/``) and
+        # runs prepare ON the devspace. Left unset, the environment behaves as
+        # before and no prepare runs -- the manual staging script drives it
+        # itself, and non-PTDBench tasks have nothing to prepare.
+        self._prepare_dir = None if prepare_dir is None else Path(prepare_dir)
+        self._tooling_dir = None if tooling_dir is None else Path(tooling_dir)
+        self._prepare_script = prepare_script
+        # Extra env for the prepare shell only. Tasks that install from a
+        # package index cannot hardcode one (search_r1 defaults to the beijing
+        # cluster's mirror, which sichuan_train's egress whitelist blocks), so
+        # the reachable value is supplied per run.
+        self._prepare_env = dict(prepare_env or {})
+        self._http_proxy = http_proxy
+        self._hf_endpoint = hf_endpoint
         self._project = project
         self._cluster = cluster
         self._resource_pool = resource_pool
@@ -595,6 +628,16 @@ class CybertronEnvironment(BaseEnvironment):
     @property
     def _logs_dir(self) -> str:
         return f"{self._run_dir}/logs"
+
+    @property
+    def _prepared_dir(self) -> str:
+        """Where prepare.sh's ``env`` handoff file lives, on the persistent fs.
+
+        Under the run dir rather than at ``/ptdbench/prepared`` directly because
+        ``/ptdbench`` is the container's ephemeral overlay; ``_setup_devspace``
+        symlinks the canonical path here so the agent and verifier still find it.
+        """
+        return f"{self._run_dir}/prepared"
 
     # -- cctl ---------------------------------------------------------------
 
@@ -956,7 +999,14 @@ class CybertronEnvironment(BaseEnvironment):
             assignments = " ".join(
                 f"{key}={shlex.quote(value)}" for key, value in env.items()
             )
-            script = f"{assignments} {script}"
+            # `VAR=x <cmd>` is only valid in front of a *simple* command. Several
+            # agents' probes start with a compound one -- codex's install check
+            # begins with `if [ -s ~/.nvm/nvm.sh ]; ...` -- and prefixing that
+            # yields `bash: syntax error near unexpected token 'then'` (rc=2).
+            # Harbor reads the non-zero rc as "not installed" and falls back to
+            # an npm/nvm install that this network blocks, so a perfectly good
+            # CLI looks missing. `export ...;` is valid before any command.
+            script = f"export {assignments}; {script}"
         if cwd:
             script = f"cd {shlex.quote(cwd)} && {script}"
         if user is not None and str(user) not in ("root", "0"):
@@ -1163,7 +1213,19 @@ class CybertronEnvironment(BaseEnvironment):
 set -e
 mkdir -p {shlex.quote(self._workspace_dir)} {shlex.quote(self._logs_dir)}
 mkdir -p {shlex.quote(self._cache_dir + "/models")} {shlex.quote(self._cache_dir + "/datasets")}
-chmod 777 {shlex.quote(self._logs_dir)}
+mkdir -p {shlex.quote(self._prepared_dir)}
+# EnvPaths puts agent/, verifier/ and artifacts/ under /logs. The agent and
+# artifacts dirs get created by the phases that write them, but the verifier
+# phase expects its dir to already exist: the Verifier downloads
+# {{logs}}/verifier wholesale afterwards and a missing dir surfaces as
+# DownloadVerifierDirError, which hides the real reason. A mounted backend gets
+# these for free from the bind mount; here they have to be made.
+mkdir -p {shlex.quote(self._logs_dir + "/agent")} \\
+         {shlex.quote(self._logs_dir + "/verifier")} \\
+         {shlex.quote(self._logs_dir + "/artifacts")}
+chmod 777 {shlex.quote(self._logs_dir)} {shlex.quote(self._logs_dir + "/agent")} \\
+          {shlex.quote(self._logs_dir + "/verifier")} \\
+          {shlex.quote(self._logs_dir + "/artifacts")}
 mkdir -p /ptdbench
 # The eval images bake /workspace (WORKDIR) and /ptdbench/{{models,datasets}}
 # (RUN mkdir) as real directories. `ln -sfn TARGET DIR` against a real directory
@@ -1173,13 +1235,27 @@ mkdir -p /ptdbench
 # the whole run is lost when the devspace stops. Remove any pre-existing real
 # dir first (it is never a correct symlink), then link with -T so any future
 # real-dir surprise is a loud failure rather than another silent nest.
-for _link in /workspace /logs /ptdbench/models /ptdbench/datasets; do
+for _link in /workspace /logs /ptdbench/models /ptdbench/datasets /ptdbench/prepared; do
   if [ -e "$_link" ] && [ ! -L "$_link" ]; then rm -rf "$_link"; fi
 done
 ln -sfnT {shlex.quote(self._workspace_dir)} /workspace
 ln -sfnT {shlex.quote(self._logs_dir)} /logs
 ln -sfnT {shlex.quote(self._cache_dir + "/models")} /ptdbench/models
 ln -sfnT {shlex.quote(self._cache_dir + "/datasets")} /ptdbench/datasets
+# prepare.sh writes $PTDBENCH_PREPARED/env on the persistent fs, but the agent
+# and verifier read it through ptdbench's canonical /ptdbench/prepared (the
+# activate hook's default, and what the generated task.toml pins). Without this
+# link the two halves disagree and everything prepare handed forward is lost.
+ln -sfnT {shlex.quote(self._prepared_dir)} /ptdbench/prepared
+# PTDBENCH_RESULTS must be set before the agent runs: every issue-level
+# instruction template says "write your answer to $PTDBENCH_RESULTS/agent_answer.md"
+# but without this export the variable is unset and the shell expands it to
+# nothing, so the agent writes to ./agent_answer.md in its cwd (/workspace)
+# instead of /logs/artifacts/. The mounted (docker) backend gets this for free
+# from the compose environment block; here we write it into the per-session
+# login profile so both the sandboxed agent shell and the verifier shell see it.
+printf 'export PTDBENCH_RESULTS=/logs/artifacts\n' \
+  > /etc/profile.d/ptdbench-results.sh
 # Always (re)compile so the binary tracks the embedded source (cheap, ~1s).
 if command -v gcc >/dev/null 2>&1; then
   cat > {shlex.quote(_LLRUN_SRC)} <<'LLRUN_EOF'
@@ -1233,6 +1309,89 @@ fi
             self.logger.debug(f"Devspace node IP {self._node_ip} (no_proxy bypass)")
         self._start_heartbeat()
         await self._setup_devspace()
+        # Upload the task's environment/ (for a prebuilt-image task that is the
+        # workspace tree) into the workdir. Every other prebuilt-image backend
+        # calls this at the end of start(); without it the trial's /workspace
+        # stays empty, since this backend has no bind mounts to fall back on.
+        await self._upload_environment_dir_after_start()
+        await self._run_ptdbench_prepare()
+
+    async def exec_stream(self, script: str) -> int:
+        """Run ``script`` on the devspace, streaming its output to our stderr.
+
+        ``exec()`` collects output with ``communicate()`` and only returns once
+        the remote command exits, so a long ``prepare.sh`` -- which sha256-verifies
+        multi-GB weights and may convert them to torch_dist on the GPU -- looks
+        hung for many minutes with nothing printed. This reuses the same
+        transport but lets the child inherit our stdio, so progress appears live.
+        Returns the remote exit code.
+        """
+        argv = [*self._transport_cmd(), f"bash -lc {shlex.quote(script)}"]
+        proc = await asyncio.create_subprocess_exec(*argv)
+        return await proc.wait()
+
+    async def _run_ptdbench_prepare(self) -> None:
+        """Run the task's ``prepare.sh`` on the devspace, before the agent starts.
+
+        Harbor has no phase between "environment is up" and "agent runs", which
+        is exactly where PTDBench's networked prepare stage belongs. Doing it
+        here means the downloads land in the trial's own /workspace on the
+        persistent filesystem, fed by the shared cluster cache, with the trial's
+        GPUs available for the HF -> torch_dist conversion that several tasks
+        have no fallback for.
+
+        Ordering matters: the workspace tree must already be uploaded (prepare
+        scripts call task-provided helpers such as ``scripts/models/*.sh``), so
+        this runs after ``_upload_environment_dir_after_start``.
+        """
+        if self._prepare_dir is None:
+            return
+        if not self._prepare_dir.is_dir():
+            raise RuntimeError(
+                f"Cybertron prepare_dir {self._prepare_dir} is not a directory"
+            )
+        if self._tooling_dir is not None:
+            await self.upload_dir(self._tooling_dir, REMOTE_TOOLING)
+        await self.upload_dir(self._prepare_dir, REMOTE_ENVIRONMENT)
+        if not (self._prepare_dir / self._prepare_script).is_file():
+            self.logger.debug(
+                f"No {self._prepare_script} in {self._prepare_dir}; skipping prepare"
+            )
+            return
+        # prepare_env wins over the task's own env: it carries per-cluster
+        # overrides (a reachable pip index, say) that the task cannot hardcode
+        # because the right value differs per cluster.
+        prepare_env = {**(self.task_env_config.env or {}), **self._prepare_env}
+        recipe = build_prepare_recipe(
+            prepared=self._prepared_dir,
+            script=self._prepare_script,
+            http_proxy=self._http_proxy,
+            hf_endpoint=self._hf_endpoint,
+            task_env=prepare_env,
+        )
+        self.logger.info(
+            f"Running {self._prepare_script} on devspace {self._devspace_id} "
+            "(downloads + any torch_dist conversion; output streams below)"
+        )
+        # Also tee to a file on the devspace: exec_stream lets the child inherit
+        # our stdio, but harbor captures that, so a failing prepare leaves only
+        # an exit code in trial.log and the actual error is lost.
+        log_path = f"{self._logs_dir}/prepare.log"
+        teed = f"{{ {recipe} ; }} 2>&1 | tee {shlex.quote(log_path)}; exit ${{PIPESTATUS[0]}}"
+        code = await self.exec_stream(teed)
+        if code != 0:
+            tail = ""
+            try:
+                res = await self._ssh_exec(
+                    f"tail -40 {shlex.quote(log_path)}", timeout_sec=60
+                )
+                tail = (res.stdout or res.stderr or "").strip()
+            except Exception as exc:  # noqa: BLE001 - diagnostics only
+                tail = f"(could not read {log_path}: {exc})"
+            raise RuntimeError(
+                f"{self._prepare_script} failed on devspace {self._devspace_id} "
+                f"with exit {code}\n--- last 40 lines of {log_path} ---\n{tail}"
+            )
 
     @override
     async def stop(self, delete: bool) -> None:
@@ -1362,7 +1521,10 @@ fi
             if member is None:
                 raise RuntimeError(f"Devspace file archive was empty: {source_path}")
             member.name = target.name
-            tar.extract(member, path=target.parent, filter="data")
+            # "data" filter rejects absolute-path symlinks (AbsoluteLinkError on
+            # Python 3.12+); use "fully_trusted" for single-file artifacts that
+            # come straight from the devspace over an authenticated SSH channel.
+            tar.extract(member, path=target.parent, filter="fully_trusted")
 
     @override
     async def download_dir(self, source_dir: str, target_dir: Path | str) -> None:

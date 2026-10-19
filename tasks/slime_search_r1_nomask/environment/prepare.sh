@@ -76,7 +76,10 @@ if [ ! -d "$FAISS_MARKER" ]; then
         rm -rf "$FAISS_SITE"
     fi
     echo "[prepare] installing faiss-gpu-cuvs==1.15.0 (CUDA 13) into $FAISS_SITE${PIP_INDEX_URL:+ via $PIP_INDEX_URL}"
-    python3 -m pip install --no-cache-dir --no-deps \
+    # --no-user: some images set PIP_USER=1 (or pip.conf [install] user=true),
+    # which is mutually exclusive with --target ("Can not combine '--user' and
+    # '--target'"). Same guard as reward_design/task_evaluator's pyext install.
+    python3 -m pip install --no-cache-dir --no-deps --no-user \
         --retries 10 --timeout 120 \
         ${PIP_INDEX_ARGS[@]+"${PIP_INDEX_ARGS[@]}"} \
         --target "$FAISS_SITE" \
