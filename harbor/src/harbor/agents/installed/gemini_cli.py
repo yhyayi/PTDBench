@@ -133,16 +133,28 @@ class GeminiCli(BaseInstalledAgent):
 
     @override
     async def install(self, environment: BaseEnvironment) -> None:
-        await self.ensure_system_dependencies(environment, ("curl",))
-        version_spec = f"@{self._version}" if self._version else "@latest"
-        await self.exec_as_agent(
-            environment,
-            command=(
-                "set -euo pipefail; "
-                f"{nvm_node_install_snippet()} && "
-                f"npm install -g @google/gemini-cli{version_spec}"
-            ),
+        # Skip the npm/nvm install when a usable `gemini` is already on PATH.
+        # Without this a pre-staged CLI is unusable on hosts that cannot reach
+        # the npm CDN or raw.githubusercontent.com (the nvm bootstrap): the
+        # install fails and takes the trial with it. The settings.json step
+        # below still runs -- it is what enables experimental skills.
+        check = await environment.exec(
+            command="if [ -s ~/.nvm/nvm.sh ]; then . ~/.nvm/nvm.sh; fi; "
+            "command -v gemini >/dev/null 2>&1"
         )
+        if check.return_code == 0:
+            self.logger.debug("Gemini CLI is already available; skipping install")
+        else:
+            await self.ensure_system_dependencies(environment, ("curl",))
+            version_spec = f"@{self._version}" if self._version else "@latest"
+            await self.exec_as_agent(
+                environment,
+                command=(
+                    "set -euo pipefail; "
+                    f"{nvm_node_install_snippet()} && "
+                    f"npm install -g @google/gemini-cli{version_spec}"
+                ),
+            )
         await self.exec_as_agent(
             environment,
             command=(
@@ -154,7 +166,10 @@ class GeminiCli(BaseInstalledAgent):
         )
         await self.exec_as_agent(
             environment,
-            command=". ~/.nvm/nvm.sh && gemini --version",
+            # Tolerate a missing nvm: a bare `. ~/.nvm/nvm.sh &&` aborts before
+            # gemini runs when the CLI was staged by other means.
+            command="if [ -s ~/.nvm/nvm.sh ]; then . ~/.nvm/nvm.sh; fi; "
+            "gemini --version",
         )
 
     def _save_image(

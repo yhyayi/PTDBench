@@ -55,10 +55,28 @@ class QwenCode(BaseInstalledAgent):
 
     @override
     def get_version_command(self) -> str | None:
-        return ". ~/.nvm/nvm.sh; qwen --version"
+        # Tolerate a missing nvm: the CLI may have been staged by other means
+        # (a bare `. ~/.nvm/nvm.sh` fails the whole command when absent, losing
+        # the version of a perfectly working binary).
+        return "if [ -s ~/.nvm/nvm.sh ]; then . ~/.nvm/nvm.sh; fi; qwen --version"
 
     @override
     async def install(self, environment: BaseEnvironment) -> None:
+        # Skip the install when a usable `qwen` is already on PATH. Unlike
+        # Codex, this agent used to reinstall unconditionally, which makes a
+        # pre-staged CLI unusable on hosts that cannot reach the npm CDN or
+        # raw.githubusercontent.com (the nvm bootstrap) -- the install fails and
+        # takes the trial with it even though the binary is right there.
+        # `. ~/.nvm/nvm.sh` is sourced tolerantly: it is absent when the CLI was
+        # installed by other means.
+        check = await environment.exec(
+            command="if [ -s ~/.nvm/nvm.sh ]; then . ~/.nvm/nvm.sh; fi; "
+            "command -v qwen >/dev/null 2>&1"
+        )
+        if check.return_code == 0:
+            self.logger.debug("Qwen Code is already available; skipping install")
+            return
+
         await self.ensure_system_dependencies(environment, ("curl",))
         version_spec = f"@{self._version}" if self._version else "@latest"
         await self.exec_as_agent(
@@ -326,7 +344,11 @@ class QwenCode(BaseInstalledAgent):
             await self.exec_as_agent(
                 environment,
                 command=(
-                    ". ~/.nvm/nvm.sh; "
+                    # Same tolerance as get_version_command/install: a bare
+                    # `. ~/.nvm/nvm.sh` aborts the whole command when nvm is
+                    # absent (CLI staged by other means), so qwen never runs and
+                    # the agent log comes back empty with no error to show.
+                    "if [ -s ~/.nvm/nvm.sh ]; then . ~/.nvm/nvm.sh; fi; "
                     "qwen --yolo --auth-type openai "
                     '--openai-api-key "$OPENAI_API_KEY" '
                     '--openai-base-url "${OPENAI_BASE_URL:-https://api.openai.com/v1}" '
