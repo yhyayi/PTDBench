@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+: "${AUTORLBENCH_RESULTS:?AUTORLBENCH_RESULTS must be set}"
+: "${AUTORLBENCH_ORACLE:?AUTORLBENCH_ORACLE must be set}"
+: "${AUTORLBENCH_VERIFIER:?AUTORLBENCH_VERIFIER must be set}"
+export PYTHONDONTWRITEBYTECODE=1
+exec python3 "$AUTORLBENCH_VERIFIER/judge.py" "$@"
