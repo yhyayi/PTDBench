@@ -15,8 +15,8 @@ else
   # The recorded checkout deliberately runs from PYTHONPATH: its generic setup.py
   # dependency ranges do not describe the already-tested recorded GPU closure.
   uv pip install --python "$venv/bin/python" --no-deps -r "$HERE/requirements-training.txt"
-  : "${AUTORLBENCH_PREPARED:?training profile requires AUTORLBENCH_PREPARED}"
+  : "${PTDBENCH_PREPARED:?training profile requires PTDBENCH_PREPARED}"
   uv pip install --python "$venv/bin/python" --no-deps --no-build-isolation \
-    "$AUTORLBENCH_PREPARED/sources/flash_attn-2.8.3.post1.tar.gz"
+    "$PTDBENCH_PREPARED/sources/flash_attn-2.8.3.post1.tar.gz"
   "$venv/bin/python" -c 'import torch, vllm, flash_attn, transformers, transfer_queue; print(torch.__version__, vllm.__version__, flash_attn.__version__, transformers.__version__)'
 fi

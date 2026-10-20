@@ -28,10 +28,10 @@ class JudgeContract(unittest.TestCase):
             results = Path(directory)
             if answer is not None:
                 (results / 'agent_answer.md').write_text(answer)
-            env = {'AUTORLBENCH_RESULTS': str(results), 'AUTORLBENCH_VERIFIER': str(VERIFIER),
-                   'AUTORLBENCH_ORACLE': str(TASK / 'evaluations/issue/oracle.md')}
+            env = {'PTDBENCH_RESULTS': str(results), 'PTDBENCH_VERIFIER': str(VERIFIER),
+                   'PTDBENCH_ORACLE': str(TASK / 'evaluations/issue/oracle.md')}
             if configured:
-                env.update(AUTORLBENCH_JUDGE_MODEL='contract-fixture', OPENAI_BASE_URL='https://invalid.example/v1',
+                env.update(PTDBENCH_JUDGE_MODEL='contract-fixture', OPENAI_BASE_URL='https://invalid.example/v1',
                            OPENAI_API_KEY='not-a-real-key')
             with patch.dict(os.environ, env, clear=True), patch('sys.argv', ['judge.py']), \
                     patch.object(judge, 'call_judge', return_value=judgment) as call:

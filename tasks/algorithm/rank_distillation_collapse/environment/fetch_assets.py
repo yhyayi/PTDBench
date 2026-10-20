@@ -69,16 +69,16 @@ def main():
     parser.add_argument('--groups', nargs='+', default=['model', 'dataset', 'build'])
     parser.add_argument('--offline', action='store_true')
     args = parser.parse_args()
-    environment = Path(os.environ['AUTORLBENCH_ENVIRONMENT'])
-    roots = {'workspace': Path(os.environ['AUTORLBENCH_WORKSPACE']), 'prepared': Path(os.environ['AUTORLBENCH_PREPARED'])}
+    environment = Path(os.environ['PTDBENCH_ENVIRONMENT'])
+    roots = {'workspace': Path(os.environ['PTDBENCH_WORKSPACE']), 'prepared': Path(os.environ['PTDBENCH_PREPARED'])}
     manifest = json.loads((environment / 'assets.json').read_text())
     for asset in manifest['assets']:
         if asset['group'] not in args.groups:
             continue
         if asset['group'] == 'model':
-            cache = Path(os.environ.get('AUTORLBENCH_MODELS', roots['prepared'] / 'download-cache/models'))
+            cache = Path(os.environ.get('PTDBENCH_MODELS', roots['prepared'] / 'download-cache/models'))
         else:
-            cache = Path(os.environ.get('AUTORLBENCH_DATASETS', roots['prepared'] / 'download-cache/datasets'))
+            cache = Path(os.environ.get('PTDBENCH_DATASETS', roots['prepared'] / 'download-cache/datasets'))
         print(f"Verify/fetch {asset['name']}", flush=True)
         deliver(asset, cache / 'autorlbench-sha256', roots, args.offline)
 

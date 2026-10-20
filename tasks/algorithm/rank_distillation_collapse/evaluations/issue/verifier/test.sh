@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-: "${AUTORLBENCH_RESULTS:?AUTORLBENCH_RESULTS must be set}"
-: "${AUTORLBENCH_ORACLE:?AUTORLBENCH_ORACLE must be set}"
-: "${AUTORLBENCH_VERIFIER:?AUTORLBENCH_VERIFIER must be set}"
+: "${PTDBENCH_RESULTS:?PTDBENCH_RESULTS must be set}"
+: "${PTDBENCH_ORACLE:?PTDBENCH_ORACLE must be set}"
+: "${PTDBENCH_VERIFIER:?PTDBENCH_VERIFIER must be set}"
 export PYTHONDONTWRITEBYTECODE=1
-exec python3 "$AUTORLBENCH_VERIFIER/judge.py" "$@"
+exec python3 "$PTDBENCH_VERIFIER/judge.py" "$@"

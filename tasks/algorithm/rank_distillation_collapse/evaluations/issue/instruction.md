@@ -11,7 +11,7 @@ You may read the workspace and the prepared Python environment, and run CPU test
 but this level does not require modifying the training implementation, fixing it, or rerunning GPU training. Do not access the network or install dependencies,
 and do not read task metadata, hidden answers, or evaluators outside the workspace and the normal runtime environment.
 
-Write the final report to `$AUTORLBENCH_RESULTS/agent_answer.md`. Replying only in chat does not count as a submission.
+Write the final report to `$PTDBENCH_RESULTS/agent_answer.md`. Replying only in chat does not count as a submission.
 The report should include:
 
 1. Whether training is healthy, and its key behavior;

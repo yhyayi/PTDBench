@@ -4,6 +4,7 @@ submitter:
 license: Apache-2.0
 created_date: '2026-10-16'
 domain: search_qa
+type: environment
 model:
   name: Qwen2.5-1.5B-Instruct
 dataset:

@@ -4,6 +4,7 @@ submitter:
 license: MIT
 created_date: '2026-10-10'
 domain: post_train
+type: data
 model:
   name: Qwen2.5-1.5B-Instruct
 dataset:

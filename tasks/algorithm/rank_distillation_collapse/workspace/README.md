@@ -76,7 +76,7 @@ A 在训练前进行了评测，B 没有单独记录 step 0。两组均训练到
 
 ## 使用环境
 
-prepare 阶段创建 uv 环境，通过 `AUTORLBENCH_PREPARED/env` 提供解释器。issue 默认模式
+prepare 阶段创建 uv 环境，通过 `PTDBENCH_PREPARED/env` 提供解释器。issue 默认模式
 只安装 CPU 诊断依赖；检查代码、日志或做小规模张量实验不需要下载模型或使用 GPU。
 在 agent 阶段保持离线，不执行 `pip install` / `uv sync`。
 

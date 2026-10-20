@@ -77,6 +77,7 @@ def validate_metadata(
         "submitter",
         "license",
         "created_date",
+        "type",
         "domain",
         "model",
         "dataset",
@@ -87,6 +88,8 @@ def validate_metadata(
     for key in required_fields:
         if key not in metadata or metadata[key] in (None, ""):
             report.add("error", f"metadata.{key}", "missing required field")
+
+    _validate_type(report, metadata.get("type"), paths)
 
     for key in ("submitter", "model", "dataset", "training", "environment", "outcome"):
         _expect_mapping(report, metadata.get(key), f"metadata.{key}")
@@ -226,6 +229,53 @@ def _validate_training(
                 f"metadata.training.script_args[{index}]",
                 "expected a string; quote the value in YAML",
             )
+
+
+#: The canonical task categories. `type` is one of these and names the
+#: directory the task lives under (tasks/<type>/<id>); `domain` stays a
+#: free-form descriptive label (e.g. `post_train`, `math_tool_use`).
+TASK_TYPES = frozenset(
+    {
+        "configuration",
+        "reward",
+        "data",
+        "environment",
+        "algorithm",
+        "infrastructure",
+    }
+)
+
+
+def _validate_type(
+    report: ValidationReport, task_type: Any, paths: Optional[TaskPaths]
+) -> None:
+    """校验 `type`：必须是六个规范类目之一，且与任务所在目录一致。
+
+    `type` 回答"这是哪一类任务"，和目录 tasks/<type>/<id> 是同一个答案，所以能机器
+    校验；`domain` 是自由描述（post_train / math_tool_use…），不受这六个约束。缺失由
+    required_fields 那轮报 "missing required field"，这里只校验取值。
+    """
+    if task_type in (None, ""):
+        return
+    if not isinstance(task_type, str):
+        report.add("error", "metadata.type", f"expected a string, got {task_type!r}")
+        return
+    if task_type not in TASK_TYPES:
+        report.add(
+            "error",
+            "metadata.type",
+            f"must be one of {', '.join(sorted(TASK_TYPES))}, got {task_type!r}",
+        )
+        return
+    # 和目录对不上，任务卡记的类目就和它实际所在的位置矛盾了。拿不到 paths（只校验
+    # 一份孤立 metadata）时跳过这一条。
+    if paths is not None and paths.root.parent.name != task_type:
+        report.add(
+            "error",
+            "metadata.type",
+            f"must match the task's category directory "
+            f"({paths.root.parent.name!r}), got {task_type!r}",
+        )
 
 
 def _validate_environment(report: ValidationReport, environment: Dict[str, Any]) -> None:

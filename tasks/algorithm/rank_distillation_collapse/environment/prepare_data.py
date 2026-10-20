@@ -42,4 +42,4 @@ def prepare(workspace):
 
 
 if __name__ == '__main__':
-    prepare(Path(os.environ['AUTORLBENCH_WORKSPACE']))
+    prepare(Path(os.environ['PTDBENCH_WORKSPACE']))

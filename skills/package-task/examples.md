@@ -1,16 +1,18 @@
-# 用户输入示例
+# User input example
 
-打包时按此结构一次给齐。缺一项就停。数字、commit 与 hash 需换成该次训练的真实值。
+Provide everything in this structure in one go when packaging. If any item is missing, stop. Replace numbers, commits, and hashes with the real values from that training run.
 
-打包时阅读 buggy commit 与 baseline commit 的代码和启动脚本 diff，把根因写成一句话，并写上这里给出的指标现象。
+When packaging, read the code and launch-script diff between the buggy commit and the baseline commit, write the root cause as one sentence, and include the metric symptoms given here.
 
-## 只有评测分
+## Evaluation score only
 
 ```yaml
 source_workspace: /home/test/test06/lyh/verl
-output_dir: /home/test/test1708/data_call/tasks/verl_implementation/llama_dapo_implementation/task_example_001
+output_dir: tasks/infrastructure/task_example_001
 task_id: task_example_001
-title: "llama_dapo_implementation implementation diagnosis: task_example_001"
+title: "Missing flash-attention hook"
+type: infrastructure          # the category = the tasks/<type>/ directory (one of the six)
+domain: post_train            # free-form descriptive label; may repeat the type
 model_name: Llama-3.2-1B-Instruct
 dataset_name: DAPO-Math-17k
 framework: verl
@@ -54,8 +56,9 @@ assets:
       model.safetensors: 2471645608
     dest: verl/Llama-3.2-1B-instruct
     why_this_path: >-
-      启动脚本 :30-38 按顺序找 /models/… → /workspace/verl/Llama-3.2-1B-instruct，
-      第一个候选没人挂，必须正好落在第二个上。目录名是小写 i。
+      Launch script :30-38 searches /models/… → /workspace/verl/Llama-3.2-1B-instruct
+      in order. Nothing mounts the first candidate, so it must land exactly on the
+      second. The directory name uses a lowercase i.
   - kind: recipe
     recipe: dapo_math_17k
     expect:
@@ -79,25 +82,25 @@ historical_eval_points:
   - { step: 200, eval_score: 0.04022346368715084 }
 ```
 
-按上述 diff 写出的 `failure_reason` 会类似：`apply_monkey_patch 不再安装 flash-attention hook，val-core 最终约 0.0402`。具体措辞以过滤后的 diff 为准。
+A `failure_reason` written from this diff would look like: `apply_monkey_patch no longer installs the flash-attention hook; final val-core is about 0.0402`. The exact wording follows the filtered diff.
 
-`assets` 里每一条落成 `environment/prepare.sh` 的一次 `ptdbench_fetch_hf` / `ptdbench_dataset` / `ptdbench_fetch_url` 调用，`dest` 前面补 `$PTDBENCH_WORKSPACE/`。`why_this_path` 写成脚本里那条注释——路径错了要到训练中途才炸。
-## 未写评分方式
+Each entry in `assets` becomes one `ptdbench_fetch_hf` / `ptdbench_dataset` / `ptdbench_fetch_url` call in `environment/prepare.sh`, with `$PTDBENCH_WORKSPACE/` prefixed to `dest`. `why_this_path` becomes the comment in the script, because a wrong path only blows up midway through training.
+## No scoring method given
 
-上面的示例到 `required_final_score` 为止，就是默认评分：分数全部看评测集键。按 `score_mode` 取该键的最高有限值（默认 `best`）或 `final_step` 那一点（`final`），达到 `required_final_score` 则 score 为 1，否则为 0。
+The example above, up to `required_final_score`, is the default scoring: the score depends entirely on the eval-set key. Per `score_mode`, take that key's highest finite value (default `best`) or the value at `final_step` (`final`). If it reaches `required_final_score`, score is 1; otherwise 0.
 
-需要收窄时再给这两项：
+Give these two only when you need to narrow it:
 
 ```yaml
-score_mode: best              # 或 final；不写按 best
+score_mode: best              # or final; defaults to best
 required_final_score_max: "1.0"
 ```
 
-`score_mode: best` 适合单点噪声大的评测（例如 30 道题的 AIME）；`final` 适合要求「跑到终点且终点达标」。`required_final_score_max` 用来挡掉明显编造的值。
+`score_mode: best` suits evals with high per-point noise (for example, 30-question AIME); `final` suits "run to the end and pass at the end". `required_final_score_max` rejects obviously fabricated values.
 
-## 用户指定评分方式时追加
+## Add when the user specifies a scoring method
 
-参考分不限于训练分。每一项给出键名、门槛、权重、出现位置和一条 log 样例，并写明及格规则。
+Reference scores are not limited to training scores. For each one, give the key name, threshold, weight, where it appears, and one log sample, and state the pass rule.
 
 ```yaml
 score_components:
@@ -113,10 +116,10 @@ score_components:
     weight: "0.2"
     source: text_log
     log_sample: "step:200 - critic/rewards/mean:0.16"
-pass_rule: "score = 各项权重乘以该项是否达到门槛（达到为 1，否则为 0）之和；score 为 1 才算通过"
+pass_rule: "score = sum over components of weight times whether the component meets its threshold (1 if met, else 0); pass only when score is 1"
 ```
 
-`role` 决定 `grader_spec.json` 里的键名，用扁平三件套写，**不要**生成 `components` / `pass_rule` 字段：
+`role` determines the key names in `grader_spec.json`. Write them as a flat triple; **do not** generate `components` / `pass_rule` fields:
 
 ```json
 {
@@ -129,11 +132,11 @@ pass_rule: "score = 各项权重乘以该项是否达到门槛（达到为 1，�
 }
 ```
 
-`role: learning_rate` 对应 `learning_rate_key` / `required_learning_rate` / `learning_rate_weight`（见 `tasks/rlve_hyper/task_008`）。评测集那一侧一律是 `validation_weight`。
+`role: learning_rate` maps to `learning_rate_key` / `required_learning_rate` / `learning_rate_weight`. The eval-set side is always `validation_weight`.
 
-`pass_rule` 按用户原文实现。用户没有写 `score_components` 时，不要套用这段加权。
+Implement `pass_rule` exactly as the user wrote it. If the user did not provide `score_components`, do not apply this weighting.
 
-## 需要多卡或大 shm 时追加
+## Add when multi-GPU or large shm is needed
 
 ```yaml
 gpus: "0,1,2,3,4,5,6,7"
@@ -141,11 +144,11 @@ needs_compose: true
 shm_size: "16gb"
 ```
 
-`needs_compose: true` 时把 `tasks/slime_retool/environment/docker-compose.yaml` 照抄过去（按 `shm_size` 改一处）。它只对 harbor 后端生效，原生 docker 路径从 `metadata.environment.env` 的 `NVIDIA_VISIBLE_DEVICES` 自己翻译 `--gpus`。
+With `needs_compose: true`, copy `tasks/reward/retool_length_hack/environment/docker-compose.yaml` verbatim (changing one line for `shm_size`). It only applies to the harbor backend; the native docker path derives `--gpus` itself from `NVIDIA_VISIBLE_DEVICES` in `environment.env` of `metadata.yaml`.
 
-## 资产需要现场转换时追加
+## Add when an asset needs on-site conversion
 
-上游没有对应仓库、只能由已下载的资产转出来时（例如 HF → Megatron torch_dist），给出转换命令与它依赖的参数：
+When no upstream repo exists and the asset can only be converted from downloaded assets (for example HF → Megatron torch_dist), give the conversion command and the arguments it depends on:
 
 ```yaml
 assets:
@@ -160,4 +163,4 @@ assets:
     guard_in_launch_script: 'if [ ! -d "$DIST_MODEL_DIR" ]'
 ```
 
-`skip_without_cuda: true` 时 `prepare.sh` 要先探测 CUDA，不可用就打印一行跳过——harbor 后端把 prepare 跑成 build-time 层，那里没有 GPU，由 `guard_in_launch_script` 那个守卫在 agent 阶段补做。产物不逐字节可复现时，不要给它写 `--expect`。
+With `skip_without_cuda: true`, `prepare.sh` must probe for CUDA first and, if unavailable, print one line and skip. The harbor backend runs prepare as a build-time layer with no GPU, so the `guard_in_launch_script` guard does the work in the agent stage. If the output is not byte-for-byte reproducible, do not write `--expect` for it.

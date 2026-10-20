@@ -48,8 +48,7 @@ verl/trainer/ppo/ray_trainer.py
 ## Evidence
 
 两臂都跑了，除 `uid` 移位外完全相同；对照臂的 `ray_trainer.py` 与 pristine upstream
-逐字节一致（sha256 `e636912ae2be46b6ff7152f6473feab3af5db962f744903dc55f7d26d58d7d73`）。对照臂日志在
-`validation/control_arm_reference/`，从不下发。
+逐字节一致（sha256 `e636912ae2be46b6ff7152f6473feab3af5db962f744903dc55f7d26d58d7d73`）。
 
 | metric | defect 臂 | control 臂（= upstream） |
 | --- | --- | --- |
@@ -140,7 +139,6 @@ DAPO-Math-17k 的 train/test parquet 到 `workspace/DAPO-Math-17k_verl`，均按
 sha 与校验和钉死。其非注释行与兄弟任务逐字节相同，两个任务共用一份数据集缓存。
 
 `environment/` 以只读挂进 agent 容器（`/ptdbench/environment`），所以里面只有
-`prepare.sh`。写着注入缺陷的 `validation/source_manifest.json` 故意放在
-`validation/` 而不是 `environment/`；`validation/` 从不下发，不要把它移回去。
+`prepare.sh`——任何会泄露注入缺陷的记录都不能放进 `environment/`。
 
 2 GPU，由 `metadata.yaml` 的 `environment.env` 声明。

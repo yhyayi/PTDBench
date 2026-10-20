@@ -9,40 +9,40 @@
 # extra to install.  Writes prepared/env so downstream stages pick up the
 # correct PYTHONPATH (verl source lives at /workspace/verl).
 #
-# Training profile (AUTORLBENCH_PREPARE_PROFILE=training): downloads the ~18.8 GB
+# Training profile (PTDBENCH_PREPARE_PROFILE=training): downloads the ~18.8 GB
 # model weights and datasets, installs the GPU package closure, and compiles
 # flash-attn from source.  Requires Linux x86_64 with a CUDA 13-compatible
 # driver and compiler toolchain.  NOTE: this profile has not been validated
 # with a clean GPU rerun.
 set -euo pipefail
 
-: "${AUTORLBENCH_WORKSPACE:?must point to the staged workspace}"
-: "${AUTORLBENCH_PREPARED:?must point to the prepared artifact directory}"
-: "${AUTORLBENCH_ENVIRONMENT:?must point to this task environment directory}"
+: "${PTDBENCH_WORKSPACE:?must point to the staged workspace}"
+: "${PTDBENCH_PREPARED:?must point to the prepared artifact directory}"
+: "${PTDBENCH_ENVIRONMENT:?must point to this task environment directory}"
 
-profile=${AUTORLBENCH_PREPARE_PROFILE:-issue}
+profile=${PTDBENCH_PREPARE_PROFILE:-issue}
 case "$profile" in issue|training) ;; *) echo 'unknown prepare profile' >&2; exit 2 ;; esac
 
-mkdir -p "$AUTORLBENCH_PREPARED"
+mkdir -p "$PTDBENCH_PREPARED"
 
 if [[ "$profile" == training ]]; then
-    python3 "$AUTORLBENCH_ENVIRONMENT/fetch_assets.py" --groups build model dataset
+    python3 "$PTDBENCH_ENVIRONMENT/fetch_assets.py" --groups build model dataset
 
-    export UV_PYTHON_INSTALL_DIR="$AUTORLBENCH_PREPARED/uv-python"
-    export UV_CACHE_DIR=${UV_CACHE_DIR:-$AUTORLBENCH_PREPARED/uv-cache}
+    export UV_PYTHON_INSTALL_DIR="$PTDBENCH_PREPARED/uv-python"
+    export UV_CACHE_DIR=${UV_CACHE_DIR:-$PTDBENCH_PREPARED/uv-cache}
     export UV_LINK_MODE=${UV_LINK_MODE:-copy}
 
-    uv venv --python 3.12.12 --allow-existing "$AUTORLBENCH_PREPARED/venv"
-    uv pip install --python "$AUTORLBENCH_PREPARED/venv/bin/python" --no-deps \
-        -r "$AUTORLBENCH_ENVIRONMENT/requirements-training.txt"
-    uv pip install --python "$AUTORLBENCH_PREPARED/venv/bin/python" \
+    uv venv --python 3.12.12 --allow-existing "$PTDBENCH_PREPARED/venv"
+    uv pip install --python "$PTDBENCH_PREPARED/venv/bin/python" --no-deps \
+        -r "$PTDBENCH_ENVIRONMENT/requirements-training.txt"
+    uv pip install --python "$PTDBENCH_PREPARED/venv/bin/python" \
         --no-deps --no-build-isolation \
-        "$AUTORLBENCH_PREPARED/sources/flash_attn-2.8.3.post1.tar.gz"
-    "$AUTORLBENCH_PREPARED/venv/bin/python" "$AUTORLBENCH_ENVIRONMENT/prepare_data.py"
-    "$AUTORLBENCH_PREPARED/venv/bin/python" "$AUTORLBENCH_ENVIRONMENT/prepare_models.py"
+        "$PTDBENCH_PREPARED/sources/flash_attn-2.8.3.post1.tar.gz"
+    "$PTDBENCH_PREPARED/venv/bin/python" "$PTDBENCH_ENVIRONMENT/prepare_data.py"
+    "$PTDBENCH_PREPARED/venv/bin/python" "$PTDBENCH_ENVIRONMENT/prepare_models.py"
 
-    python_bin="$AUTORLBENCH_PREPARED/venv/bin/python"
-    venv_dir="$AUTORLBENCH_PREPARED/venv"
+    python_bin="$PTDBENCH_PREPARED/venv/bin/python"
+    venv_dir="$PTDBENCH_PREPARED/venv"
 else
     # Issue profile: the image's /opt/venv has everything needed.
     python_bin="/opt/venv/bin/python"
@@ -54,12 +54,12 @@ fi
 {
     printf 'VIRTUAL_ENV=%s\n' "$venv_dir"
     printf 'PATH=%s/bin:%s\n' "$venv_dir" "$PATH"
-    printf 'PYTHONPATH=%s/verl\n' "$AUTORLBENCH_WORKSPACE"
+    printf 'PYTHONPATH=%s/verl\n' "$PTDBENCH_WORKSPACE"
     printf 'HF_HUB_OFFLINE=1\nHF_DATASETS_OFFLINE=1\nWANDB_MODE=disabled\nPYTHONDONTWRITEBYTECODE=1\n'
-    printf 'AUTORLBENCH_PREPARE_PROFILE=%s\n' "$profile"
-} > "$AUTORLBENCH_PREPARED/env"
+    printf 'PTDBENCH_PREPARE_PROFILE=%s\n' "$profile"
+} > "$PTDBENCH_PREPARED/env"
 
-"$python_bin" - "$AUTORLBENCH_PREPARED" "$profile" <<'PY'
+"$python_bin" - "$PTDBENCH_PREPARED" "$profile" <<'PY'
 import json, sys
 from pathlib import Path
 import torch
