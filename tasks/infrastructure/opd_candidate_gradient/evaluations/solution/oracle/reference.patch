@@ -1,0 +1,17 @@
+diff --git a/verl/trainer/opd/kernels.py b/verl/trainer/opd/kernels.py
+--- a/verl/trainer/opd/kernels.py
++++ b/verl/trainer/opd/kernels.py
+@@ -106,11 +106,2 @@ def sparse_log_probs(
+-            out["cand_log_probs"] = torch.stack(
+-                [
+-                    logprobs_from_logits(
+-                        logits=logits,
+-                        labels=candidate_ids[..., i],
+-                        inplace_backward=False,
+-                    )
+-                    for i in range(width)
+-                ],
+-                dim=-1,
+-            )
++            log_probs_all = torch.log_softmax(logits, dim=-1, dtype=_accum_dtype(logits))
++            out["cand_log_probs"] = torch.gather(log_probs_all, -1, candidate_ids)

@@ -1,0 +1,50 @@
+[
+    {
+        "hyperparameters": {
+            "temperature": "0.7",
+            "top_p": "0.95",
+            "n": "16",
+            "max_tokens": "31744",
+            "task_name": "aime25"
+        },
+        "mean_score": 0.23958333333333334,
+        "distinct_4gram": 0.5951897970160431,
+        "best_score": 0.4666666666666667,
+        "solve_none": 16,
+        "solve_all": 1,
+        "avg_output_length": 14897.3875,
+        "format_error_rollouts": 53
+    },
+    {
+        "hyperparameters": {
+            "temperature": "0.7",
+            "top_p": "0.95",
+            "n": "16",
+            "max_tokens": "31744",
+            "task_name": "aime24"
+        },
+        "mean_score": 0.27291666666666664,
+        "distinct_4gram": 0.611488111118652,
+        "best_score": 0.6333333333333333,
+        "solve_none": 11,
+        "solve_all": 1,
+        "avg_output_length": 15371.147916666667,
+        "format_error_rollouts": 50
+    },
+    {
+        "hyperparameters": {
+            "temperature": "0.7",
+            "top_p": "0.95",
+            "n": "16",
+            "max_tokens": "31744",
+            "task_name": "amc23"
+        },
+        "mean_score": 0.703125,
+        "distinct_4gram": 0.5812456749511382,
+        "best_score": 0.95,
+        "solve_none": 2,
+        "solve_all": 16,
+        "avg_output_length": 9306.4,
+        "format_error_rollouts": 33
+    }
+]

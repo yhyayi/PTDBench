@@ -1,0 +1,38 @@
+title: OPD CUDA candidate-gradient divergence
+submitter:
+  name: Yaxuan Li
+license: Apache-2.0
+created_date: '2026-08-18'
+type: infrastructure
+domain: code
+model:
+  name: DeepSeek-R1-Distill-Qwen-1.5B
+dataset:
+  name: DAPO-Math-17k processed derivative
+training:
+  framework: verl
+  algo: colocated OPD with top-k candidates
+  script: opd.sh
+environment:
+  image: verl-opd
+  env:
+    # opd.sh fixes 8 cards (NGPUS_PER_NODE=8, SBATCH --gres=gpu:8); the full
+    # colocated OPD run shares them across the FSDP actor, the colocated teacher
+    # forward, and the vLLM rollout. The issue diagnosis and the default
+    # solution verifier (a deterministic CPU regression test) need no GPU; GPUs
+    # are only used by the optional maintainer full run (PTDBENCH_RUN_FULL_OPD=1).
+    CUDA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
+    NVIDIA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
+outcome:
+  failure_type: implementation_bug
+  failure_reason: >-
+    sparse_log_probs in verl/trainer/opd/kernels.py computes the top-k candidate
+    log-probabilities by looping over the last dimension of candidate_ids and
+    passing candidate_ids[..., i] — a stride-K non-contiguous 1-D view for a
+    (N, K) matrix with K > 1 — into logprobs_from_logits. The optimized
+    CUDA/FlashAttention cross-entropy wrapper flattens labels with reshape(-1),
+    which preserves that stride instead of making a contiguous copy, so the
+    kernel reads neighboring candidate slots. The resulting candidate
+    log-probabilities and their backward gradients stay finite and at a similar
+    scale but diverge from log_softmax(logits, -1).gather(-1, candidate_ids), so
+    the optimizer update is materially wrong while nothing crashes.

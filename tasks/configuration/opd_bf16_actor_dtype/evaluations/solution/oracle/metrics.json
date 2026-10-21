@@ -1,0 +1,59 @@
+{
+  "description": "Shortened verifier run (15 steps, batch 16x4, 3072 response tokens, 2 GPUs) of the original workspace (buggy) and of the workspace with reference.patch applied (reference). late_adv_mean is the mean critic/advantages/mean over steps 8-15.",
+  "late_window": [
+    8,
+    15
+  ],
+  "buggy": {
+    "late_adv_mean": -0.26753450371325016,
+    "frac_bf16_view_changed": 0.007652168041199985,
+    "runs": {
+      "bug_a": {
+        "late_adv_mean": -0.26857176423072815,
+        "early_adv_mean": -0.2666965027650197,
+        "frac_bf16_view_changed": 0.007652774088846472,
+        "rel_change_norm": 1.9409049377986627e-05,
+        "late_grad_norm_mean": 2.302734375,
+        "frac_grad_norm_bf16_exact": 1.0,
+        "saved_dtype": "torch.bfloat16",
+        "host": "g26 (2x A800-80GB)"
+      },
+      "bug_b": {
+        "late_adv_mean": -0.26649724319577217,
+        "early_adv_mean": -0.26668564478556317,
+        "frac_bf16_view_changed": 0.0076515619935534985,
+        "rel_change_norm": 1.927362887727122e-05,
+        "late_grad_norm_mean": 2.3046875,
+        "frac_grad_norm_bf16_exact": 1.0,
+        "saved_dtype": "torch.bfloat16",
+        "host": "g26 (2x A800-80GB)"
+      }
+    }
+  },
+  "reference": {
+    "late_adv_mean": -0.250245894305408,
+    "frac_bf16_view_changed": 0.05053513894641121,
+    "runs": {
+      "fix_a": {
+        "late_adv_mean": -0.24887769483029842,
+        "early_adv_mean": -0.26550182700157166,
+        "frac_bf16_view_changed": 0.05053986859401448,
+        "rel_change_norm": 0.00017493896772239421,
+        "late_grad_norm_mean": 2.2535980343818665,
+        "frac_grad_norm_bf16_exact": 0.0,
+        "saved_dtype": "torch.float32",
+        "host": "g83 (2x A800-80GB)"
+      },
+      "fix_b": {
+        "late_adv_mean": -0.2516140937805176,
+        "early_adv_mean": -0.26633644104003906,
+        "frac_bf16_view_changed": 0.050530409298807935,
+        "rel_change_norm": 0.0001750867726306046,
+        "late_grad_norm_mean": 2.245002180337906,
+        "frac_grad_norm_bf16_exact": 0.0,
+        "saved_dtype": "torch.float32",
+        "host": "g82 (2x A800-80GB)"
+      }
+    }
+  }
+}

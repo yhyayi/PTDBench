@@ -1,0 +1,27 @@
+title: OPD actor stalls with bf16 master weights
+submitter:
+  name: Yaxuan Li
+license: Apache-2.0
+created_date: '2026-10-12'
+type: configuration
+domain: post_train
+model:
+  name: DeepSeek-R1-Distill-Qwen-1.5B
+dataset:
+  name: DAPO-Math-17k
+training:
+  framework: verl
+  algo: on-policy distillation (sampled-token, token_reward_direct)
+  script: on_policy_distillation.sh
+environment:
+  # CUDA 12.8 base providing uv + the PTDBench tooling; the torch/vLLM/flash-attn
+  # stack is built from environment/requirements.txt into a uv venv by prepare.sh
+  # (environment/setup_uv.sh), not from the image.
+  image: opd-verl-uv
+  prepare: environment/prepare.sh
+  env:
+    # The recorded run and the solution verifier both use two GPUs.
+    CUDA_VISIBLE_DEVICES: "0,1"
+outcome:
+  failure_type: training_failure
+  failure_reason: 'The sampled-token OPD run stays finite and trains for 270 steps without errors, but the actor barely learns: the per-token reverse KL only drifts from 0.285 to 0.255 over ~240 steps, actor/grad_norm stays near its initial value, and checkpoint benchmark scores stay flat, because MODEL_DTYPE=bf16 makes the actor''s FSDP master weights and AdamW update bf16, so lr=1e-6 updates round away for ~99% of the weights.'

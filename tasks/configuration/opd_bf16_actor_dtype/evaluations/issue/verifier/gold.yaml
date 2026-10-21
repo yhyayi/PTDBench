@@ -1,0 +1,14 @@
+category: configuration
+framework: verl
+task: ptdbench_opd_bf16_actor_dtype
+verdict: unhealthy
+root_cause:
+- on_policy_distillation.sh sets MODEL_DTYPE=bf16, so actor_rollout_ref.actor.fsdp_config.model_dtype=bf16 makes the actor's FSDP flat parameters (master weights) and AdamW states bf16; FSDP MixedPrecision only controls compute/reduce dtypes
+- with lr=1e-6 the per-element Adam step (~1e-6) is below half a bf16 ulp for |w| >= 2^-11, so the update rounds away; only ~0.8% of weights ever change and the actor is effectively frozen
+evidence_metrics:
+- reverse KL (-critic/advantages/mean) 0.285 -> 0.255 over ~240 steps vs ~0.02 for an fp32 actor; actor/grad_norm stays 1.4-2.0 vs ~0.1
+- every logged actor/grad_norm is exactly bf16-representable; train accuracy and offline AIME/AMC avg@16 stay flat; no NaN or crash
+- teacher/reward-model dtype, gradient underflow, rollout dtype, hardware and pg_loss scale are not the cause
+fix:
+  must:
+  - keep the actor master weights / optimizer update in fp32 (actor fsdp_config.model_dtype=fp32), or an equivalent fp32 master copy or stochastic-rounding optimizer, without changing the recipe (lr, data, models, objective)

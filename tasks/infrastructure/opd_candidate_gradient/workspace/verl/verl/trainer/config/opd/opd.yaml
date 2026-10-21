@@ -1,0 +1,62 @@
+# Format checks enforced on CI:
+# 1. Comments must appear above each field.
+# 2. There must be a blank line between each field.
+# 3. Inline comments (after a field on the same line) are not allowed.
+# 4. Indentation level is respected for nested fields.
+
+# Colocated On-Policy Distillation (OPD) via KL-in-reward.
+# The teacher shares the actor's GPUs as a forward-only inner engine worker, and
+# the per-token (and per-candidate-token) reverse KL is fed to the policy
+# gradient as an advantage. See docs and examples/opd_colocate.
+
+# Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs
+_target_: verl.workers.config.OPDConfig
+
+# whether colocated OPD is enabled
+enable: False
+
+# HF path (or local path) of the teacher model. Must share the student's tokenizer.
+teacher_model_path: null
+
+# 0 selects naive sampled-token OPD: the advantage is -(log pi_s - log pi_t) at the
+# sampled token only. >0 selects top-k OPD over a candidate token set per position.
+top_k: 0
+
+# how the per-position candidate token set is chosen when top_k > 0:
+# only_stu: the student's own top-k tokens
+# only_tch: the teacher's top-k tokens
+# intersection: tokens in both top-k sets (others are masked out)
+# union: the concatenation of both top-k sets, deduplicated by masking
+strategy: only_stu
+
+# probability weighting applied across the K candidates before they enter the
+# advantage. When is_norm=False these are raw full-vocabulary probabilities;
+# when is_norm=True they are renormalized over the candidate set.
+# student_p: student probability
+# teacher_p: teacher probability
+# none: uniform weights over the valid candidates
+reward_weight_mode: student_p
+
+# whether to renormalize student/teacher log-probs over the selected candidate
+# set before computing their difference, and to use the same conditional student
+# distribution in the actor PPO ratio/score; only applies when top_k > 0
+is_norm: False
+
+# whether to add all non-candidate vocabulary tokens as one aggregated bucket
+# in the KL objective. Requires top_k > 0, is_norm=False, and student_p weighting.
+outside_bucket: False
+
+# temperature applied to the teacher logits before the log_softmax
+teacher_temperature: 1.0
+
+# number of packed tokens processed per chunk when building top-k / gathered
+# log-probs. Bounds the transient [chunk_size, vocab] buffer.
+chunk_size: 4096
+
+# KL estimator used to turn the log-prob difference into a reward. Only k1
+# (the plain log ratio) is supported: it is the unbiased one under the policy
+# gradient formulation.
+kl_estimator: k1
+
+# weight of the task-reward GRPO advantage when adv_estimator=opd_token_kl_plus_grpo
+grpo_outcome_weight: 1.0
