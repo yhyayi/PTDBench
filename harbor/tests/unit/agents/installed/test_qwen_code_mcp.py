@@ -22,6 +22,21 @@ class TestRegisterMcpServers:
         agent = QwenCode(logs_dir=temp_dir, model_name="qwen/qwen3-coder-plus")
         assert agent._build_register_mcp_servers_command() is None
 
+    def test_reasoning_effort_is_written_as_generation_config(self, temp_dir):
+        agent = QwenCode(
+            logs_dir=temp_dir,
+            model_name="qwen/qwen3-coder-plus",
+            reasoning_effort="max",
+        )
+        result = self._parse_config(agent._build_register_mcp_servers_command())
+        assert result == {
+            "model": {"generationConfig": {"reasoning": {"effort": "max"}}}
+        }
+
+    def test_invalid_reasoning_effort_is_rejected(self, temp_dir):
+        with pytest.raises(ValueError, match="reasoning_effort"):
+            QwenCode(logs_dir=temp_dir, reasoning_effort="extreme")
+
     def test_sse_server(self, temp_dir):
         servers = [
             MCPServerConfig(

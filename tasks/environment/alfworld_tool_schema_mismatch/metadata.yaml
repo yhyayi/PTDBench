@@ -14,7 +14,15 @@ training:
   algo: grpo
   script: tool_schema/alfworld_case/train.sh
 environment:
-  image: agent-r1-alfworld
+  # The task was delivered against `agent-r1-alfworld`, but that environment has
+  # no docker/images/<name>.Dockerfile -- the single source of truth for which
+  # images exist (ptdbench/core/types.py) -- and no image on the platform, so
+  # the schema rejected it and every trial failed before reaching a devspace.
+  # Pointed at `verl` to unblock the issue-level sweep: that level is read-only
+  # diagnosis plus an LLM judge, and this task's prepare.sh only fetches Qwen3-4B
+  # without importing anything, so it does not depend on the image's Python env.
+  # NOT valid for the solution level, which retrains under agent-r1.
+  image: verl
   env:
     CUDA_VISIBLE_DEVICES: "0,1,2,3"
     NVIDIA_VISIBLE_DEVICES: "0,1,2,3"

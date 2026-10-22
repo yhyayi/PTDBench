@@ -14,9 +14,19 @@ from harbor.models.task.config import MCPServerConfig
 MODEL = "xai/grok-4.5"
 
 
-def _mock_environment():
+def _mock_environment(*, grok_present: bool = True):
     environment = AsyncMock()
-    environment.exec.return_value = AsyncMock(return_code=0, stdout="", stderr="")
+    ok = AsyncMock(return_code=0, stdout="", stderr="")
+    if grok_present:
+        environment.exec.return_value = ok
+    else:
+        missing = AsyncMock(return_code=1, stdout="", stderr="")
+
+        async def exec_(*args, **kwargs):
+            command = kwargs.get("command", args[0] if args else "")
+            return missing if "command -v grok" in command else ok
+
+        environment.exec.side_effect = exec_
     return environment
 
 
@@ -52,7 +62,7 @@ class TestGrokBuildInstall:
     @pytest.mark.asyncio
     async def test_install_commands(self, temp_dir):
         agent = GrokBuild(logs_dir=temp_dir)
-        environment = _mock_environment()
+        environment = _mock_environment(grok_present=False)
         agent.ensure_system_dependencies = AsyncMock()
 
         await agent.install(environment)
@@ -74,12 +84,24 @@ class TestGrokBuildInstall:
     @pytest.mark.asyncio
     async def test_install_pins_version(self, temp_dir):
         agent = GrokBuild(logs_dir=temp_dir, version="0.2.91")
-        environment = _mock_environment()
+        environment = _mock_environment(grok_present=False)
 
         await agent.install(environment)
 
         install_command = "\n".join(_exec_commands(environment))
         assert "| bash -s 0.2.91" in install_command
+
+    @pytest.mark.asyncio
+    async def test_install_skips_installer_when_grok_is_staged(self, temp_dir):
+        # Egress-restricted hosts cannot reach x.ai; a pre-staged CLI is used as is.
+        agent = GrokBuild(logs_dir=temp_dir)
+        environment = _mock_environment(grok_present=True)
+        agent.ensure_system_dependencies = AsyncMock()
+
+        await agent.install(environment)
+
+        agent.ensure_system_dependencies.assert_not_awaited()
+        assert not any("x.ai/cli/install.sh" in c for c in _exec_commands(environment))
 
     @pytest.mark.asyncio
     async def test_install_registers_skills(self, temp_dir):

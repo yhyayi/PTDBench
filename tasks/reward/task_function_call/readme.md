@@ -220,9 +220,12 @@ trailing section of the sibling's `prepare.sh` (installs into
 Do **not** edit `docker/images/verl.Dockerfile`; that image is shared by every
 verl task.
 
-**Known residual leak.** The two HF repositories are named
-`LIF1014/ptdbench-verl-coding-tasks-function-call` and
-`…-function-call-dataset`. `prepare.sh` must name them to fetch them, so the
-string survives there and cannot be sanitized from inside this package —
-closing it means republishing both repos under a neutral name and updating the
-revisions here.
+**Known residual leak.** The model now comes from the official
+`Qwen/Qwen2.5-1.5B-Instruct@989aa7980e4cf806f80c7fef2b1adb7bc71aa306`, which is
+byte-identical on every allowed file to the former task snapshot
+`LIF1014/ptdbench-verl-coding-tasks-function-call@8d94247`. The dataset repo is
+still `LIF1014/ptdbench-verl-coding-tasks-function-call-dataset`. `prepare.sh`
+must name it to fetch it, and the shared download cache (mounted read-only into
+the agent stage) is keyed by repo name, so the string is visible to the agent
+there too. Closing it means republishing the dataset under a neutral name and
+updating `--repo` (and `--revision`, unless the repo is renamed in place).

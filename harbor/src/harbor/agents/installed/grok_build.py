@@ -307,20 +307,30 @@ class GrokBuild(BaseInstalledAgent):
 
     @override
     async def install(self, environment: BaseEnvironment) -> None:
-        await self.ensure_system_dependencies(
-            environment,
-            ("curl", "bash", "ca_certificates", "coreutils", "procps"),
+        # Skip the installer when a usable `grok` is already on PATH: hosts
+        # that cannot reach x.ai (egress-whitelisted clusters) would otherwise
+        # fail the trial in setup even with the CLI staged by other means.
+        # Same pattern as the gemini-cli and qwen-code agents.
+        check = await environment.exec(
+            command=f"{self._PATH_EXPORT}; command -v grok >/dev/null 2>&1"
         )
-        version_arg = f" -s {shlex.quote(self._version)}" if self._version else ""
-        await self.exec_as_agent(
-            environment,
-            command=(
-                "set -euo pipefail; "
-                f"curl -fsSL {self._INSTALL_SCRIPT_URL} | bash{version_arg} && "
-                f"{self._PATH_EXPORT} && "
-                "grok --version"
-            ),
-        )
+        if check.return_code == 0:
+            self.logger.debug("Grok CLI is already available; skipping install")
+        else:
+            await self.ensure_system_dependencies(
+                environment,
+                ("curl", "bash", "ca_certificates", "coreutils", "procps"),
+            )
+            version_arg = f" -s {shlex.quote(self._version)}" if self._version else ""
+            await self.exec_as_agent(
+                environment,
+                command=(
+                    "set -euo pipefail; "
+                    f"curl -fsSL {self._INSTALL_SCRIPT_URL} | bash{version_arg} && "
+                    f"{self._PATH_EXPORT} && "
+                    "grok --version"
+                ),
+            )
         skills_command = self._build_register_skills_command()
         if skills_command:
             await self.exec_as_agent(environment, command=skills_command)

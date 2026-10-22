@@ -130,6 +130,7 @@ def build_prepare_recipe(
         # any repo that is not already cached, so a cold cache can never warm up.
         "unset HF_HUB_OFFLINE TRANSFORMERS_OFFLINE HF_DATASETS_OFFLINE; "
         f"export PTDBENCH_WORKSPACE={shlex.quote(workspace)} "
+        f"PTDBENCH_ENVIRONMENT={shlex.quote(environment)} "
         f"PTDBENCH_PREPARED={shlex.quote(prepared)} "
         f"PTDBENCH_MODELS={shlex.quote(models)} "
         f"PTDBENCH_DATASETS={shlex.quote(datasets)}; "

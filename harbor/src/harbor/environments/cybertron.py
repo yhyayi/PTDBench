@@ -27,6 +27,7 @@ import json
 import shlex
 import shutil
 import threading
+import uuid
 from pathlib import Path, PurePosixPath
 from typing import Any, override
 
@@ -383,6 +384,23 @@ _DEFAULT_SANDBOX_RO_TOOL_DIRS: tuple[str, ...] = (
     "/root/slime",
 )
 
+# stderr markers of an SSH session that never reached the node (tsh's Teleport
+# proxy dial timing out, or OpenSSH's connect failing). Only these are retried:
+# anything later may have run the remote command already.
+_SSH_CONNECT_FAILURE_MARKERS: tuple[bytes, ...] = (
+    b"failed connecting to host",
+    b"unable to establish proxy stream",
+    b"ssh: connect to host",
+    b"Error while dialing",
+)
+_SSH_CONNECT_RETRY_DELAYS_SEC: tuple[int, ...] = (5, 15, 30)
+_PATH_KIND_TIMEOUT_SEC = 60
+
+
+def _never_connected(stderr: bytes | None) -> bool:
+    return bool(stderr) and any(m in stderr for m in _SSH_CONNECT_FAILURE_MARKERS)
+
+
 # $HOME for sandboxed (agent/verifier) commands. The container's real home
 # (/root) is outside the Landlock allowlist; /workspace is the symlink to the
 # writable per-trial workspace, so pointing HOME here keeps tool caches/config
@@ -527,6 +545,14 @@ class CybertronEnvironment(BaseEnvironment):
             else _DEFAULT_SANDBOX_RO_TOOL_DIRS
         )
 
+        # Name of the per-trial dir under harbor-runs. Deliberately NOT derived
+        # from session_id: that is ``{task_name}__{rand}__env``, and the task
+        # name tends to spell out the defect (verl_grpo_uid_after_repeat). The
+        # dir is the agent's realpath cwd, so every CLI echoes it into the
+        # model's context (gemini quoted it back as "the workspace's issue
+        # title"). Fresh per instance; the session -> dir mapping is logged.
+        self._run_uid = uuid.uuid4().hex[:12]
+
         # attach mode: reuse an existing devspace instead of creating one
         self._devspace_id: str | None = devspace_id
         self._owns_devspace = devspace_id is None
@@ -616,10 +642,7 @@ class CybertronEnvironment(BaseEnvironment):
     @property
     def _run_dir(self) -> str:
         base = self._runs_dir_override or f"/user/{self._user}/harbor-runs"
-        safe_session = "".join(
-            ch if ch.isalnum() or ch in "-._" else "-" for ch in self.session_id
-        )
-        return f"{base}/{safe_session}"
+        return f"{base}/{self._run_uid}"
 
     @property
     def _workspace_dir(self) -> str:
@@ -804,15 +827,21 @@ class CybertronEnvironment(BaseEnvironment):
                 "(pass tsh_path, put tsh on PATH, or set use_tsh=False)."
             )
         numeric = self._numeric_id(self._devspace_id)
-        process = await asyncio.create_subprocess_exec(
-            self._tsh_path,
-            "ls",
-            "--format",
-            "json",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr, code = await self._collect_process(process, timeout_sec=60)
+        # Same transient proxy dial failure _ssh_raw retries; an expired login
+        # fails differently and still surfaces on the first attempt.
+        for delay in (*_SSH_CONNECT_RETRY_DELAYS_SEC, None):
+            process = await asyncio.create_subprocess_exec(
+                self._tsh_path,
+                "ls",
+                "--format",
+                "json",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr, code = await self._collect_process(process, timeout_sec=60)
+            if code == 0 or delay is None or not _never_connected(stderr):
+                break
+            await asyncio.sleep(delay)
         if code != 0:
             raise RuntimeError(
                 f"`tsh ls` failed ({code}); is the Teleport login current "
@@ -967,20 +996,33 @@ class CybertronEnvironment(BaseEnvironment):
         stdin: bytes | None = None,
         timeout_sec: int | None = None,
     ) -> tuple[bytes, bytes, int]:
-        process = await asyncio.create_subprocess_exec(
-            *self._transport_cmd(),
-            command,
-            # No inherited stdin when we're not piping bytes: tsh ssh has no
-            # `-n`, and inheriting a TTY can wedge concurrent transfers.
-            stdin=asyncio.subprocess.PIPE
-            if stdin is not None
-            else asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        return await self._collect_process(
-            process, timeout_sec=timeout_sec, stdin=stdin
-        )
+        # The Teleport proxy intermittently refuses the dial, and with no retry
+        # one blip anywhere in a trial (setup, upload, the /logs/verifier
+        # download after an already-judged run) fails the whole trial. Retrying
+        # is safe only when the connection never came up -- the remote command
+        # then never ran, so even non-idempotent commands can be resent.
+        for delay in (*_SSH_CONNECT_RETRY_DELAYS_SEC, None):
+            process = await asyncio.create_subprocess_exec(
+                *self._transport_cmd(),
+                command,
+                # No inherited stdin when we're not piping bytes: tsh ssh has no
+                # `-n`, and inheriting a TTY can wedge concurrent transfers.
+                stdin=asyncio.subprocess.PIPE
+                if stdin is not None
+                else asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr, return_code = await self._collect_process(
+                process, timeout_sec=timeout_sec, stdin=stdin
+            )
+            if return_code == 0 or delay is None or not _never_connected(stderr):
+                return stdout, stderr, return_code
+            self.logger.debug(
+                f"SSH to {self._host} never connected; retrying in {delay}s"
+            )
+            await asyncio.sleep(delay)
+        raise AssertionError("unreachable")
 
     async def _ssh_exec(
         self,
@@ -1064,6 +1106,13 @@ class CybertronEnvironment(BaseEnvironment):
         the proxy. Emitted as an ``export`` inside the sandbox's inner
         ``bash -lc`` so it runs *after* the login shell sources the profile and
         therefore wins; children inherit it. Empty until the node IP is known.
+
+        The profile exports only the lowercase proxy pair, so the uppercase
+        ones are mirrored from them. Agents built on gemini-cli (gemini, qwen)
+        load the workspace's ``.env`` with plain dotenv parsing, filling in any
+        variable that is unset; the slime tasks ship a shell-style ``.env``
+        with ``HTTPS_PROXY="$https_proxy"``, which arrived as that literal
+        string and broke every request (``ENOTFOUND $https_proxy``).
         """
         if not self._node_ip:
             return ""
@@ -1073,7 +1122,13 @@ class CybertronEnvironment(BaseEnvironment):
             additions.append(f"{octets[0]}.{octets[1]}.0.0/16")
         joined = ",".join(additions)
         value = f"{joined}${{no_proxy:+,$no_proxy}}"
-        return f'export no_proxy="{value}"; export NO_PROXY="{value}"; '
+        return (
+            f'export no_proxy="{value}"; export NO_PROXY="{value}"; '
+            'if [ -n "${http_proxy:-}" ]; then '
+            'export HTTP_PROXY="${HTTP_PROXY:-$http_proxy}"; fi; '
+            'if [ -n "${https_proxy:-}" ]; then '
+            'export HTTPS_PROXY="${HTTPS_PROXY:-$https_proxy}"; fi; '
+        )
 
     async def _resolve_node_ip(self) -> str | None:
         """Best-effort primary cluster IP of the devspace node (for no_proxy).
@@ -1211,6 +1266,15 @@ class CybertronEnvironment(BaseEnvironment):
         # ptdbench expects, and compile the Landlock launcher. Runs unconfined.
         setup = f"""
 set -e
+# Clear what the previous trial on this devspace left behind. /tests and
+# /solution live on the container rootfs, which every trial on an attached
+# devspace shares, and both are --rw in the agent's Landlock allowlist: the last
+# verifier's oracle.md would otherwise be readable by the next agent -- the
+# answer itself when the same task runs back to back for several models. /tmp is
+# allowlisted too, and the agent CLIs keep scratch there that can hold the
+# previous agent's transcript. One trial per devspace at a time is already
+# assumed (/workspace is a single global symlink), so nothing live is removed.
+rm -rf /tests /solution /tmp/claude-* /tmp/codex-home /tmp/gemini-client-error-*
 mkdir -p {shlex.quote(self._workspace_dir)} {shlex.quote(self._logs_dir)}
 mkdir -p {shlex.quote(self._cache_dir + "/models")} {shlex.quote(self._cache_dir + "/datasets")}
 mkdir -p {shlex.quote(self._prepared_dir)}
@@ -1285,6 +1349,7 @@ LLSHIM_EOF
   fi
 fi
 """
+        self.logger.debug(f"Session {self.session_id} runs in {self._run_dir}")
         result = await self._ssh_exec(setup, timeout_sec=300)
         if result.return_code != 0:
             raise RuntimeError(
@@ -1424,7 +1489,6 @@ fi
                 f"read the task's prepare.sh there: {exc}"
             )
 
-
     @override
     async def stop(self, delete: bool) -> None:
         self._stop_heartbeat()
@@ -1557,6 +1621,37 @@ fi
             # Python 3.12+); use "fully_trusted" for single-file artifacts that
             # come straight from the devspace over an authenticated SSH channel.
             tar.extract(member, path=target.parent, filter="fully_trusted")
+
+    @override
+    async def is_dir(self, path: str, user: str | int | None = None) -> bool:
+        return await self._path_kind(path, require_dir=True, user=user)
+
+    @override
+    async def is_file(self, path: str, user: str | int | None = None) -> bool:
+        return await self._path_kind(path, require_dir=False, user=user)
+
+    async def _path_kind(
+        self, path: str, *, require_dir: bool, user: str | int | None
+    ) -> bool:
+        # The base check gives `test -d` 10 s and reads any non-zero exit as
+        # "no". Here every exec is a Teleport round trip that can take longer,
+        # and the 124 timeout then classified /workspace as a *file*: the
+        # artifact handler saved an empty file, and PTDBench zeroed a run the
+        # judge had already scored 1.0. `test` exits 1 for "no"; anything else
+        # is unknown, and raising lets the artifact handler fall back to its
+        # suffix heuristic (no suffix -> directory).
+        result = await self.exec(
+            self._path_kind_check_command(path, require_dir=require_dir),
+            timeout_sec=_PATH_KIND_TIMEOUT_SEC,
+            user=user,
+        )
+        if result.return_code in (0, 1):
+            return result.return_code == 0
+        raise RuntimeError(
+            f"Could not check whether {path} is a "
+            f"{'directory' if require_dir else 'file'} on the devspace "
+            f"(exit {result.return_code}): {result.stderr}"
+        )
 
     @override
     async def download_dir(self, source_dir: str, target_dir: Path | str) -> None:

@@ -19,13 +19,11 @@ set -euo pipefail
 # MODEL_PATH=/workspace/Qwen2.5-1.5B-Instruct 写进了 "The effective run must use"，
 # 历史 log :83 记的 vLLM model 同样是这条路径——三处必须一致。
 #
-# 这个仓是本任务专用的快照（仓里的 PTDBENCH.md 明写 "Do not reuse this repository
-# as a shared family checkpoint"）。
-#
-# allow 列表按仓里实际存在的文件写死，.gitattributes 那种没人读的不取。
+# 官方仓的固定 revision。allow 列表里的每个文件（含 model.safetensors）与历史 run
+# 用的快照逐字节相同，校验值不变。
 ptdbench_fetch_hf \
-    --repo LIF1014/ptdbench-verl-coding-tasks-function-call \
-    --revision 8d94247a55f318abf15ceb596b30eb2208fdab29 \
+    --repo Qwen/Qwen2.5-1.5B-Instruct \
+    --revision 989aa7980e4cf806f80c7fef2b1adb7bc71aa306 \
     --allow config.json \
     --allow generation_config.json \
     --allow LICENSE \

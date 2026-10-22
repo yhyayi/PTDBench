@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from harbor.environments.ptdbench_prepare import (
+    REMOTE_ENVIRONMENT,
     REMOTE_PREPARED,
     build_prepare_recipe,
     hf_export,
@@ -71,6 +72,20 @@ class TestPrepareRecipe:
         )
         # Everything else the task declares still reaches prepare.
         assert "CUDA_VISIBLE_DEVICES=0,1,2,3" in recipe
+
+    def test_task_env_cannot_override_the_environment_dir(self):
+        """The task.toml's PTDBENCH_ENVIRONMENT is the docker mount point.
+
+        On a devspace environment/ is uploaded to REMOTE_ENVIRONMENT instead, so
+        a prepare.sh that reads $PTDBENCH_ENVIRONMENT (search_r1_zero_query_vector
+        does, for its data manifest) found nothing at /ptdbench/environment.
+        """
+        recipe = build_prepare_recipe(
+            task_env={"PTDBENCH_ENVIRONMENT": "/ptdbench/environment"}
+        )
+        assert recipe.index("PTDBENCH_ENVIRONMENT=/ptdbench/environment") < (
+            recipe.index(f"PTDBENCH_ENVIRONMENT={REMOTE_ENVIRONMENT}")
+        )
 
     def test_task_env_values_are_quoted(self):
         recipe = build_prepare_recipe(

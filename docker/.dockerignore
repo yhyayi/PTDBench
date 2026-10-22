@@ -11,4 +11,5 @@
 # agent-r1-alfworld.Dockerfile installs its pinned stack from this runtime dir.
 !agent-r1-runtime
 !agent-r1-runtime/**
+!verl-moe-token/mcore5047-minimal.patch
 **/__pycache__

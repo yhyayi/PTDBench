@@ -128,10 +128,12 @@ stage, verifies the archive and the unpacked parquet bytes, and stages
 
 ## External model asset
 
-- Repository: `LIF1014/ptdbench-verl-implementation-torch-functional`
-- Publication status: `published`
-- Pinned revision: `36a4c226ef70aef2c38df173a7cf86a47ad3ad00`
-- Model: `Qwen2.5-1.5B-Instruct` (same bytes as the `task_function_call` snapshot; `model.safetensors` SHA-256 `dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee`)
+- Repository: `Qwen/Qwen2.5-1.5B-Instruct` (official)
+- Pinned revision: `989aa7980e4cf806f80c7fef2b1adb7bc71aa306`
+- Byte-identical, on every allowed file, to the former task snapshot
+  `LIF1014/ptdbench-verl-implementation-torch-functional@36a4c22`; switched
+  because that repo name is visible to the agent through the shared download cache.
+- Model: `Qwen2.5-1.5B-Instruct` (`model.safetensors` SHA-256 `dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee`)
 
 ## Environment requirement
 

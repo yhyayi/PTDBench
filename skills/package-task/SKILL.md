@@ -24,7 +24,7 @@ label and is not constrained to these six.)
 
 Authoritative sources in the repo: `ptdbench/tasks/validator.py` (validation rules), `docker/README.md` (environment images).
 For finished tasks, see `tasks/reward/retool_length_hack/` (issue + solution) and
-`tasks/data/task_train_too_hard/` (issue only).
+`tasks/data/task_train_too_hard_new/` (issue only).
 
 ## Outputs
 
@@ -71,7 +71,7 @@ If any item is missing, stop and ask. Field list in [reference.md](reference.md#
 | --- | --- | --- |
 | 1. Two git commits | `git diff <buggy> <baseline>` | Injected defect |
 | 2. raw task: `buggy_workspace/` + `fixed_workspace/` | `diff -rq`, then `diff -u` per file | See [CONTRIBUTING.md](../../CONTRIBUTING.md) for format |
-| 3. Historical snapshot, no control | The user-supplied `bug_root_cause`; if missing, ask. Do not infer it from logs yourself | `data/task_train_too_hard` |
+| 3. Historical snapshot, no control | The user-supplied `bug_root_cause`; if missing, ask. Do not infer it from logs yourself | `data/task_train_too_hard_new` |
 
 The root cause comes only from code, launch scripts, and the hyperparameters, rewards, and data processing they directly reference.
 Differences in logs, W&B, checkpoints, weights, and data files never count as root cause.

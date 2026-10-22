@@ -1,143 +1,127 @@
-# data diagnosis: task_train_too_hard
+# data diagnosis: TACO GRPO run (training set too hard)
 
 ## Case overview
 
-- Evaluation key: `data/task_train_too_hard`
+- Evaluation key: `data/task_train_too_hard_new`
 - Case family: `data`
-- Schema version: `2`
 - Evaluation levels: `issue`
 - Model: `Qwen2.5-1.5B-Instruct`
-- Training framework: `verl`
+- Training framework: `verl` (GRPO)
+- Environment image: `verl`
 - Primary source evaluation metric: `val-core/taco/acc/mean@1`
 
 This document is for maintainers and reviewers. It is not exposed to the
-agent during evaluation.
-
-There is no solution level. Issue grading compares
+agent during evaluation. There is no solution level. Issue grading compares
 `$PTDBENCH_RESULTS/agent_answer.md` to hidden `oracle.md`.
 
 ## Canonical failure reason
 
-The training set is too hard, and its difficulty does not match the validation
-set. `workspace/taco_verl/train.parquet` contains only TACO `VERY_HARD` rows.
+`workspace/taco_verl/train.parquet` contains only TACO `VERY_HARD` rows;
 `workspace/taco_verl/test.parquet` is the existing TACO `EASY` validation set.
+The training problems are too hard for the 1.5B model under the binary
+all-tests-pass reward, so almost every GRPO group is all-zero, advantages are
+zero on most steps, and training never learns. Held-out accuracy stays flat.
+
+The train/validation difficulty mismatch is evidence for "too hard", not the
+mechanism: the run would stall the same way with a `VERY_HARD` validation set.
+Code, launch hyperparameters, and the model are the healthy baseline.
 
 ## Workspace and hidden evaluations
 
-| Path                 | Visibility and purpose                                              |
-| -------------------- | ------------------------------------------------------------------- |
-| `workspace/`         | Agent-visible experiment snapshot. Code is the healthy baseline.   |
-| `evaluations/issue/` | Neutral diagnosis instruction, issue oracle, and issue verifier.   |
+| Path                 | Visibility and purpose                                            |
+| -------------------- | ----------------------------------------------------------------- |
+| `workspace/`         | Agent-visible snapshot: code, one training log, wandb, dumps.    |
+| `environment/`       | Agent-visible (read-only): `prepare.sh`.                          |
+| `evaluations/issue/` | Neutral instruction, hidden oracle, and issue verifier.           |
 
-The agent cannot read oracle or verifier paths.
-
-## Canonical expected outcome
-
-Verdict: **unhealthy**.
-
-Essential root cause, either formulation:
-
-- the training set is too hard
-- the training set and the validation set do not match in difficulty
-
-Code, launch hyperparameters, and the model are not the root cause.
+`workspace/rollout_data/` holds the per-step training rollout dumps
+(400 files x 128 rollouts) and `workspace/validation_data/` the nine
+validation dumps (184 rollouts each).
 
 ## Historical training run
 
-Log: `workspace/logs/qwen2_5_1.5b_instruct_taco_fsdp_20261010_073442.log`.
-Wandb: `workspace/logs/wandb/offline-run-20261010_073718-kovw4pvq`.
+- Log: `workspace/logs/qwen2_5_1.5b_instruct_taco_fsdp_20261021_080557.log`
+- Wandb: `workspace/logs/wandb/offline-run-20261021_080907-4pye3rsp`
+- 4 GPUs, 400/400 steps in 15:18:01 (137.70 s/step); 145 steps per epoch
+  (2329 training rows), so the step cap stops training in the third epoch.
+- Config: `train_batch_size=16`, `rollout.n=8`, `lr=1e-6`, `use_kl_loss=True`,
+  `kl_loss_coef=0.02` (low_var_kl), `entropy_coeff=0.001`, rollout temperature
+  1.0, validation temperature 0.7.
 
-The run finished `400/400` steps. The progress bar records `8:40:39`
-(about 8 hours 41 minutes, 78.10 seconds per step). The train dataloader has
-145 steps per epoch and `total_training_steps` is 400, so the step cap stops
-the job during the third epoch. Epoch index 0 covers steps 1–145, epoch index
-1 starts at step 146, and epoch index 2 starts at step 291.
+Held-out results on 184 TACO `EASY` rows (counts are `round(acc * 184)`):
 
-Held-out `val-core/taco/acc/mean@1` on 184 TACO `EASY` rows. Counts are
-`round(acc * 184)`.
+| Step | Fully correct | acc    | pass_rate |
+| ---- | ------------- | ------ | --------- |
+| 0    | 13/184        | 0.0707 | 0.2246    |
+| 50   | 17/184        | 0.0924 | 0.2335    |
+| 100  | 16/184        | 0.0870 | 0.2212    |
+| 150  | 16/184        | 0.0870 | 0.2416    |
+| 200  | 13/184        | 0.0707 | 0.2224    |
+| 250  | 15/184        | 0.0815 | 0.2343    |
+| 300  | 13/184        | 0.0707 | 0.2386    |
+| 350  | 12/184        | 0.0652 | 0.2473    |
+| 400  | 14/184        | 0.0761 | 0.2250    |
 
-| Step | Fully correct | acc | pass_rate |
-| ---- | ------------- | --- | --------- |
-| 0 | 9/184 | 0.0489 | 0.1967 |
-| 50 | 18/184 | 0.0978 | 0.2887 |
-| 100 | 17/184 | 0.0924 | 0.2918 |
-| 150 | 16/184 | 0.0870 | 0.3050 |
-| 200 | 6/184 | 0.0326 | 0.1167 |
-| 250 | 1/184 | 0.0054 | 0.0649 |
-| 300 | 4/184 | 0.0217 | 0.1149 |
-| 350 | 5/184 | 0.0272 | 0.1433 |
-| 400 | 7/184 | 0.0380 | 0.1351 |
+Training signal:
 
-The last validation accuracy, 0.0380 (7/184), is below the step-0 value,
-0.0489 (9/184). The peak is step 50 at 0.0978 (18/184). After step 200 the
-curve stays below the step-0 baseline.
+- `critic/rewards/mean` averages 0.0078; 254/400 steps are 0; max 0.1016.
+- 256/400 steps have all-zero advantages and `pg_loss` = 0.
+- Rollout dumps: 0.78% of 51,200 training rollouts succeed; 175/6,400 groups
+  (2.7%) are mixed, 2 all-correct, the rest all-zero; 104 of 2,151 distinct
+  training prompts are ever solved.
+- Entropy rises 0.69 -> ~1.0-1.1 (peak 2.04); response length 300-750 tokens,
+  clip ratio 0.2%. Hard-coded `print(<constant>)` outputs: 9/51,200 training,
+  0/1,656 validation.
 
-`critic/rewards/mean` over training steps 1–400 averages 0.0938. Steps 1–100
-average about 0.0082. Of the 400 steps, 96 are 0. The maximum is 0.4375 at
-step 299. Step 400 is 0.1250. Fifty-step means:
-
-| Steps | Mean training reward |
-| ----- | -------------------- |
-| 1–50 | 0.0081 |
-| 51–100 | 0.0083 |
-| 101–150 | 0.0188 |
-| 151–200 | 0.0934 |
-| 201–250 | 0.1789 |
-| 251–300 | 0.1467 |
-| 301–350 | 0.1470 |
-| 351–400 | 0.1495 |
-
-The 101–150 mean is exactly 0.01875. From step 201 onward the fifty-step
-means stay near 0.15 while held-out accuracy does not recover.
+An earlier version of this task shipped a run with `use_kl_loss=False`,
+`entropy_coeff=0`. That run failed differently (reward hacking with hard-coded
+outputs, entropy and length collapse, validation below step 0), which made
+"no KL / no entropy regularization" an independently sufficient explanation.
+It has been removed from the workspace; only the run above is shipped.
 
 ## Evaluation design
 
-`issue` grades `$PTDBENCH_RESULTS/agent_answer.md` against hidden `oracle.md`.
-The judge scores verdict, root-cause, and evidence agreement
-(weights 0.2 / 0.6 / 0.2). Pass is a weighted score of at least `0.8`.
-
-Root-cause credit is full when the diagnosis states that the training set is
-too hard, or that the training and validation sets do not match in difficulty.
-Either formulation is enough. A code defect is not required.
+The judge scores verdict, root cause, and evidence (weights 0.2 / 0.6 / 0.2);
+pass is a weighted score of at least `0.8`. Full root-cause credit requires
+"training data too hard" connected to the missing learning signal. Stating only
+"too hard" or only a train/validation difficulty mismatch, without the causal
+chain, gets partial root-cause credit (0.3) and cannot reach the pass line.
+See `evaluations/issue/verifier/judge_prompt.md`.
 
 ## External dataset asset
 
 - Repository: `LIF1014/ptdbench-data-task-train-too-hard-dataset`
-- Publication status: `published`
 - Pinned revision: `22a1fee0ea2527f514c4115f6c792216a99d7e6f`
 - Dataset license: `Apache-2.0`
-- Provenance: TACO `VERY_HARD` training rows and the existing TACO `EASY` validation snapshot.
+- Archive `artifacts/workspace-assets.tar.gz`: 167,612,568 bytes, SHA-256
+  `eddeece8c2828e21b581d5168dd4604470165cb061a53e68d50b26d49ce6d916`.
 
+| Runtime path                        | Size              | SHA-256                                                            |
+| ----------------------------------- | ----------------- | ------------------------------------------------------------------ |
+| `workspace/taco_verl/test.parquet`  | 61,082,426 bytes  | `0593078d24134d204b305dd0373acfc33daed9a2c73fdad7304a2fde191daea3` |
+| `workspace/taco_verl/train.parquet` | 168,834,942 bytes | `8640b3e6c7a5ff3d5b51aa46e74f74147f3c565cd89b73676d5113f8e546d573` |
 
-| Runtime path                            | Size              | SHA-256                                                            |
-| --------------------------------------- | ----------------- | ------------------------------------------------------------------ |
-| `workspace/taco_verl/test.parquet`      | 61,082,426 bytes  | `0593078d24134d204b305dd0373acfc33daed9a2c73fdad7304a2fde191daea3` |
-| `workspace/taco_verl/train.parquet`     | 168,834,942 bytes | `8640b3e6c7a5ff3d5b51aa46e74f74147f3c565cd89b73676d5113f8e546d573` |
+2329 `VERY_HARD` training rows (all `stdin`; 4 rows above 2048 prompt tokens
+dropped) and the unchanged 184-row `EASY` validation set. The parquet files do
+not store `extra_info.difficulty`.
 
-
-The archive `artifacts/workspace-assets.tar.gz` is 167,612,568 bytes, SHA-256
-`eddeece8c2828e21b581d5168dd4604470165cb061a53e68d50b26d49ce6d916`.
-It contains 2329 `VERY_HARD` training rows, all `stdin`, and the unchanged
-184-row `EASY` validation set. `VERY_HARD` has no call-based problems. The
-converter was checked against the existing EASY `train.parquet`: 5996 `stdin`
-rows and 2372 `call_based` rows matched. Rows above 2048 prompt tokens are
-dropped; 4 `VERY_HARD` rows were dropped that way.
-
-The agent-visible parquet files and this archive revision do not store
-`extra_info.difficulty`. Prompts, `reward_model`, `index`, `split`,
-`code_type`, and `fn_name` are unchanged. The Docker image downloads this
-revision from `hf-mirror.com` at build time.
+Known leak: the repository name above contains the answer and appears in the
+agent-visible `environment/prepare.sh`. Republishing the archive under a
+neutral repository name is still open.
 
 ## External model asset
 
-- Repository: `LIF1014/ptdbench-verl-implementation-torch-functional`
-- Publication status: `published`
-- Pinned revision: `36a4c226ef70aef2c38df173a7cf86a47ad3ad00`
-- Model: `Qwen2.5-1.5B-Instruct` (`model.safetensors` SHA-256 `dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee`)
+- Repository: `Qwen/Qwen2.5-1.5B-Instruct` (official)
+- Pinned revision: `989aa7980e4cf806f80c7fef2b1adb7bc71aa306`
+- Byte-identical, on every allowed file, to the former task snapshot
+  `LIF1014/ptdbench-verl-implementation-torch-functional@36a4c22`; switched
+  because that repo name is visible to the agent through the shared download cache.
+- `model.safetensors` SHA-256 `dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee`
 
 ## Environment requirement
 
-- Base image: `verlai/verl:vllm017.latest`
-- Launch script: `examples/grpo_trainer/run_qwen2_5_1.5b_instruct_taco_fsdp.sh`
-- The designated experiment uses 8 GPUs and a 400-step budget.
-- Issue evaluation does not launch training.
+- Image: `verl` (`docker/images/verl.Dockerfile`); assets come from
+  `environment/prepare.sh`.
+- The recorded run had `pyext==0.7` installed (see the wandb requirements);
+  issue evaluation does not run the scorer, so `prepare.sh` does not install it.
+- Issue evaluation does not launch training and needs no GPU.

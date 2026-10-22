@@ -48,6 +48,21 @@ class QwenCode(BaseInstalledAgent):
         ),
     ]
 
+    # qwen-code's own validator accepts exactly these (it clamps to what the
+    # model supports at request time).
+    _REASONING_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+
+    def __init__(self, *args, reasoning_effort: str | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if reasoning_effort is not None and (
+            reasoning_effort not in self._REASONING_EFFORTS
+        ):
+            raise ValueError(
+                f"Invalid reasoning_effort {reasoning_effort!r}; expected one of "
+                f"{', '.join(self._REASONING_EFFORTS)}"
+            )
+        self._reasoning_effort = reasoning_effort
+
     @staticmethod
     @override
     def name() -> str:
@@ -295,18 +310,33 @@ class QwenCode(BaseInstalledAgent):
         )
 
     def _build_register_mcp_servers_command(self) -> str | None:
-        """Return a shell command that writes MCP config to ~/.qwen/settings.json."""
-        if not self.mcp_servers:
+        """Return a shell command that writes ~/.qwen/settings.json.
+
+        Carries the MCP servers and, when set, the reasoning effort
+        (``model.generationConfig.reasoning.effort``, which qwen-code has no
+        CLI flag for). None when there is nothing to write.
+        """
+        settings: dict[str, Any] = {}
+        if self.mcp_servers:
+            servers: dict[str, dict[str, Any]] = {}
+            for server in self.mcp_servers:
+                if server.transport == "stdio":
+                    servers[server.name] = {
+                        "command": server.command,
+                        "args": server.args,
+                    }
+                elif server.transport == "streamable-http":
+                    servers[server.name] = {"httpUrl": server.url}
+                else:  # sse
+                    servers[server.name] = {"url": server.url}
+            settings["mcpServers"] = servers
+        if self._reasoning_effort:
+            settings["model"] = {
+                "generationConfig": {"reasoning": {"effort": self._reasoning_effort}}
+            }
+        if not settings:
             return None
-        servers: dict[str, dict[str, Any]] = {}
-        for server in self.mcp_servers:
-            if server.transport == "stdio":
-                servers[server.name] = {"command": server.command, "args": server.args}
-            elif server.transport == "streamable-http":
-                servers[server.name] = {"httpUrl": server.url}
-            else:  # sse
-                servers[server.name] = {"url": server.url}
-        config = json.dumps({"mcpServers": servers}, indent=2)
+        config = json.dumps(settings, indent=2)
         escaped = shlex.quote(config)
         return f"mkdir -p ~/.qwen && echo {escaped} > ~/.qwen/settings.json"
 

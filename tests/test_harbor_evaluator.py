@@ -257,6 +257,15 @@ class HarborTaskMaterializerTests(FixtureTestCase):
         self.assertIn('PTDBENCH_STAGE = "agent"', agent_env)
         self.assertIn('PTDBENCH_STAGE = "verifier"', verifier_env)
 
+    def test_only_the_verifier_learns_the_task_id(self):
+        # 任务 id 往往直接点出缺陷，agent 跑一下 `env` 就能看到。
+        task_toml = self.toml(self.materialize())
+        agent_env, verifier_env = task_toml.split("[environment.env]")[1].split(
+            "[verifier.env]"
+        )
+        self.assertNotIn("PTDBENCH_TASK_ID", agent_env)
+        self.assertIn("PTDBENCH_TASK_ID = ", verifier_env)
+
     def test_no_gpu_option_is_written(self):
         # Harbor 的 docker 环境不支持 GPU；写了 gpus 会让 trial 初始化失败。
         self.assertNotIn("gpus", self.toml(self.materialize()))

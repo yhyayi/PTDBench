@@ -359,6 +359,33 @@ class TestWrapSandbox:
         assert "export no_proxy=" in wrapped
         assert "export NO_PROXY=" in wrapped
 
+    @pytest.mark.parametrize(
+        ("env", "expected"),
+        [
+            # Profile sets only lowercase: uppercase is mirrored, so dotenv
+            # loaders cannot fill it with a .env's literal "$https_proxy".
+            ({"https_proxy": "http://p:1", "http_proxy": "http://p:1"}, "http://p:1"),
+            # An explicit uppercase value is kept.
+            ({"https_proxy": "http://p:1", "HTTPS_PROXY": "http://q:2"}, "http://q:2"),
+            # No proxy configured: nothing is invented.
+            ({}, "<unset>"),
+        ],
+    )
+    def test_preamble_mirrors_uppercase_proxy(self, tmp_path, env, expected):
+        import subprocess
+
+        e = self._env(tmp_path)
+        e._node_ip = "10.1.2.3"
+        script = e._proxy_preamble() + 'echo "${HTTPS_PROXY-<unset>}"'
+        out = subprocess.run(
+            ["bash", "-c", script],
+            env={"PATH": "/usr/bin:/bin", **env},
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        assert out == expected
+
 
 class TestResolveNodeIp:
     async def test_valid_ip_accepted(self, tmp_path, monkeypatch):
@@ -388,7 +415,121 @@ class TestResolveNodeIp:
         assert await env._resolve_node_ip() is None
 
 
+class TestRunDirName:
+    """The per-trial dir is the agent's realpath cwd, so it must not carry the
+    task name: session_id is ``{task_name}__{rand}__env`` and task names tend to
+    spell out the defect."""
+
+    def test_run_dir_does_not_leak_the_task_name(self, tmp_path):
+        env = _make_env(tmp_path, image_id="1")
+        env._cluster_user = "u"
+        assert "test-task" not in env._run_dir
+        assert env._run_dir.startswith("/user/u/harbor-runs/")
+        assert env._workspace_dir.startswith(env._run_dir)
+        assert env._logs_dir.startswith(env._run_dir)
+
+    def test_run_dir_is_stable_per_instance_and_fresh_per_trial(self, tmp_path):
+        a = _make_env(tmp_path / "a", image_id="1")
+        b = _make_env(tmp_path / "b", image_id="1")
+        a._cluster_user = b._cluster_user = "u"
+        assert a._run_dir == a._run_dir
+        assert a._run_dir != b._run_dir
+
+
+class TestSshConnectRetry:
+    def _env(self, tmp_path, monkeypatch, results):
+        env = _make_env(tmp_path, image_id="1", use_tsh=False)
+        env._host = "h"
+        calls: list[int] = []
+
+        async def fake_spawn(*args, **kwargs):
+            return object()
+
+        async def fake_collect(process, *, timeout_sec, stdin=None):
+            calls.append(1)
+            return results[len(calls) - 1]
+
+        async def no_sleep(_):
+            return None
+
+        monkeypatch.setattr(cybertron_mod.asyncio, "create_subprocess_exec", fake_spawn)
+        monkeypatch.setattr(
+            CybertronEnvironment, "_collect_process", staticmethod(fake_collect)
+        )
+        monkeypatch.setattr(cybertron_mod.asyncio, "sleep", no_sleep)
+        return env, calls
+
+    async def test_retries_until_the_proxy_dial_succeeds(self, tmp_path, monkeypatch):
+        dial = b"failed connecting to host h:0: unable to establish proxy stream\n"
+        env, calls = self._env(
+            tmp_path, monkeypatch, [(b"", dial, 255), (b"", dial, 255), (b"ok", b"", 0)]
+        )
+        assert await env._ssh_raw("tar cf - .") == (b"ok", b"", 0)
+        assert len(calls) == 3
+
+    async def test_does_not_resend_a_command_that_reached_the_node(
+        self, tmp_path, monkeypatch
+    ):
+        env, calls = self._env(tmp_path, monkeypatch, [(b"", b"tar: no such dir", 2)])
+        assert await env._ssh_raw("tar cf - .") == (b"", b"tar: no such dir", 2)
+        assert len(calls) == 1
+
+    async def test_gives_up_after_the_last_retry(self, tmp_path, monkeypatch):
+        dial = b"ssh: connect to host h port 22: Connection timed out"
+        env, calls = self._env(tmp_path, monkeypatch, [(b"", dial, 255)] * 4)
+        assert (await env._ssh_raw("true"))[2] == 255
+        assert len(calls) == 4
+
+
+class TestPathKind:
+    """A slow Teleport round trip must not turn /workspace into a "file"."""
+
+    def _env(self, tmp_path, monkeypatch, return_code):
+        env = _make_env(tmp_path, image_id="1")
+        seen: dict[str, object] = {}
+
+        async def fake_exec(self, command, *args, timeout_sec=None, **kwargs):
+            seen["timeout_sec"] = timeout_sec
+            return cybertron_mod.ExecResult(
+                stdout="", stderr="timed out", return_code=return_code
+            )
+
+        monkeypatch.setattr(CybertronEnvironment, "exec", fake_exec)
+        return env, seen
+
+    async def test_yes_and_no_are_answered(self, tmp_path, monkeypatch):
+        env, seen = self._env(tmp_path, monkeypatch, 0)
+        assert await env.is_dir("/workspace") is True
+        assert seen["timeout_sec"] >= 60
+        env, _ = self._env(tmp_path, monkeypatch, 1)
+        assert await env.is_dir("/workspace") is False
+
+    @pytest.mark.parametrize("code", [124, 255])
+    async def test_inconclusive_check_raises(self, tmp_path, monkeypatch, code):
+        env, _ = self._env(tmp_path, monkeypatch, code)
+        with pytest.raises(RuntimeError, match="/workspace"):
+            await env.is_dir("/workspace")
+
+
 class TestSetupDevspaceScript:
+    async def test_clears_previous_trial_leftovers_first(self, tmp_path, monkeypatch):
+        # /tests survives on an attached devspace's rootfs and is --rw in the
+        # agent sandbox: the previous verifier's oracle.md would be readable.
+        env = _make_env(tmp_path, image_id="1")
+        env._cluster_user = "u"
+        captured: dict[str, str] = {}
+
+        async def fake_exec(self, command, *args, **kwargs):
+            captured["setup"] = command
+            return cybertron_mod.ExecResult(stdout="", stderr=None, return_code=0)
+
+        monkeypatch.setattr(CybertronEnvironment, "_ssh_exec", fake_exec)
+        await env._setup_devspace()
+        setup = captured["setup"]
+        cleanup = "rm -rf /tests /solution /tmp/claude-* /tmp/codex-home"
+        assert cleanup in setup
+        assert setup.index(cleanup) < setup.index("ln -sfnT ")
+
     async def test_installs_rename_shim_via_ld_so_preload(self, tmp_path, monkeypatch):
         env = _make_env(tmp_path, image_id="1")
         env._cluster_user = "u"

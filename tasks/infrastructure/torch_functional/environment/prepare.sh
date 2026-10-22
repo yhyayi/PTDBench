@@ -23,13 +23,11 @@ set -euo pipefail
 # 里 VERL_ROOT 是启动脚本上溯两级，容器里就是 /workspace，所以 dest 必须正好是
 # $PTDBENCH_WORKSPACE/Qwen2.5-1.5B-Instruct。
 #
-# 这个仓是本任务专用的快照，不和 task_function_call 共用；model.safetensors 的字节
-# 与 task_function_call 相同（readme.md "External model asset"：同一份
-# Qwen2.5-1.5B-Instruct 快照），但 revision 各是各的。allow 列表原样来自 legacy
-# Dockerfile 的 allow_patterns。
+# 官方仓的固定 revision。allow 列表里的每个文件（含 model.safetensors）与历史 run
+# 用的快照逐字节相同，校验值不变。
 ptdbench_fetch_hf \
-    --repo LIF1014/ptdbench-verl-implementation-torch-functional \
-    --revision 36a4c226ef70aef2c38df173a7cf86a47ad3ad00 \
+    --repo Qwen/Qwen2.5-1.5B-Instruct \
+    --revision 989aa7980e4cf806f80c7fef2b1adb7bc71aa306 \
     --allow config.json \
     --allow generation_config.json \
     --allow LICENSE \
