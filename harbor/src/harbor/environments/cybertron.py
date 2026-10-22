@@ -1376,9 +1376,24 @@ fi
         # Also tee to a file on the devspace: exec_stream lets the child inherit
         # our stdio, but harbor captures that, so a failing prepare leaves only
         # an exit code in trial.log and the actual error is lost.
-        log_path = f"{self._logs_dir}/prepare.log"
+        # Not under _logs_dir: that one is --rw in the agent's llrun sandbox (it
+        # is where the agent writes its answer), and prepare's output names the
+        # HF repos and archive members the task was built from -- enough to give
+        # away what the agent is meant to diagnose. _run_dir itself is not
+        # mounted into the sandbox, so the log stays readable over SSH for
+        # debugging while being invisible to the agent.
+        log_path = f"{self._run_dir}/prepare.log"
         teed = f"{{ {recipe} ; }} 2>&1 | tee {shlex.quote(log_path)}; exit ${{PIPESTATUS[0]}}"
         code = await self.exec_stream(teed)
+        # The environment dir is an input to prepare and must not outlive it:
+        # REMOTE_ENVIRONMENT lives under /workspace, which the agent gets rw, so
+        # leaving it there hands the agent prepare.sh -- the HF repo names, the
+        # archive members, the sha256 pins. Any of those can name the defect the
+        # agent is supposed to diagnose -- a dataset repo is sometimes named
+        # after the very defect it carries. Removed on both paths:
+        # a failed prepare aborts the trial, but the workspace is persistent and
+        # a later trial on the same devspace would still find the tree.
+        await self._remove_remote_environment_dir()
         if code != 0:
             tail = ""
             try:
@@ -1392,6 +1407,23 @@ fi
                 f"{self._prepare_script} failed on devspace {self._devspace_id} "
                 f"with exit {code}\n--- last 40 lines of {log_path} ---\n{tail}"
             )
+
+    async def _remove_remote_environment_dir(self) -> None:
+        """Drop the uploaded environment/ tree before the agent stage sees it.
+
+        Best-effort: failing to clean up must not fail an otherwise good
+        prepare, but it is worth a warning because the leak is silent.
+        """
+        try:
+            await self._ssh_exec(
+                f"rm -rf {shlex.quote(REMOTE_ENVIRONMENT)}", timeout_sec=60
+            )
+        except Exception as exc:  # noqa: BLE001 - cleanup is best-effort
+            self.logger.warning(
+                f"Failed to remove {REMOTE_ENVIRONMENT}; the agent stage can "
+                f"read the task's prepare.sh there: {exc}"
+            )
+
 
     @override
     async def stop(self, delete: bool) -> None:

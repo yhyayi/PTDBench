@@ -101,6 +101,35 @@ class SandboxRequest:
             raise ValueError("the prepare stage needs host_prepared")
 
 
+def sees_environment_dir(request: SandboxRequest) -> bool:
+    """这个阶段该不该看得到任务的 environment/。
+
+    prepare 要跑里面的 prepare.sh；verifier 偶尔要读里面的资源。**agent 不给**：
+    prepare.sh 写着任务是怎么搭起来的——下哪个 HF 仓库、解哪个归档、校验哪些
+    sha256——其中任何一个名字都可能直接点出要诊断的缺陷。
+
+    以前三个阶段共用一张挂载表，agent 也挂着；"别把答案写进 prepare.sh" 是写在
+    prepare.sh 文件头里的一条约定，靠任务作者自觉。约定覆盖不到"仓库名本身就是
+    答案"这种情况，所以改成机制。
+    """
+    return request.stage != "agent"
+
+
+def sees_download_cache(request: SandboxRequest) -> bool:
+    """这个阶段该不该看得到 $PTDBENCH_{MODELS,DATASETS}。
+
+    prepare 要写（下载落点），verifier 要读（判分常要读 checkpoint 或对齐数据集
+    样本）。**agent 不给**：HF 缓存的目录名就是仓库名（datasets--<owner>--<repo>），
+    而仓库名有时就是照着它承载的那个缺陷起的，等于把答案写在目录名里。
+    agent 也不需要它：prepare 交付的权重/数据集已经被
+    materialize() 硬链进 workspace，是真实字节，缓存挂不挂都读得到。
+
+    挂载表和环境变量都走这一个判据，免得两边漂移——漂移的表现是 PTDBENCH_MODELS
+    指着一个没挂上的路径，报出来是"目录是空的"而不是"你看不到"。
+    """
+    return request.stage != "agent"
+
+
 class SandboxRuntime(ABC):
     """运行平台的统一接口。
 
@@ -177,7 +206,9 @@ class SandboxRuntime(ABC):
             oracle = ""
             verifier = ""
         env = {
-            "PTDBENCH_TASK_ID": request.task_id,
+            # agent 阶段给空：任务 id 往往直接点出缺陷（verl_grpo_uid_after_repeat），
+            # 和 oracle 一样不该让 agent 读到。
+            "PTDBENCH_TASK_ID": "" if request.stage == "agent" else request.task_id,
             "PTDBENCH_EVALUATION_LEVEL": request.evaluation_level,
             "PTDBENCH_TASK_ROOT": task_root,
             "PTDBENCH_VISIBLE_TASK": visible,
@@ -192,13 +223,17 @@ class SandboxRuntime(ABC):
             "PTDBENCH_PREPARED": (
                 self.path(request, "prepared") if request.host_prepared else ""
             ),
-            # 两个下载缓存根，三个阶段都导出。给空字符串表示"这次没有配"，和
-            # prepared 的处理一致。
+            # 两个下载缓存根。给空字符串表示"这次看不到"，和 prepared 一致——
+            # agent 阶段总是空的，见 sees_download_cache()。
             "PTDBENCH_MODELS": (
-                self.path(request, "models") if request.host_models else ""
+                self.path(request, "models")
+                if request.host_models and sees_download_cache(request)
+                else ""
             ),
             "PTDBENCH_DATASETS": (
-                self.path(request, "datasets") if request.host_datasets else ""
+                self.path(request, "datasets")
+                if request.host_datasets and sees_download_cache(request)
+                else ""
             ),
         }
         env.update(self._network_policy_env(request))

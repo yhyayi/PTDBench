@@ -277,7 +277,8 @@ class TaskEvaluator:
             evaluation_level=evaluation.level,
             log_level=config.log_level,
             debian_mirror=config.debian_mirror,
-            environment_dir=self._environment_mount(package),
+            # agent 阶段不挂 environment/：见 _environment_mount 的注释。
+            environment_dir=None,
             prepared_dir=run.prepared,
             models_dir=run.models,
             datasets_dir=run.datasets,
@@ -286,7 +287,20 @@ class TaskEvaluator:
 
     @staticmethod
     def _environment_mount(package: TaskPackage) -> Optional[Path]:
-        """任务的 environment/ 目录，没有就不挂。"""
+        """任务的 environment/ 目录，没有就不挂。
+
+        只给 prepare 和 verifier 用。**agent 阶段不挂**：这个目录里的
+        prepare.sh 写着任务是怎么搭起来的——下哪个 HF 仓库、解哪个归档、
+        校验哪些 sha256——而其中任何一个名字都可能直接点出要诊断的缺陷
+        （数据集仓库名有时就是照着它承载的那个缺陷起的）。
+
+        agent 阶段没有任何东西读它：activate hook 在镜像的 /etc/profile.d 下，
+        不在这里；仓库现有任务的 agent 阶段也没有引用 $PTDBENCH_ENVIRONMENT。
+        以前挂着只是因为三个阶段共用一张挂载表。
+
+        在此之前，"别把答案写进 prepare.sh" 是一条写在 prepare.sh 文件头里的
+        约定，靠每个任务作者自觉；约定覆盖不到"仓库名本身就是答案"这种情况。
+        """
         return package.paths.environment if package.paths.environment.is_dir() else None
 
     @staticmethod

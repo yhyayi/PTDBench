@@ -25,6 +25,8 @@ from ..base import (
     SandboxInstance,
     SandboxRequest,
     SandboxRuntime,
+    sees_download_cache,
+    sees_environment_dir,
 )
 from ..factory import register_runtime
 
@@ -446,21 +448,23 @@ class DockerRuntime(SandboxRuntime):
                 DockerMount(request.host_task_root, "/task", read_only=True),
                 DockerMount(request.host_results, "/results"),
             ]
-        if request.host_environment is not None:
-            # 三个阶段都只读：没有任何一个阶段有理由改仓库里的任务定义。
+        if request.host_environment is not None and sees_environment_dir(request):
+            # 只读：没有任何一个阶段有理由改仓库里的任务定义。
             mounts.append(
                 DockerMount(request.host_environment, PTDBENCH_ENVIRONMENT_DIR, read_only=True)
             )
         if request.stage != "prepare" and request.host_prepared is not None:
             mounts.append(DockerMount(request.host_prepared, PREPARED_DIR, read_only=True))
-        # 下载缓存：只有 prepare 需要写，后两个阶段挂只读的同一份。
-        read_only = request.stage != "prepare"
-        for host, container in (
-            (request.host_models, MODELS_DIR),
-            (request.host_datasets, DATASETS_DIR),
-        ):
-            if host is not None:
-                mounts.append(DockerMount(host, container, read_only=read_only))
+        # 下载缓存：prepare 写，verifier 只读，agent 看不到。判据见
+        # sees_download_cache()——环境变量那边用的是同一个。
+        if sees_download_cache(request):
+            read_only = request.stage != "prepare"
+            for host, container in (
+                (request.host_models, MODELS_DIR),
+                (request.host_datasets, DATASETS_DIR),
+            ):
+                if host is not None:
+                    mounts.append(DockerMount(host, container, read_only=read_only))
         return tuple(mounts)
 
     @staticmethod

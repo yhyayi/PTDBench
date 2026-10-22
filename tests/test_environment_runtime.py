@@ -104,13 +104,21 @@ class MountTableTests(unittest.TestCase):
             self.assertIn(container_path, mounts)
             self.assertFalse(mounts[container_path].read_only, container_path)
 
-    def test_later_stages_see_the_download_cache_read_only(self) -> None:
-        # 看得到是为了排查时对得上账；只读是因为判分依据不能是 agent 改得动的东西。
-        for stage in ("agent", "verifier"):
-            mounts = self._mounts(make_request(stage))
-            for container_path in (MODELS_DIR, DATASETS_DIR):
-                self.assertIn(container_path, mounts, (stage, container_path))
-                self.assertTrue(mounts[container_path].read_only, (stage, container_path))
+    def test_verifier_sees_the_download_cache_read_only(self) -> None:
+        # 判分脚本常要读 checkpoint 或对齐数据集样本；只读是因为判分依据不能是
+        # agent 改得动的东西。
+        mounts = self._mounts(make_request("verifier"))
+        for container_path in (MODELS_DIR, DATASETS_DIR):
+            self.assertIn(container_path, mounts, container_path)
+            self.assertTrue(mounts[container_path].read_only, container_path)
+
+    def test_agent_never_sees_the_download_cache(self) -> None:
+        # HF 缓存的目录名就是仓库名（datasets--<owner>--<repo>），而仓库名可能
+        # 直接点出要诊断的缺陷（仓库名照着缺陷起）。agent 也不需要它：
+        # prepare 交付的字节已经硬链进 workspace。
+        mounts = self._mounts(make_request("agent"))
+        for container_path in (MODELS_DIR, DATASETS_DIR):
+            self.assertNotIn(container_path, mounts, container_path)
 
     def test_stages_without_a_download_cache_still_run(self) -> None:
         # 没有共享缓存只是"这次的下载不会被下一次复用"，不是错误。
@@ -147,11 +155,16 @@ class MountTableTests(unittest.TestCase):
 
     # --- environment：三个阶段都只读 ----------------------------------------
 
-    def test_environment_is_read_only_in_every_stage(self) -> None:
-        for stage in ("prepare", "agent", "verifier"):
+    def test_environment_is_read_only_where_it_is_mounted(self) -> None:
+        for stage in ("prepare", "verifier"):
             mount = self._mounts(make_request(stage))[PTDBENCH_ENVIRONMENT_DIR]
             self.assertEqual(mount.host_path, ROOT / "environment", stage)
             self.assertTrue(mount.read_only, stage)
+
+    def test_agent_never_sees_the_environment_dir(self) -> None:
+        # prepare.sh 写着任务是怎么搭起来的（HF 仓库名、归档成员、sha256），
+        # 其中任何一个名字都可能点出要诊断的缺陷。
+        self.assertNotIn(PTDBENCH_ENVIRONMENT_DIR, self._mounts(make_request("agent")))
 
     def test_task_without_environment_dir_mounts_nothing(self) -> None:
         # environment/ 是可选的；没有就不挂，而不是挂一个不存在的目录。
@@ -265,6 +278,12 @@ class StandardEnvTests(unittest.TestCase):
             self.assertEqual(env["PTDBENCH_VERIFIER"], "", stage)
             self.assertEqual(env["PTDBENCH_TASK_ROOT"], "/task", stage)
 
+    def test_agent_never_learns_the_task_id(self) -> None:
+        # 任务 id 往往直接点出缺陷（verl_grpo_uid_after_repeat）。
+        self.assertEqual(self._env("agent")["PTDBENCH_TASK_ID"], "")
+        for stage in ("prepare", "verifier"):
+            self.assertNotEqual(self._env(stage)["PTDBENCH_TASK_ID"], "", stage)
+
     def test_verifier_gets_the_grading_paths(self) -> None:
         env = self._env("verifier")
         self.assertEqual(env["PTDBENCH_ORACLE"], "/task/oracle")
@@ -279,12 +298,16 @@ class StandardEnvTests(unittest.TestCase):
         self.assertEqual(env["PTDBENCH_MODELS"], MODELS_DIR)
         self.assertEqual(env["PTDBENCH_DATASETS"], DATASETS_DIR)
 
-    def test_the_download_cache_is_exported_to_every_stage(self) -> None:
-        # 三个阶段都挂得到，所以三个阶段都该拿到真实路径而不是空串。
-        for stage in ("prepare", "agent", "verifier"):
+    def test_the_download_cache_is_exported_where_it_is_mounted(self) -> None:
+        # 挂得到的阶段拿真实路径；agent 挂不到，就得是空串——"你看不到"，而不是
+        # "路径在那儿但目录是空的"。两边共用 sees_download_cache()。
+        for stage in ("prepare", "verifier"):
             env = self._env(stage)
             self.assertEqual(env["PTDBENCH_MODELS"], MODELS_DIR, stage)
             self.assertEqual(env["PTDBENCH_DATASETS"], DATASETS_DIR, stage)
+        env = self._env("agent")
+        self.assertEqual(env["PTDBENCH_MODELS"], "")
+        self.assertEqual(env["PTDBENCH_DATASETS"], "")
 
     def test_unmounted_directories_are_the_empty_string(self) -> None:
         # "你看不到"，而不是"路径在那儿但目录是空的"——后者会让 prepare.sh 把模型

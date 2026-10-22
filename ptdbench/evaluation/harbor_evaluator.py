@@ -276,8 +276,9 @@ exit "$verifier_status"
 
         # 两个 stage 共用的部分：挂载路径、离线开关，以及让 `bash -c` 也加载
         # activate hook 的 BASH_ENV（Harbor 不起登录 shell）。
+        # PTDBENCH_TASK_ID 只给 verifier：任务 id 往往直接点出缺陷
+        # （verl_grpo_uid_after_repeat），agent 一跑 `env` 就能读到答案。
         shared_env = {
-            "PTDBENCH_TASK_ID": package.task_id,
             "PTDBENCH_EVALUATION_LEVEL": evaluation.level,
             "PTDBENCH_WORKSPACE": "/workspace",
             "PTDBENCH_RESULTS": "/logs/artifacts",
@@ -298,6 +299,7 @@ exit "$verifier_status"
         }
         verifier_env = {
             **shared_env,
+            "PTDBENCH_TASK_ID": package.task_id,
             "PTDBENCH_TASK_ROOT": "/tests",
             "PTDBENCH_ORACLE": oracle_path,
             "PTDBENCH_VERIFIER": "/tests/verifier",
