@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "task_id": "openrsi_reward_direction",
+  "metric_key": "eval/validation_tts_draft176/medal_rate",
+  "final_step": 39,
+  "historical_final_baseline": "0.0",
+  "required_final_score": "0.0",
+  "score_mode": "best",
+  "log_roots": [
+    "experiment_logs"
+  ]
+}

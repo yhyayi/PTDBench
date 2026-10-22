@@ -1,0 +1,32 @@
+task_id: openrsi_reward_direction
+family: reward_design
+framework: slime
+launch_script: examples/openmle_rl/scripts/run_openrsi_reward_direction.sh
+model: Qwen3-4B-Thinking-2507
+dataset: OpenMLE-Tasks CPU subset (100 training tasks, lower-is-better oversampled)
+algo: gspo
+recipe: examples/openmle_rl
+expected_verdict: unhealthy
+root_cause:
+- reward_func_utils.py adds _task_direction(meta) returning a constant True, and both _signed()
+  and _static_bound_limits_signed() now read direction from it instead of from the per-task
+  higher_is_better flag
+- because both sites agree on the wrong direction, lower-is-better tasks are rewarded for
+  getting worse rather than saturating to a constant reward
+expected_remediation:
+- restore per-task direction so that both _signed() and _static_bound_limits_signed() honour
+  higher_is_better again
+key_files:
+- examples/openmle_rl/reward_func_utils.py
+external_assets_not_in_git:
+- the small policy model, delivered by environment/prepare.sh
+- the CPU-runnable OpenMLE training task pool, delivered by environment/prepare.sh
+- the MLE-Bench Lite CPU-feasible evaluation subset, delivered by environment/prepare.sh
+note: >-
+  Direction handling lives in exactly two places (the score side and the bound side), and both
+  must agree. A mutation at only one site is degenerate: the score and the bounds end up on
+  opposite sides of the same interval, every sample clips to 0 or 1, the group reward spread
+  collapses and the advantage becomes identically zero. That is a different and easier failure
+  mode than the one staged here. Not yet validated end to end: this package was built without
+  GPU access, so the bug is verified at unit level and the inversion by simulation, and
+  grader_spec.json carries placeholder thresholds.

@@ -1,0 +1,15 @@
+# Candidate runtime; pip-freeze.txt in the built image records transitive versions.
+torch==2.8.0
+vllm==0.11.0
+verl==0.7.0
+transformers==4.57.1
+numpy==1.26.4
+peft==0.17.1
+tensordict==0.10.0
+torchdata==0.11.0
+ray[default]==2.48.0
+datasets==3.6.0
+wandb==0.22.2
+opencv-python-headless==4.11.0.86
+einops==0.8.1
+matplotlib==3.10.7

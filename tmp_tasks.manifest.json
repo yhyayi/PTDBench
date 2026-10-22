@@ -1,0 +1,191 @@
+{
+  "manifest_version": "v1",
+  "format": "ndjson",
+  "base_token": "WxR5briuQaIZr2srUuVclJ7vnwd",
+  "table_id": "tbl17RtBmIDUQbFP",
+  "rev": 172,
+  "timezone": "Asia/Shanghai",
+  "query_context": {
+    "field_scope": "all_fields",
+    "record_scope": "all_records"
+  },
+  "requested_limit": 5,
+  "records_count": 5,
+  "page_count": 1,
+  "has_more": true,
+  "next_offset": 5,
+  "record_file": "/Users/chenyinghao/workspace/PTDBench/tmp_tasks.ndjson",
+  "record_file_size_bytes": 15679,
+  "manifest_file": "/Users/chenyinghao/workspace/PTDBench/tmp_tasks.manifest.json",
+  "columns": {
+    "Bug 内容": {
+      "field_id": "flduvKv2OT",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 666
+      },
+      "example": "• 症状：单次 30 题评测给出一个低分（如 10%）并被当作稳定结论；正确做法是多采样后用 mean reducer 聚合以降低方差。\n• 根因：config/eval_config.yaml 的 evaluation.samples_per_quest",
+      "example_truncated": true
+    },
+    "Issue 级评测": {
+      "field_id": "fldJPCt3fN",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 205
+      },
+      "example": "issue 级（复现 + 诊断）：LLM judge 比对隐藏 oracle.md，verdict 0.2 / root-cause 0.6 / evidence 0.2 加权 ≥0.8；须判 unhealthy、定位无条件长度 bonus 并说清因果，不",
+      "example_truncated": true
+    },
+    "Solution 级评测": {
+      "field_id": "fldxpvVrHz",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 344
+      },
+      "example": "solution 级（修复并重跑）：修好后跑满 400 步、只读新实验日志；score = 0.8·validation + 0.2·training，两者都满足（score==1.0）才 pass。\n指标 / 阈值：val-core/taco/acc/m",
+      "example_truncated": true
+    },
+    "record_id": {
+      "physical_type": "string",
+      "stats": {
+        "max_length": 16
+      },
+      "example": "reczz28NIoeSo83n"
+    },
+    "一句话": {
+      "field_id": "fld4N9Quf4",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 258
+      },
+      "example": "staged verl/utils/reward_score/taco.py 忽略 fn_name 并强制所有样本走 stdin 路径，函数调用题在 train 与 val 恒得 0（stdin 题仍正常）；dirty 验证 val-core/taco/a",
+      "example_truncated": true
+    },
+    "任务路径": {
+      "field_id": "fldgbSJIcE",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 49
+      },
+      "example": "tasks/reward/task_function_call"
+    },
+    "关键结果": {
+      "field_id": "fldIesFnT5",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 358
+      },
+      "example": "指标 | buggy | fixed（阈值）\nval-core/math__math/acc/mean@1 终值 | 0.0 | ≥0.10\nval-aux/math__math/parser_matched/mean@1 | 0.0 | —\ncritic",
+      "example_truncated": true
+    },
+    "分类": {
+      "field_id": "fld7qnVLSp",
+      "field_type": "select",
+      "physical_type": "array<string>",
+      "stats": {
+        "empty_count": 0,
+        "max_length": 1,
+        "avg_length": 1
+      },
+      "example": [
+        "② Reward"
+      ]
+    },
+    "来源思路": {
+      "field_id": "fld8782WvR",
+      "field_type": "link",
+      "physical_type": "array<struct<id string>>",
+      "stats": {
+        "empty_count": 5,
+        "max_length": 0,
+        "avg_length": 0
+      },
+      "hint": "All values are empty; type inference may be ambiguous. Avoid analyzing this column unless required."
+    },
+    "构建同学": {
+      "field_id": "fldIsT7U0u",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 3
+      },
+      "example": "面壁"
+    },
+    "构建状态": {
+      "field_id": "fldDWKLuxu",
+      "field_type": "select",
+      "physical_type": "array<string>",
+      "stats": {
+        "empty_count": 0,
+        "max_length": 1,
+        "avg_length": 1
+      },
+      "example": [
+        "完成Issue评测"
+      ]
+    },
+    "训练耗时": {
+      "field_id": "fldz1gT6PG",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 35
+      },
+      "example": "元数据未记录"
+    },
+    "设定": {
+      "field_id": "fldKJupZ0Z",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 121
+      },
+      "example": "PPO-Critic / Qwen3-4B-Base / GuruMath controlled smoke / verl"
+    },
+    "资源": {
+      "field_id": "fldfc8yXmF",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 84
+      },
+      "example": "8 x GPU（型号元数据未记录；ray start --num-gpus 8 + --actor-num-gpus-per-node 8）"
+    },
+    "镜像": {
+      "field_id": "fldL1evAEa",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 68
+      },
+      "example": "ppo-critic-vimpo（无 sha）"
+    },
+    "问题简述": {
+      "field_id": "fldw0c9xMX",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 88
+      },
+      "example": "AIME25 单样本评测高方差，一次低分被误当成 PPO 训练失败"
+    }
+  }
+}

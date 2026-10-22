@@ -1,0 +1,28 @@
+title: 'OpenRSI reward-direction: metric direction ignored in score-to-reward mapping'
+submitter:
+  name: nickyang
+license: CC-BY-NC-4.0
+created_date: '2026-10-14'
+domain: post_train
+type: reward
+model:
+  name: Qwen3-4B-Thinking-2507
+dataset:
+  name: OpenMLE-Tasks CPU subset (100 training tasks, lower-is-better oversampled)
+training:
+  framework: slime
+  algo: gspo
+  script: examples/openmle_rl/scripts/run_openrsi_reward_direction.sh
+environment:
+  image: slime-v0.3.2
+  env:
+    # WANDB_API_KEY must be non-empty even in offline mode: the launcher passes
+    # it as an unquoted --wandb-key, and an empty expansion merges the flag with
+    # the following array element, producing a confusing argparse error.
+    WANDB_MODE: offline
+    WANDB_API_KEY: ptdbench-offline
+    WANDB_SILENT: "true"
+    TOKENIZERS_PARALLELISM: "false"
+outcome:
+  failure_type: reward_misalignment
+  failure_reason: "The score-to-reward mapping no longer honours the per-task higher_is_better flag: _task_direction always returns True, so _signed and _static_bound_limits_signed treat every metric as a maximisation target. On the roughly half of the task pool whose metrics are lower-is-better (RMSLE, log-loss, RMSE) the reward ordering inverts and the policy is reinforced for making those metrics worse, while maximisation tasks train normally."

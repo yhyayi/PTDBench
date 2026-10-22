@@ -1,0 +1,189 @@
+{
+  "manifest_version": "v1",
+  "format": "ndjson",
+  "base_token": "WxR5briuQaIZr2srUuVclJ7vnwd",
+  "table_id": "tbl17RtBmIDUQbFP",
+  "rev": 176,
+  "timezone": "Asia/Shanghai",
+  "query_context": {
+    "field_scope": "all_fields",
+    "record_scope": "all_records"
+  },
+  "requested_limit": 50,
+  "records_count": 18,
+  "page_count": 1,
+  "has_more": false,
+  "record_file": "/Users/chenyinghao/workspace/PTDBench/tmp_verify.ndjson",
+  "record_file_size_bytes": 71302,
+  "manifest_file": "/Users/chenyinghao/workspace/PTDBench/tmp_verify.manifest.json",
+  "columns": {
+    "Bug 内容": {
+      "field_id": "flduvKv2OT",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 1146
+      },
+      "example": "E5 查询向量从 GPU tensor 转 NumPy 时未真正回传 CPU，检索返回全零查询向量、丧失问题语义区分（故障同时作用于训练与验证两条路径）；同等 32 步 GRPO 预算下，128 题 held-out EM 终值 buggy 仅 15.62",
+      "example_truncated": true
+    },
+    "Issue 级评测": {
+      "field_id": "fldJPCt3fN",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 449
+      },
+      "example": "issue 级（复现 + 诊断）：LLM judge 比对隐藏 oracle.md，verdict 0.2 / root-cause 0.6 / evidence 0.2 加权 ≥0.8；须判 unhealthy 并以正确因果角色定位 observatio",
+      "example_truncated": true
+    },
+    "Solution 级评测": {
+      "field_id": "fldxpvVrHz",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 605
+      },
+      "example": "solution 级（修复并重跑，不判 TACO 准确率）：grader 只读 experiment_logs，须全部满足：\n- 每个 resolved max_response_length 均为 30720\n- 日志无 CUDA OOM\n- 存在一次 ",
+      "example_truncated": true
+    },
+    "record_id": {
+      "physical_type": "string",
+      "stats": {
+        "max_length": 16
+      },
+      "example": "reczz28NIoeSo83n"
+    },
+    "一句话": {
+      "field_id": "fld4N9Quf4",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 481
+      },
+      "example": "On-policy 排序蒸馏的生成分布退化"
+    },
+    "任务路径": {
+      "field_id": "fldgbSJIcE",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 50
+      },
+      "example": "tasks/data/task_train_too_hard"
+    },
+    "关键结果": {
+      "field_id": "fldIesFnT5",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 687
+      },
+      "example": "指标 | 缺陷版（历史）| 门槛\nval-core/taco/acc/mean@1 峰值 | 终值 0.0 | ≥ 0.125\ncritic/rewards/mean 均值 | — | > 0.14\n注：无新鲜 400 步曲线（logs/wandb/out",
+      "example_truncated": true
+    },
+    "分类": {
+      "field_id": "fld7qnVLSp",
+      "field_type": "select",
+      "physical_type": "array<string>",
+      "stats": {
+        "empty_count": 0,
+        "max_length": 1,
+        "avg_length": 1
+      },
+      "example": [
+        "⑥ Data"
+      ]
+    },
+    "来源思路": {
+      "field_id": "fld8782WvR",
+      "field_type": "link",
+      "physical_type": "array<struct<id string>>",
+      "stats": {
+        "empty_count": 18,
+        "max_length": 0,
+        "avg_length": 0
+      },
+      "hint": "All values are empty; type inference may be ambiguous. Avoid analyzing this column unless required."
+    },
+    "构建同学": {
+      "field_id": "fldIsT7U0u",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 3
+      },
+      "example": "面壁"
+    },
+    "构建状态": {
+      "field_id": "fldDWKLuxu",
+      "field_type": "select",
+      "physical_type": "array<string>",
+      "stats": {
+        "empty_count": 0,
+        "max_length": 1,
+        "avg_length": 1
+      },
+      "example": [
+        "完成Issue评测"
+      ]
+    },
+    "训练耗时": {
+      "field_id": "fldz1gT6PG",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 221
+      },
+      "example": "元数据未记录"
+    },
+    "设定": {
+      "field_id": "fldKJupZ0Z",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 243
+      },
+      "example": "GRPO / Llama-3.2-1B-Instruct / DAPO-Math-17k / verl"
+    },
+    "资源": {
+      "field_id": "fldfc8yXmF",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 202
+      },
+      "example": "2 × H800（CUDA_VISIBLE_DEVICES=0,1）"
+    },
+    "镜像": {
+      "field_id": "fldL1evAEa",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 542
+      },
+      "example": "search-r1-verl"
+    },
+    "问题简述": {
+      "field_id": "fldw0c9xMX",
+      "field_type": "text",
+      "physical_type": "string|null",
+      "stats": {
+        "null_count": 0,
+        "max_length": 130
+      },
+      "example": "AIME25 单样本评测高方差，一次低分被误当成 PPO 训练失败"
+    }
+  }
+}
