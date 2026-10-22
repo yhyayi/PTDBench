@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Recorded assets are immutable. Every downloaded file is checked before conversion.
 set -euo pipefail
-: "${AUTORLBENCH_WORKSPACE:?}"
-export W="$AUTORLBENCH_WORKSPACE"
+: "${PTDBENCH_WORKSPACE:?}"
+export W="$PTDBENCH_WORKSPACE"
 mkdir -p "$W/metadata" "$W/data/gsm8k" "$W/.tmp" "$W/.home"
 export HOME="$W/.home" TMPDIR="$W/.tmp"
 export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
 export PYTHONPATH="$W/src/$(cat "$W/variant.txt"):$W/scripts"
-autorlbench_fetch_hf \
+ptdbench_fetch_hf \
     --repo Qwen/Qwen1.5-MoE-A2.7B-Chat \
     --type model \
     --revision ec052fda178e241c7c443468d2fa1db6618996be \
@@ -67,7 +67,7 @@ autorlbench_fetch_hf \
     --expect-size vocab.json=2776833 \
     --dest "$W/models/Qwen1.5-MoE-A2.7B-Chat"
 
-autorlbench_fetch_hf \
+ptdbench_fetch_hf \
     --repo openai/gsm8k \
     --type dataset \
     --revision 740312add88f781978c0658806c59bc2815b9866 \

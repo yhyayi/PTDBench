@@ -19,7 +19,7 @@ interval are fixed.
 Write one concise UTF-8 diagnosis to:
 
 ```text
-$AUTORLBENCH_RESULTS/agent_answer.md
+$PTDBENCH_RESULTS/agent_answer.md
 ```
 
 State the verdict, identify the concrete root cause or causes, and explain the

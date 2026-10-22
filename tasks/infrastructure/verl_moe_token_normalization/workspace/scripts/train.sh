@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Run INSIDE the declared derived image, with workspace mounted writable.
 set -euo pipefail
-export W=${AUTORLBENCH_WORKSPACE:-$(cd -- "$(dirname -- "$0")/.." && pwd -P)}
+export W=${PTDBENCH_WORKSPACE:-$(cd -- "$(dirname -- "$0")/.." && pwd -P)}
 export VARIANT=$(cat "$W/variant.txt")
-if [[ -n "${AUTORLBENCH_RESULTS:-}" ]]; then
-  default_run_dir="$AUTORLBENCH_RESULTS/experiment_logs"
+if [[ -n "${PTDBENCH_RESULTS:-}" ]]; then
+  default_run_dir="$PTDBENCH_RESULTS/experiment_logs"
 else
   default_run_dir="$W/runs/$VARIANT-$(date +%Y%m%d-%H%M%S)-$$"
 fi

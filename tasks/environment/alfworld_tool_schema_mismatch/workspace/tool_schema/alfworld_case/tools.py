@@ -32,7 +32,7 @@ REGISTRY = {
     "heat": ("Heat your held object using a microwave at your current location.", ("object", "receptacle"), "heat {object} with {receptacle}"),
     "cool": ("Cool your held object using a fridge at your current location.", ("object", "receptacle"), "cool {object} with {receptacle}"),
 }
-# Object-manipulation tools are advertised to the model with an "_object" suffix.
+# Maps executor names to the names advertised in the tool schema.
 SCHEMA_NAMES = {name: name + "_object" for name in ("clean", "heat", "cool")}
 
 

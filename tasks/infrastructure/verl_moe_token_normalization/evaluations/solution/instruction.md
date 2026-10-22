@@ -26,8 +26,8 @@ scripts/train.sh
 Run it as a foreground process:
 
 ```bash
-mkdir -p "$AUTORLBENCH_RESULTS/experiment_logs"
-TRAINING_RUN_DIR="$AUTORLBENCH_RESULTS/experiment_logs" bash scripts/train.sh
+mkdir -p "$PTDBENCH_RESULTS/experiment_logs"
+TRAINING_RUN_DIR="$PTDBENCH_RESULTS/experiment_logs" bash scripts/train.sh
 ```
 
 The effective run must use:
@@ -37,7 +37,7 @@ The effective run must use:
 - validation data `/workspace/data/gsm8k/validation64.parquet` (the prepared 64 held-out rows)
 - 150 training steps, validation at step 100 and the final step 150
 - the supplied configuration, seeds, CP2/EP2/TP1 layout and two allocated GPUs
-- `TRAINING_RUN_DIR=$AUTORLBENCH_RESULTS/experiment_logs`
+- `TRAINING_RUN_DIR=$PTDBENCH_RESULTS/experiment_logs`
 - `WANDB_MODE=offline`
 
 The launcher places stdout under `experiment_logs/logs/train.log` and offline
@@ -47,6 +47,6 @@ Keep the dataset, validation selection, reward function, model, batch sizes,
 training budget and evaluation schedule unchanged. Do not disable configured
 loss terms or parallelism to avoid an implementation defect.
 
-Only fresh logs below `$AUTORLBENCH_RESULTS/experiment_logs` are scored. Do not
+Only fresh logs below `$PTDBENCH_RESULTS/experiment_logs` are scored. Do not
 copy, edit, or fabricate metrics or replay frozen historical logs as a new run.
 Otherwise the run is scored 0. Leave frozen evidence under `observed_run/` intact.

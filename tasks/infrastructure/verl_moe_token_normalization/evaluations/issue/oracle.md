@@ -1,6 +1,5 @@
 # Canonical issue oracle
 
-Source: verl-project/verl issue 6609 and the supplied reference.patch, sealed in reference/.
 Expected verdict: **unhealthy**.
 
 ## Root cause
@@ -18,29 +17,28 @@ Expected verdict: **unhealthy**.
 ## Trigger conditions
 
 The recorded real_gsm8k.yaml enables calculate_per_token_loss=True, CP2, EP2,
-TP1, and nonzero moe_z_loss_coeff=0.001. Auxiliary autograd gradients bypass
-manual scaling of the main policy loss. The shared router prescaling backport
-and padding-mask compatibility fixes are already present; they are not the missing fix.
+TP1, and nonzero moe_z_loss_coeff=0.001. The router pre-scales the z-loss
+gradient by num_tokens through MoEAuxLossAutoScaler, expecting MCore to divide
+it back by the token count; the auxiliary autograd gradients bypass the manual
+scaling applied to the main policy loss (the `has_auxiliary_loss` branch skips
+the DP*CP division). The router prescaling backport and padding-mask
+compatibility fixes are already present; they are not the missing fix.
 
 ## Observable impact
 
-The supplied W&B history has 148 records; the console history reaches 150.
-At W&B steps 1 and 148 actor/grad_norm is 223.222475206911 and
-144.49191694520493, critic/rewards/mean is 0.25 and 0, and
-response_length/mean is 233 and 1024. These are observations from one run,
-not proof that this defect alone caused collapse. Held-out validation is in stdout.log.
+- actor/grad_norm is 223.22 at W&B step 1 and 144.49 at step 148, far above
+  clip_grad=1.0 from the first step onward.
+- critic/rewards/mean falls from 0.25 (step 1) to 0 (step 148);
+  response_length/mean rises from 233 to 1024 and saturates the response limit.
+- Held-out val-core/openai/gsm8k/acc/mean@1 in stdout.log is 0.0 at step 100
+  and 0.0 at step 150.
 
-## Wrong diagnoses and evidence limits
+## Wrong diagnoses
 
-Do not attribute the defect to the two missing W&B tail records, synthetic data,
-an absent full run, or a missing router backport. Training reaches step 150;
-missing W&B steps 149-150 are a logging limitation. Low training reward alone
-does not establish held-out health or causation. Disabling z-loss or per-token
-mode avoids the trigger but does not repair the normalization contract.
-The paired repaired control reaches held-out accuracy 0.453125 at step 100
-and 0.546875 at step 150, versus 0 at both steps in the defective console.
-The task now includes a single-pair calibrated solution tier; no fresh agent
-evaluation is claimed. The two source workspaces have identical launch,
-configuration and environment files and differ in one training-code file.
-The source README additionally discloses an execution-time W&B finish
-lifecycle difference. Cross-seed variance and step-0 accuracy are unmeasured.
+- The two missing W&B tail records (steps 149-150) are a logging limitation;
+  training and final validation reach step 150 in stdout.log.
+- A missing router prescaling backport or padding-mask fix: both are present.
+- Synthetic data or an absent full run.
+- Low training reward alone, without connecting it to the gradient scale.
+- Disabling z-loss or per-token mode avoids the trigger but does not repair the
+  normalization contract; naming it as the root cause is wrong.

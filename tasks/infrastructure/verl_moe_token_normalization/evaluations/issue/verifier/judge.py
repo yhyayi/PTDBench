@@ -144,9 +144,9 @@ def write_json(path: Path, value: dict[str, Any]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    verifier = Path(os.environ.get("AUTORLBENCH_VERIFIER", Path(__file__).parent))
-    results = Path(os.environ.get("AUTORLBENCH_RESULTS", "/results"))
-    oracle = Path(os.environ.get("AUTORLBENCH_ORACLE", "/task/oracle.md"))
+    verifier = Path(os.environ.get("PTDBENCH_VERIFIER", Path(__file__).parent))
+    results = Path(os.environ.get("PTDBENCH_RESULTS", "/results"))
+    oracle = Path(os.environ.get("PTDBENCH_ORACLE", "/task/oracle.md"))
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--answer", type=Path, default=results / "agent_answer.md")
     parser.add_argument("--oracle", type=Path, default=oracle)
@@ -161,15 +161,15 @@ def main() -> int:
         answer = read_required(args.answer.resolve(), "agent_answer.md")
         oracle = read_required(args.oracle.resolve(), "oracle.md")
         prompt = read_required(args.prompt.resolve(), "judge_prompt.md")
-        model = os.environ.get("AUTORLBENCH_JUDGE_MODEL", "").strip()
+        model = os.environ.get("PTDBENCH_JUDGE_MODEL", "").strip()
         base_url = os.environ.get("OPENAI_BASE_URL", "").strip()
         api_key = os.environ.get("OPENAI_API_KEY", "").strip()
         if not model or not base_url or not api_key:
             raise JudgeError(
-                "AUTORLBENCH_JUDGE_MODEL, OPENAI_BASE_URL, and OPENAI_API_KEY "
+                "PTDBENCH_JUDGE_MODEL, OPENAI_BASE_URL, and OPENAI_API_KEY "
                 "are required"
             )
-        timeout_s = float(os.environ.get("AUTORLBENCH_JUDGE_TIMEOUT_S", "60"))
+        timeout_s = float(os.environ.get("PTDBENCH_JUDGE_TIMEOUT_S", "60"))
         judgment = call_judge(
             prompt=prompt,
             oracle=oracle,

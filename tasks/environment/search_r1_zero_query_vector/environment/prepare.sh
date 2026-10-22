@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# search_r1_zero_query_vector —— 跑起来之前要准备的东西。
+# 本任务跑起来之前要准备的东西。
 #
 # 跑在独立的 prepare 阶段容器里：root、`search-r1-verl` 镜像、**唯一有网的阶段**，
 # 而且 $PTDBENCH_WORKSPACE、$PTDBENCH_MODELS、$PTDBENCH_DATASETS 都可写。

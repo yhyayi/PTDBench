@@ -1,6 +1,6 @@
 # Solution verifier
 
-Run `test.sh` with `AUTORLBENCH_RESULTS` pointing to fresh run results.
+Run `test.sh` with `PTDBENCH_RESULTS` pointing to fresh run results.
 The task-local grader reuses the repository's metric grader with one change:
 step/metric matching is bounded to a single physical veRL console line, so
 step 100 or 150 validation cannot attach to a preceding training step.

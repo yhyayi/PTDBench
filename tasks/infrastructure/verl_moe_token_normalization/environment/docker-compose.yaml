@@ -1,7 +1,7 @@
 # GPU wiring for the Harbor backend.
 #
 # The native docker runtime translates metadata.environment.env's
-# NVIDIA_VISIBLE_DEVICES into `--gpus` itself (autorlbench/runtimes/providers/
+# NVIDIA_VISIBLE_DEVICES into `--gpus` itself (ptdbench/runtimes/providers/
 # docker.py::_gpu_args). Harbor's path has no equivalent: the generated
 # task.toml carries no `gpus` field, and harbor's local docker environment
 # reports `gpus: False` in its capabilities, so even asking for GPUs there is
@@ -9,7 +9,7 @@
 # the `main` service, merged after its own build/prebuilt compose
 # (harbor/src/harbor/environments/docker/docker.py::_docker_compose_paths).
 # The harbor adapter passes this file to `harbor run --extra-docker-compose`
-# (autorlbench/evaluation/harbor_evaluator.py::HarborRunner._compose_overlay_args);
+# (ptdbench/evaluation/harbor_evaluator.py::HarborRunner._compose_overlay_args);
 # it cannot go into the generated task's environment/, because harbor stops
 # uploading the workspace from there once a compose file is present.
 #
