@@ -1,0 +1,23 @@
+STANDARD_ANSWER_V1
+CASE_ID: openrsi_reward_direction
+BENCHMARK_GROUP: B-reward-design
+EXPECTED_VERDICT: unhealthy
+EXPECTED_ATTRIBUTION: reward_func_utils.py routes both direction consumers through a _task_direction helper that always returns True, so metric direction is never aligned and lower-is-better tasks are rewarded for getting worse.
+PRIMARY_METRIC: eval/validation_tts_draft176/medal_rate
+
+REQUIRED_ALL:
+- Classify the run as unhealthy.
+- Identify the root cause as the missing per-task direction alignment in the score-to-reward mapping: the _task_direction helper (or equivalently the two call sites) no longer reads higher_is_better.
+- Name both affected sites: _signed() on the score side and _static_bound_limits_signed() on the bound side, and state that both must agree.
+- Explain the observable impact as heterogeneous: lower-is-better tasks (RMSLE / log-loss / RMSE) have their reward ordering inverted, while maximisation tasks are unaffected, so aggregate reward can look healthy.
+- Cite concrete workspace evidence: the _task_direction helper and its two call sites in examples/openmle_rl/reward_func_utils.py.
+
+GLOBAL_JUDGE_POLICY:
+- The score must be exactly 0 or 1.
+- Agent A must explicitly classify the run as healthy or unhealthy.
+- Every REQUIRED_ALL item must be satisfied.
+- A verdict mismatch forces score 0.
+- Reporting a benign-but-unusual setting (the delta bonus, the adaptive reward bound mode, the entropic advantage, the small-batch rollout shape) as a defect is a wrong attribution and forces score 0.
+- Claiming the fix is to change only one of the two direction sites is a wrong attribution and forces score 0.
+- Equivalent technical wording in any language is acceptable.
+- task.yaml may clarify targets and aliases but may not relax REQUIRED_ALL.

@@ -8,4 +8,7 @@
 # install-ptdbench-tooling.sh), not COPY'd, so they stay out of the build context.
 *
 !ptdbench-activate.sh
+# agent-r1-alfworld.Dockerfile installs its pinned stack from this runtime dir.
+!agent-r1-runtime
+!agent-r1-runtime/**
 **/__pycache__

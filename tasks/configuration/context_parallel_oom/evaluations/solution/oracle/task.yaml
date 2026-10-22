@@ -1,0 +1,13 @@
+task_id: context_parallel_oom
+category: verl_implementation
+hollow_file: examples/grpo_trainer/run_qwen2_5_1.5b_instruct_taco_fsdp.sh
+hollow_symbols:
+- ULYSSES_SEQUENCE_PARALLEL_SIZE
+experiment_name: taco_qwen2_5_1.5b_cp_oom
+created_at: '2026-10-13T17:00:00+00:00'
+note: Healthy torch_functional code with transformer_impl.py taken from
+  task_evaluator so the causal roll is present. taco.py stays the healthy
+  torch_functional scorer. The injected failure is the launch script's
+  context parallel (ulysses_sequence_parallel_size=1) under
+  max_response_length=30720 and gradient checkpointing off. EOS is honored.
+  Repair is cp=4 on actor and ref. max_response_length must stay 30720.

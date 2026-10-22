@@ -1,0 +1,19 @@
+category: reward_design
+framework: slime
+task: openrsi_reward_direction
+verdict: unhealthy
+root_cause:
+- reward_func_utils.py gains a _task_direction(meta) helper that always returns True, and both
+  _signed() and _static_bound_limits_signed() now read direction from it instead of from the
+  per-task higher_is_better flag, so metric direction is never aligned
+- on lower-is-better tasks (RMSLE / log-loss / RMSE) the reward ordering inverts, so the best
+  sample in a group receives a negative advantage and the worst a large positive one
+evidence_metrics:
+- roughly half the task pool is lower-is-better, so the failure is heterogeneous, not global
+- maximisation tasks are unaffected because _signed already returned the raw score for them
+- weakening only the score side or only the bound side saturates every sample to one reward and
+  zeroes the advantage rather than inverting it
+- aggregate reward can look healthy while held-out lower-is-better tasks degrade monotonically
+fix:
+  must:
+  - Restore per-task direction so _signed and the bound pair both honour higher_is_better.
