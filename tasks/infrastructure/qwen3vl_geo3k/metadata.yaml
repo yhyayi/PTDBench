@@ -1,0 +1,23 @@
+title: 'verl_implementation diagnosis: qwen3vl_geo3k'
+submitter:
+  name: benchmark_evaluation
+license: Apache-2.0
+created_date: '2026-10-22'
+type: infrastructure
+domain: post_train
+model:
+  name: Qwen3-VL-8B-Instruct
+dataset:
+  name: geometry3k
+training:
+  framework: verl
+  algo: grpo
+  script: run_qwen3vl_geo3k_grpo.sh
+environment:
+  image: verl-qwen3vl-cu130
+  env:
+    CUDA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
+    NVIDIA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
+outcome:
+  failure_type: implementation_bug
+  failure_reason: HFModelConfig uses raw AutoProcessor instead of the verl adapter, so missing multimodal RoPE capability triggers flat image positions in training; the recorded mean training-rollout KL is 0.006591 rather than 0.000623 nat/token with the adapter restored.
