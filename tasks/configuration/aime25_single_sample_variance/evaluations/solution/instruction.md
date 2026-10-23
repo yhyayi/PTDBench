@@ -20,8 +20,36 @@ Do not modify the preserved original evaluation evidence under
 `workspace/ptdbench_case/original_eval/`. Do not modify any evaluation, oracle,
 or verifier file. Do not use the network.
 
-> **Note (this task's solution grading differs from the other `ppo_critic`
-> tasks).** This is an evaluation-protocol repair, not a training run, so there
-> is no metric-reconstruction grader. The verifier deterministically checks the
-> repaired protocol and that the preserved evidence is unchanged. See the
-> maintainer `readme.md`, "Evaluation design".
+## Your job
+
+This task is a protocol repair, not a training run — there is nothing to
+launch. **Do not start any evaluation or training run**; cheap, non-training
+checks are allowed and encouraged: run
+
+```bash
+python3 run_eval.py --protocol-only
+```
+
+from `/workspace` to confirm the repaired configuration reports
+`samples_per_question: 32` and `expected_generations: 960` without generating
+anything.
+
+When you are done, submit a report at `/workspace/report.md`. It must
+summarize:
+
+1. **Root cause** — why the single-run protocol was unreliable.
+2. **Changes** — every file you changed and what you changed in it.
+3. **Expected effect** — how the repaired protocol addresses the
+   unreliability.
+4. **How you verified the fix** — the checks you ran
+   (`run_eval.py --protocol-only` and anything else).
+
+A missing or empty `/workspace/report.md` scores 0.
+
+## How you will be graded
+
+After you submit the report, the system runs a task-specific verifier that
+deterministically checks the repaired protocol and that the preserved evidence
+is unchanged. There is no metric-reconstruction grader and no rerun of an
+experiment — the verifier itself is the whole evaluation. See the maintainer
+`readme.md`, "Evaluation design".
