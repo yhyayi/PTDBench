@@ -373,7 +373,7 @@ actor_rollout_ref:
       ib_device: null
   model:
     _target_: verl.workers.config.HFModelConfig
-    path: /home/test/test06/lyh/data_call/tasks/reward_design/task_grpo_broadcast/workspace/Qwen2.5-1.5B-Instruct
+    path: /home/test/test06/lyh/data_call/tasks/taco_grpo/workspace/Qwen2.5-1.5B-Instruct
     hf_config_path: null
     tokenizer_path: null
     use_shm: false
@@ -436,8 +436,8 @@ actor_rollout_ref:
 data:
   tokenizer: null
   use_shm: false
-  train_files: /home/test/test06/lyh/data_call/tasks/reward_design/task_grpo_broadcast/workspace/taco_verl/train.parquet
-  val_files: /home/test/test06/lyh/data_call/tasks/reward_design/task_grpo_broadcast/workspace/taco_verl/test.parquet
+  train_files: /home/test/test06/lyh/data_call/tasks/taco_grpo/workspace/taco_verl/train.parquet
+  val_files: /home/test/test06/lyh/data_call/tasks/taco_grpo/workspace/taco_verl/test.parquet
   train_max_samples: -1
   val_max_samples: -1
   prompt_key: prompt
@@ -693,7 +693,7 @@ reward:
   _target_: verl.workers.config.RewardConfig
   num_workers: 32
   custom_reward_function:
-    path: /home/test/test06/lyh/data_call/tasks/reward_design/task_grpo_broadcast/workspace/verl/utils/reward_score/taco.py
+    path: /home/test/test06/lyh/data_call/tasks/taco_grpo/workspace/verl/utils/reward_score/taco.py
     name: compute_score
   reward_manager:
     _target_: verl.workers.config.reward.RewardManagerConfig
@@ -841,7 +841,7 @@ trainer:
   total_epochs: 15
   total_training_steps: 400
   project_name: verl_grpo_taco
-  experiment_name: taco_qwen2_5_1.5b_grpo_broadcast
+  experiment_name: taco_qwen2_5_1.5b_grpo
   logger:
   - console
   - wandb

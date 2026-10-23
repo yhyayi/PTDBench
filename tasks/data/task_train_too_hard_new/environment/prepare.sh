@@ -50,14 +50,9 @@ ptdbench_fetch_hf \
 #
 # 归档校验值取自 legacy Dockerfile 的 DATASET_ARCHIVE_SHA256 / DATASET_ARCHIVE_SIZE。
 TACO_STAGING="$PTDBENCH_WORKSPACE/.ptdbench-taco-archive"
-# 缓存根必须和 --dest 分开、且不能是 --dest 的子目录：materialize() 在拷贝前会
-# 先 rmtree(dest)，dest 套着缓存的话，它删掉的正是自己马上要拷的源
-# （FileNotFoundError: .../snapshots）。所以这里是 staging 的兄弟目录。
-TACO_CACHE="$PTDBENCH_WORKSPACE/.ptdbench-taco-cache"
-rm -rf "$TACO_STAGING" "$TACO_CACHE"
-# 两个目录都带 repo 名或归档，而 workspace 在 agent 阶段是挂着的；中途失败时
-# 必须照样清掉，否则现场就留着一个名字即答案的目录。trap 覆盖非零退出和中断。
-trap 'rm -rf "$TACO_STAGING" "$TACO_CACHE"' EXIT
+rm -rf "$TACO_STAGING"
+# staging 里是解包前的归档，workspace 在 agent 阶段挂着；中途失败也要清掉。
+trap 'rm -rf "$TACO_STAGING"' EXIT
 
 # 这个归档的 HF repo 名把本任务的结论直接写在了名字里，所以它不能以明文出现在
 # 任何 agent 读得到的地方。三条泄漏路径：
@@ -65,10 +60,10 @@ trap 'rm -rf "$TACO_STAGING" "$TACO_CACHE"' EXIT
 #   1. 这个文件：agent 阶段 environment/ 只读挂在 /ptdbench/environment，
 #      prepare.sh 的正文 agent 读得到。所以 repo 名以 base64 存放，用时才解开
 #      ——明文不进源码，解出来是真名，revision / sha256 / size 校验全部照旧。
-#   2. 下载缓存的目录名：fetch 先落到 $PTDBENCH_DATASETS 的 HF 缓存布局
-#      （hf_repo_dir: datasets--<owner>--<repo>，repo 名变成目录名），再硬链到
-#      --dest；而 $PTDBENCH_DATASETS 在 agent 阶段同样只读挂着。把这一条 fetch
-#      的缓存根指到上面那个跑完即删的目录，agent 阶段就看不到。
+#   2. 下载缓存的目录名：fetch 默认按 repo 名建 datasets--<owner>--<repo>，而
+#      $PTDBENCH_DATASETS 是跨 run 共享的缓存。--cache-as 让它落在一个中性别名
+#      下，既不泄漏、又仍然复用（早先的做法是把缓存根指到跑完即删的目录，结果
+#      每个配置都要重下 160MB，把 hf-mirror 打到 429）。
 #   3. prepare.log：它在 $_logs_dir 里，而那个目录以 --rw 挂进 agent 容器的
 #      /logs（agent 的答案也写在那里）。fetch 会打 "[fetch] downloading <repo>"，
 #      失败时 traceback 还会打出缓存路径——注意那是 datasets--A--B 这种双横线
@@ -82,10 +77,10 @@ TACO_REPO=$(printf %s \
     | base64 -d)
 TACO_SLUG="${TACO_REPO#*/}"
 
-PTDBENCH_DATASETS="$TACO_CACHE" \
 ptdbench_fetch_hf \
     --type dataset \
     --repo "$TACO_REPO" \
+    --cache-as ptdbench/taco-assets-data \
     --revision 22a1fee0ea2527f514c4115f6c792216a99d7e6f \
     --allow artifacts/workspace-assets.tar.gz \
     --expect artifacts/workspace-assets.tar.gz=eddeece8c2828e21b581d5168dd4604470165cb061a53e68d50b26d49ce6d916 \

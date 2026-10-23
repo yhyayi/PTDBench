@@ -1,4 +1,4 @@
-# reward_design implementation diagnosis: task_grpo_broadcast
+# algorithm implementation diagnosis: task_grpo_broadcast
 
 ## Case overview
 
@@ -16,17 +16,23 @@ tasks using the same held-out protocol may intentionally share a name.
 
 ## Canonical failure reason
 
-Two defects:
+`compute_grpo_outcome_advantage` returns shape `[batch, response_length]`, but
+the per-sample advantages are written along the sequence axis and expanded down
+every row before the response mask. Training does not crash; the policy
+gradient is decoupled from each sample's reward and held-out accuracy does not
+improve.
 
-- `compute_grpo_outcome_advantage` returns shape `[batch, response_length]`, but the per-sample advantages are written along the sequence axis and broadcast down every row before the response mask.
-- `taco.py::_to_bool_results` calls `e.item(0)` whenever a test result is a NumPy array. A call-based completion that returns an empty array makes `output == expected` a size-0 array, and `.item(0)` raises `IndexError`, which aborts the training job. The step is whichever rollout first returns that value.
+An earlier version also injected a scorer defect (`taco.py::_to_bool_results`
+calling `.item(0)` on a possibly empty array). It was removed: it never fired in
+the recorded run and could only be found by code reading. The scorer now treats
+a size-0 comparison as a failed case.
 
 ## Workspace and hidden evaluations
 
 
 | Path                    | Visibility and purpose                                                                     |
 | ----------------------- | ------------------------------------------------------------------------------------------ |
-| `workspace/`            | Agent-visible experiment snapshot. Historical logs and wandb were not copied.             |
+| `workspace/`            | Agent-visible snapshot: code, one recorded run (wandb + hydra outputs).                   |
 | `evaluations/issue/`    | Neutral diagnosis instruction, issue oracle, and task-local issue verifier.                |
 | `evaluations/solution/` | Repair-and-run instruction, hidden reference material, and metric-only verifier.           |
 
@@ -35,71 +41,54 @@ The agent cannot read oracle or verifier paths. `issue` grading compares
 `$PTDBENCH_RESULTS/agent_answer.md` to hidden `oracle.md` with an LLM
 judge. `solution` grading reads only the new experiment logs.
 
-## Source and preserved context
+## Recorded run
 
-```yaml
-bench_category: reward_design
-source_task: data_call/tasks/reward_design/task_function_call
-evidence_kind: injected_implementation_defect
-packaging_tier: B0
-packaging_ready: true
-b1_scoring_ready: true
-target_files:
-  - verl/trainer/ppo/core_algos.py
-  - verl/utils/reward_score/taco.py
-validation_stack: TACO_EASY
-already_at_baseline: false
-metric_status: not_run
-verify:
-  num_gpus: 8
-  timeout_minutes: 660
-  max_train_steps: 400
-  eval_metric_key: val-core/taco/acc/mean@1
-```
-
-The copy started from `task_function_call`. That package's workspace `taco.py`
-still forces stdin scoring. This task restores the `fn_name` call-based path
-from that package's healthy scorer, then keeps a second defect already present
-in that scorer: `_to_bool_results` uses `e.item(0)` on array results.
-`task_function_call` itself is unchanged. Logs, wandb, `agent_trace.json`,
-and `workspace/outputs` were not copied, so the function-call curve is not
-evidence for these defects.
-
-## Original failure evidence
-
-No fresh 400-step curve is stored for these defects. Solution grading
-still requires a new run and reads only that run's experiment logs.
+- `workspace/logs/wandb/offline-run-20260926_105216-l7my3znq/files/output.log`
+  (console with per-step metrics), `files/config.yaml`, and
+  `workspace/outputs/2026-09-26/10-48-56/.hydra/`.
+- 4 GPUs, train batch 16 x `n=8`, `max_response_length=4096`, KL and entropy
+  off. Configured for 400 steps; the log ends at step 284 after about 8 hours of
+  step time with no exception (job time limit).
+- `critic/rewards/mean` averages 0.122 (steps 1-284, none 0). Held-out
+  `val-core/taco/acc/mean@1`: 0.0761 / 0.0489 / 0.0598 / 0.0707 / 0.0435 /
+  0.0543 at steps 0 / 50 / 100 / 150 / 200 / 250.
+- Fingerprint: the token-weighted `critic/advantages/mean` stays near zero
+  (median |mean| 4.9e-4) versus 3.9e-3 to 9.3e-3 on the correct-code TACO runs in
+  `task_train_too_hard_new`, `task_function_call`, and `torch_functional`.
+- Sanitized: the original experiment name and the source machine's task path
+  named the defect. They were rewritten to `taco_qwen2_5_1.5b_grpo` /
+  `tasks/taco_grpo` in the text artifacts, and the binary `run-*.wandb` (which
+  carries CRC-checked records) was removed. The original 254 MB console log was
+  only an LFS pointer in this repo and was removed.
+- The run is attributed to the defective code from its experiment name, paths,
+  and the fingerprint above; the code at run time was not recorded.
 
 ## Canonical expected outcome
 
 Verdict: **unhealthy**.
 
-Root cause targets, both required:
+Root cause target:
 
 - `verl/trainer/ppo/core_algos.py::compute_grpo_outcome_advantage`
-- `verl/utils/reward_score/taco.py::_to_bool_results`
 
 Required fix targets:
 
 - `verl/trainer/ppo/core_algos.py::compute_grpo_outcome_advantage`: `restore`; target state/value: `scores = scores.unsqueeze(-1) * response_mask`, so each row carries that sample's scalar GRPO advantage on its response tokens.
-- `verl/utils/reward_score/taco.py::_to_bool_results`: stop calling `.item(0)` on a possibly empty `ndarray`. A size-0 comparison result must become a failed case and must not escape `compute_score`.
 
 ## Evaluation design
 
 `issue` grades `$PTDBENCH_RESULTS/agent_answer.md` against hidden
 `oracle.md`. The judge scores verdict, root-cause, and evidence agreement
-(weights 0.2 / 0.6 / 0.2). Pass is a weighted score of at least `0.9`.
-`root_cause_score` is `1` only when both causes above are identified. If
-either cause is missing, `root_cause_score` is at most `0.5`. With the other
-two scores at `1`, that caps the weighted score at `0.7`, so a one-cause
-diagnosis does not pass.
+(weights 0.2 / 0.6 / 0.2). Pass is a weighted score of at least `0.8`.
 
 `solution` does not grade a structured diagnosis. The agent must repair the
 staged workspace, run the designated launch script for 400 steps, and produce
 fresh experiment logs. Scoring is weighted:
 
-- validation: a finite `val-core/taco/acc/mean@1` peak of at least `0.125`
-  (12.5%) scores `1`, otherwise `0`
+- validation: a finite `val-core/taco/acc/mean@1` peak of at least `0.10`
+  (10%) scores `1`, otherwise `0`. The healthy reference on this data and
+  launch (`torch_functional`, fixed) peaks at 0.125; the defective run here
+  peaks at 0.076.
 - training reward: the mean `critic/rewards/mean` over training steps must be
   strictly above `0.14` to score `1`, otherwise `0`
 - final `score = 0.8 * validation + 0.2 * training reward`

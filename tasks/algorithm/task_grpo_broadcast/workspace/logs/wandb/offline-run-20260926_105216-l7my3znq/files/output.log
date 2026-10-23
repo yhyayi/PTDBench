@@ -3,7 +3,7 @@ wandb: Use W&B Weave for improved LLM call tracing. Install Weave with `pip inst
 wandb: For more information, check out the docs at: https://weave-docs.wandb.ai/
 Training Progress:   0%|          | 0/400 [00:00<?, ?it/s]W0926 10:54:41.906000 6901 torch/fx/_symbolic_trace.py:53] is_fx_tracing will return true for both fx.symbolic_trace and torch.export. Please use is_fx_tracing_symbolic_tracing() for specifically fx.symbolic_trace or torch.compiler.is_compiling() for specifically torch.export/compile.
 Training Progress:  21%|██        | 84/400 [2:04:29<7:52:44, 89.76s/it]
-Checkpoint tracker file does not exist: /home/test/test06/lyh/data_call/tasks/reward_design/task_grpo_broadcast/workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_grpo_broadcast/latest_checkpointed_iteration.txt
+Checkpoint tracker file does not exist: /home/test/test06/lyh/data_call/tasks/taco_grpo/workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_grpo/latest_checkpointed_iteration.txt
 Training from scratch
 test_gen_batch meta info: {'eos_token_id': 151645, 'pad_token_id': 151643, 'recompute_log_prob': False, 'do_sample': True, 'validate': True, 'global_steps': 0}
 validation generation end

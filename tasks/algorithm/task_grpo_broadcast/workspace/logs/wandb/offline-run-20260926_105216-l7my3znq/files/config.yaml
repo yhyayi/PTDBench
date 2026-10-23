@@ -72,7 +72,7 @@ _wandb:
         program: /usr/local/lib/python3.12/dist-packages/ray/_private/workers/default_worker.py
         git:
           remote_url: git@github.com:1rubbishyuan/data_call.git
-        root: /home/test/test06/lyh/data_call/tasks/reward_design/task_grpo_broadcast/workspace/logs
+        root: /home/test/test06/lyh/data_call/tasks/taco_grpo/workspace/logs
         host: g29
         executable: /usr/bin/python3
         cpu_count: 104
@@ -435,7 +435,7 @@ actor_rollout_ref:
       trace:
         _target_: verl.workers.config.TraceConfig
         project_name: verl_grpo_taco
-        experiment_name: taco_qwen2_5_1.5b_grpo_broadcast
+        experiment_name: taco_qwen2_5_1.5b_grpo
         backend: null
         token2text: false
         max_samples_per_step_per_worker: null
@@ -475,7 +475,7 @@ actor_rollout_ref:
         enable: false
         port: 9090
         file: /tmp/ray/session_latest/metrics/prometheus/prometheus.yml
-        served_model_name: /home/test/test06/lyh/data_call/tasks/reward_design/task_grpo_broadcast/workspace/Qwen2.5-1.5B-Instruct
+        served_model_name: /home/test/test06/lyh/data_call/tasks/taco_grpo/workspace/Qwen2.5-1.5B-Instruct
       quantization: null
       quantization_config_file: null
       mtp:
@@ -512,7 +512,7 @@ actor_rollout_ref:
         ib_device: null
     model:
       _target_: verl.workers.config.HFModelConfig
-      path: /home/test/test06/lyh/data_call/tasks/reward_design/task_grpo_broadcast/workspace/Qwen2.5-1.5B-Instruct
+      path: /home/test/test06/lyh/data_call/tasks/taco_grpo/workspace/Qwen2.5-1.5B-Instruct
       hf_config_path: null
       tokenizer_path: null
       use_shm: false
@@ -577,8 +577,8 @@ data:
   value:
     tokenizer: null
     use_shm: false
-    train_files: /home/test/test06/lyh/data_call/tasks/reward_design/task_grpo_broadcast/workspace/taco_verl/train.parquet
-    val_files: /home/test/test06/lyh/data_call/tasks/reward_design/task_grpo_broadcast/workspace/taco_verl/test.parquet
+    train_files: /home/test/test06/lyh/data_call/tasks/taco_grpo/workspace/taco_verl/train.parquet
+    val_files: /home/test/test06/lyh/data_call/tasks/taco_grpo/workspace/taco_verl/test.parquet
     train_max_samples: -1
     val_max_samples: -1
     prompt_key: prompt
@@ -845,7 +845,7 @@ reward:
     _target_: verl.workers.config.RewardConfig
     num_workers: 32
     custom_reward_function:
-      path: /home/test/test06/lyh/data_call/tasks/reward_design/task_grpo_broadcast/workspace/verl/utils/reward_score/taco.py
+      path: /home/test/test06/lyh/data_call/tasks/taco_grpo/workspace/verl/utils/reward_score/taco.py
       name: compute_score
     reward_manager:
       _target_: verl.workers.config.reward.RewardManagerConfig
@@ -999,7 +999,7 @@ trainer:
     total_epochs: 15
     total_training_steps: 400
     project_name: verl_grpo_taco
-    experiment_name: taco_qwen2_5_1.5b_grpo_broadcast
+    experiment_name: taco_qwen2_5_1.5b_grpo
     logger:
     - console
     - wandb
@@ -1018,7 +1018,7 @@ trainer:
     critic_warmup: 0
     default_hdfs_dir: null
     del_local_ckpt_after_load: false
-    default_local_dir: checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_grpo_broadcast
+    default_local_dir: checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_grpo
     max_actor_ckpt_to_keep: null
     max_critic_ckpt_to_keep: null
     ray_wait_register_center_timeout: 300

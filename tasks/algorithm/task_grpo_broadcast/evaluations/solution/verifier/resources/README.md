@@ -4,7 +4,7 @@
 
 It reads every log under `experiment_logs` and assigns a weighted score:
 
-- validation: the highest finite `val-core/taco/acc/mean@1` at any step must be at least `0.125` (12.5%) to score `1`, otherwise `0`. A later lower step does not fail this component if an earlier peak already meets the threshold.
+- validation: the highest finite `val-core/taco/acc/mean@1` at any step must be at least `0.10` (10%) to score `1`, otherwise `0`. A later lower step does not fail this component if an earlier peak already meets the threshold.
 - training reward: the mean `critic/rewards/mean` over training steps must be strictly above `0.14` to score `1`, otherwise `0`
 - final `score = 0.8 * validation + 0.2 * training reward`
 

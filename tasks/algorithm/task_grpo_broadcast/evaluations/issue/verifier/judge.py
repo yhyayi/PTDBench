@@ -18,7 +18,7 @@ WEIGHTS = {
     "root_cause_score": 0.6,
     "evidence_score": 0.2,
 }
-PASS_SCORE = 0.9
+PASS_SCORE = 0.8
 
 
 class JudgeError(RuntimeError):

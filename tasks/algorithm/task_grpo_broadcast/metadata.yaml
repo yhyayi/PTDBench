@@ -1,4 +1,4 @@
-title: 'reward_design diagnosis: task_grpo_broadcast'
+title: 'algorithm diagnosis: TACO GRPO run'
 submitter:
   name: benchmark_evaluation
 license: MIT
@@ -22,4 +22,4 @@ environment:
     NVIDIA_VISIBLE_DEVICES: "0,1,2,3,4,5,6,7"
 outcome:
   failure_type: implementation_bug
-  failure_reason: compute_grpo_outcome_advantage lays the length-B GRPO advantages along the sequence axis and expands that row across the batch. The tensor stays [B, S], but tokens no longer receive their own sample's advantage. Independently, taco.py _to_bool_results calls ndarray.item(0); a size-0 comparison array from a call-based empty ndarray return raises IndexError and aborts training.
+  failure_reason: "compute_grpo_outcome_advantage lays the length-B GRPO advantages along the sequence axis (reshape to [1, B], pad to the response length, expand across rows) instead of giving each row its own sample's scalar advantage. The tensor stays [B, S] so nothing crashes, but every row's tokens carry column-indexed advantages (position j gets sample j's value, positions past 128 get 0); the policy gradient is decoupled from each sample's reward. The recorded run keeps critic/rewards/mean near 0.12 while held-out acc stays flat (0.076 at step 0, 0.043-0.071 through step 250), and the token-weighted critic/advantages/mean collapses to ~0 (median |mean| 4.9e-4, 8-19x below correct TACO runs)."

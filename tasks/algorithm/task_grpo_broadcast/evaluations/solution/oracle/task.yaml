@@ -5,7 +5,7 @@ hollow_symbols: null
 hollowed_symbols:
 - compute_grpo_outcome_advantage
 baseline_path: hidden/baseline/verl/trainer/ppo/core_algos.py
-experiment_name: taco_qwen2_5_1.5b_grpo_broadcast
+experiment_name: taco_qwen2_5_1.5b_grpo
 created_at: '2026-09-24T10:00:00+00:00'
 note: verl GRPO/TACO diagnosis. Hidden baseline is the healthy copy of the touched file.
   Agent cannot read oracle/baseline. Thresholds are inherited from task_function_call and

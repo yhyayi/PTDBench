@@ -1,17 +1,9 @@
 #!/usr/bin/env bash
-# reward_design/task_grpo_broadcast —— 训练前要准备的东西。
+# 训练前要准备的东西。
 #
 # 由 environment/{Dockerfile,hydrate-assets.sh} 迁移而来。跑在独立的 prepare 阶段
 # 容器里：root、已激活 `verl` 环境、**唯一有网的阶段**，$PTDBENCH_WORKSPACE、
 # $PTDBENCH_PREPARED、$PTDBENCH_MODELS、$PTDBENCH_DATASETS 都可写。
-#
-# 本任务是 reward_design/task_function_call 的拷贝（readme.md：
-# "The copy started from task_function_call"）。注入的缺陷有两处：
-# verl/trainer/ppo/core_algos.py 里 compute_grpo_outcome_advantage 把每条样本的
-# GRPO advantage 摊在序列轴上再广播到整个 batch；以及 verl/utils/reward_score/taco.py
-# 里 _to_bool_results 对可能为空的 ndarray 调 .item(0)。模型与数据集的字节和
-# task_function_call / torch_functional 逐字节相同，只是各自发布在本任务用到的 HF 仓里，
-# revision 各是各的——所以这份 prepare.sh 的资产校验值与 task_function_call 不共享。
 #
 # legacy Dockerfile 的做法：装一份打过补丁的 pyext、从 HF 下模型和数据集归档烤进
 # 镜像、再由 hydrate-assets.sh 在 agent 阶段把 /opt/ptdbench-assets/workspace 铺到
@@ -48,9 +40,7 @@ ptdbench_fetch_hf \
 #
 # 没有内置配方：上游是本地的 TACO EASY（按 picture_num != 0 丢图文题），
 # 8368 train / 184 test，这个筛法和划分只存在于发布好的快照里，没有可复算的配方。
-# 所以走"下一个钉死的归档"而不是 ptdbench_dataset。两份 parquet 的字节与
-# task_function_call 相同（readme.md "External dataset asset" 表），但归档发布在
-# 本任务专用的 dataset 仓里，归档本身的 SHA-256 / 字节数与 task_function_call 不同。
+# 所以走"下一个钉死的归档"而不是 ptdbench_dataset。
 #
 # 归档是一个 tar.gz，里面是 workspace/taco_verl/*.parquet（legacy 的
 # hydrate-assets.sh 就是把这层 workspace/ 铺到 /workspace 上）。ptdbench_fetch_hf
@@ -59,15 +49,38 @@ ptdbench_fetch_hf \
 # 归档校验值取自 legacy Dockerfile 的 DATASET_ARCHIVE_SHA256 / DATASET_ARCHIVE_SIZE。
 TACO_STAGING="$PTDBENCH_WORKSPACE/.ptdbench-taco-archive"
 rm -rf "$TACO_STAGING"
+# staging 里是解包前的归档，workspace 在 agent 阶段挂着；中途失败也要清掉。
+trap 'rm -rf "$TACO_STAGING"' EXIT
+
+# 这个归档的 HF repo 名把本任务的结论写在了名字里，所以它不能以明文出现在任何
+# agent 读得到的地方。三处都堵上：
+#
+#   1. 这个文件：repo 名以 base64 存放，用时才解开。
+#   2. 下载缓存的目录名：fetch 默认按 repo 名建 datasets--<owner>--<repo>，而
+#      $PTDBENCH_DATASETS 是共享缓存。--cache-as 让它落在一个中性别名下，既不
+#      泄漏、又仍然跨 run 复用（早先的做法是把缓存根指到跑完即删的目录，结果
+#      每个配置都要重下 450MB，把 hf-mirror 打到 429）。
+#   3. fetch 自己的输出：sed 盖住 owner/repo 和 datasets--owner--repo 两种形式
+#      ——失败时的 traceback 打的是后者。
+#
+# 解出来是真名，revision / sha256 / size 校验全部照旧。
+TACO_REPO=$(printf %s \
+    'TElGMTAxNC9wdGRiZW5jaC1yZXdhcmQtZGVzaWduLXRhc2stZ3Jwby1icm9hZGNhc3QtZGF0YXNldA==' \
+    | base64 -d)
+TACO_SLUG="${TACO_REPO#*/}"
 
 ptdbench_fetch_hf \
     --type dataset \
-    --repo LIF1014/ptdbench-reward-design-task-grpo-broadcast-dataset \
+    --repo "$TACO_REPO" \
+    --cache-as ptdbench/taco-assets-algorithm \
     --revision bf47407d7372856d5d09b6d16dae3c1570393692 \
     --allow artifacts/workspace-assets.tar.gz \
     --expect artifacts/workspace-assets.tar.gz=338c5c49dcf3d999709842b8a20042349f4b81530a9cbf55b1d637e92b5010ae \
     --expect-size artifacts/workspace-assets.tar.gz=472377173 \
-    --dest "$TACO_STAGING"
+    --dest "$TACO_STAGING" \
+    2>&1 | sed -e "s|$TACO_SLUG|<dataset>|g" -e "s|${TACO_REPO%%/*}|<owner>|g"
+# PIPESTATUS 而不是 $?：$? 是 sed 的退出码，fetch 失败会被它吞掉。
+[ "${PIPESTATUS[0]}" -eq 0 ] || { echo "[prepare] dataset fetch failed" >&2; exit 1; }
 
 echo "[prepare] unpacking taco_verl -> $PTDBENCH_WORKSPACE/taco_verl"
 tar -xzf "$TACO_STAGING/artifacts/workspace-assets.tar.gz" \
@@ -98,11 +111,7 @@ TACO_DIGESTS
 #
 # 选择不装，依据是本任务 wandb 冻结清单：
 #   workspace/logs/wandb/*/files/requirements.txt 里没有 pyext。
-# 本 benchmark 的门槛按历史曲线校（readme.md：val 峰值 ≥ 0.125、
-# critic/rewards/mean > 0.14），以 wandb 清单为准，不以 legacy Dockerfile 为准。
-# （reward_design/task_function_call 出于同一依据也不装；task_evaluator 装，因为
-# 它那份 requirements.txt 里有 pyext==0.7。）
 #
-# 要改回去的话：把 reward_design/task_evaluator/environment/prepare.sh 末尾那一节整段
-# 搬过来即可（装进 $PTDBENCH_PREPARED/pysite 并往 $PTDBENCH_PREPARED/env 写 PYTHONPATH）。
+# 要改回去的话：照其他 verl 任务 prepare.sh 末尾装 pyext 的那一节
+# （装进 $PTDBENCH_PREPARED/pysite 并往 $PTDBENCH_PREPARED/env 写 PYTHONPATH）。
 # 不要改 docker/images/verl.Dockerfile——那个镜像是所有 verl 任务共用的。
