@@ -358,6 +358,10 @@ class EvaluationResult:
     workspace_before_hash: str
     workspace_after_hash: str
     metadata: Dict[str, Any]
+    # solution 层的系统重跑：agent 交 report 之后、判分之前 harness 跑的那一遍
+    # 实验。issue 层和没有 run_spec.json 的任务为 None。放在末尾带默认值，
+    # 老的构造点（harbor、测试）按位置传参时不用改也能继续工作。
+    rerun: Optional[CommandResult] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -371,6 +375,7 @@ class EvaluationResult:
             "agent_setup": None if self.agent_setup is None else self.agent_setup.to_dict(),
             "agent": None if self.agent is None else self.agent.to_dict(),
             "verifier": None if self.verifier is None else self.verifier.to_dict(),
+            "rerun": None if self.rerun is None else self.rerun.to_dict(),
             "workspace_before_hash": self.workspace_before_hash,
             "workspace_after_hash": self.workspace_after_hash,
             "metadata": self.metadata,

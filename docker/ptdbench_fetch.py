@@ -274,14 +274,25 @@ def materialize(source: Path, dest: Path) -> None:
 # --------------------------------------------------------------------------
 
 
-def hf_repo_dir(repo: str, repo_type: str) -> Path:
+def hf_repo_dir(repo: str, repo_type: str, cache_as: str | None = None) -> Path:
+    """Where this repo's cache tree lives.
+
+    ``cache_as`` renames the tree. A repo name is sometimes the answer to the
+    task that pulls it, and the cache dir is keyed by that name -- the shared
+    cache under ``$PTDBENCH_DATASETS`` is mounted into stages that must not see
+    it, so the directory name alone leaks. Caching under a neutral alias keeps
+    the reuse (the alternative, a throwaway cache root per run, re-downloads
+    hundreds of MB every time and gets the mirror to answer 429).
+    """
     prefix = "datasets--" if repo_type == "dataset" else "models--"
-    slug = prefix + repo.replace("/", "--")
+    slug = prefix + (cache_as or repo).replace("/", "--")
     return root_for(repo_type) / "hf" / "hub" / slug
 
 
-def hf_cache_dir(repo: str, revision: str, repo_type: str) -> Path:
-    return hf_repo_dir(repo, repo_type) / "snapshots" / revision
+def hf_cache_dir(
+    repo: str, revision: str, repo_type: str, cache_as: str | None = None
+) -> Path:
+    return hf_repo_dir(repo, repo_type, cache_as) / "snapshots" / revision
 
 
 def find_local_blobs(
@@ -320,7 +331,13 @@ def find_local_blobs(
     return found
 
 
-def seed_hf_cache(repo: str, revision: str, repo_type: str, local_blobs: Dict[str, Path]) -> None:
+def seed_hf_cache(
+    repo: str,
+    revision: str,
+    repo_type: str,
+    local_blobs: Dict[str, Path],
+    cache_as: str | None = None,
+) -> None:
     """Pre-build this repo's cache pointer from an identical blob already on disk.
 
     Lays down exactly what a successful ``snapshot_download`` of this file would
@@ -332,7 +349,7 @@ def seed_hf_cache(repo: str, revision: str, repo_type: str, local_blobs: Dict[st
     The small, non-xet files in the same repo still download normally from the
     mirror; only the sha-pinned blobs we have locally are short-circuited.
     """
-    base = hf_repo_dir(repo, repo_type)
+    base = hf_repo_dir(repo, repo_type, cache_as)
     blobs = base / "blobs"
     snap = base / "snapshots" / revision
     for relative, src in local_blobs.items():
@@ -358,7 +375,8 @@ def seed_hf_cache(repo: str, revision: str, repo_type: str, local_blobs: Dict[st
 def fetch_hf(args: argparse.Namespace) -> Path:
     expect, sizes = parse_expectations(args)
     repo_type = args.type
-    cached = hf_cache_dir(args.repo, args.revision, repo_type)
+    cache_as = getattr(args, "cache_as", None)
+    cached = hf_cache_dir(args.repo, args.revision, repo_type, cache_as)
 
     # A snapshot dir that EXISTS is not the same as a snapshot that is COMPLETE:
     # an interrupted snapshot_download leaves the `snapshots/<rev>/` tree (and its
@@ -432,6 +450,9 @@ def fetch_hf(args: argparse.Namespace) -> Path:
         # still download normally from the mirror below.
         local_blobs = find_local_blobs(repo_type, expect, sizes)
         if local_blobs:
+            # Seeded under the real name: snapshot_download derives the directory
+            # from repo_id and would not look at the alias. The tree is moved to
+            # the alias below, once the download is done.
             seed_hf_cache(args.repo, args.revision, repo_type, local_blobs)
         downloaded = Path(
             snapshot_download(
@@ -449,9 +470,58 @@ def fetch_hf(args: argparse.Namespace) -> Path:
         )
         require_verified(downloaded, expect, sizes, f"downloaded {args.repo}@{args.revision[:12]}")
         cached = downloaded
+        if cache_as:
+            cached = rename_cache_tree(args.repo, repo_type, cache_as, args.revision)
 
     materialize(cached, args.dest)
     return args.dest
+
+
+def rename_cache_tree(
+    repo: str, repo_type: str, cache_as: str, revision: str
+) -> Path:
+    """Move a freshly downloaded cache tree from the repo's name to an alias.
+
+    ``snapshot_download`` derives its directory from ``repo_id``, so the tree
+    always lands under the real name first. Moving it afterwards is what keeps
+    the name off disk while the bytes stay reusable by the next run.
+
+    The snapshot entries are symlinks with *relative* targets
+    (``../../blobs/<sha>``), so moving the whole repo dir -- blobs included --
+    keeps them resolvable; moving only ``snapshots/`` would dangle them.
+    """
+    source = hf_repo_dir(repo, repo_type)
+    target = hf_repo_dir(repo, repo_type, cache_as)
+    if source == target:
+        return hf_cache_dir(repo, revision, repo_type, cache_as)
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        # A previous run already cached this under the alias. Merge, with the
+        # two halves of the tree treated differently:
+        #
+        # blobs/  content-addressed -- same filename means same bytes, so an
+        #         existing one is kept and the duplicate dropped.
+        # the rest snapshots/<rev>/* are the symlinks that name which blob each
+        #         file resolves to, plus refs/. These must take the fresh
+        #         version: keeping a stale pointer silently serves the old
+        #         revision's bytes under the new revision's path.
+        for item in source.rglob("*"):
+            if item.is_dir():
+                continue
+            relative = item.relative_to(source)
+            moved = target / relative
+            moved.parent.mkdir(parents=True, exist_ok=True)
+            is_blob = relative.parts[:1] == ("blobs",)
+            if is_blob and (moved.exists() or moved.is_symlink()):
+                continue
+            if moved.exists() or moved.is_symlink():
+                moved.unlink()
+            os.replace(item, moved)
+        shutil.rmtree(source, ignore_errors=True)
+    else:
+        os.replace(source, target)
+    return hf_cache_dir(repo, revision, repo_type, cache_as)
 
 
 # --------------------------------------------------------------------------
@@ -620,6 +690,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     hf.add_argument("--workers", type=int, default=8)
+    hf.add_argument(
+        "--cache-as",
+        metavar="OWNER/NAME",
+        help="cache under this name instead of --repo. For a repo whose name "
+        "gives away the defect the task asks about: the shared cache is visible "
+        "to stages that must not see it, and the directory name alone is the "
+        "leak. Downloads and checksums are unaffected -- only the cache "
+        "directory is renamed, so the bytes still get reused across runs.",
+    )
     add_common(hf)
 
     url = subparsers.add_parser("url", help="fetch a file or archive over http(s)")

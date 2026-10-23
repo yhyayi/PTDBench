@@ -39,6 +39,12 @@ from ..core.types import (
 )
 from ..tasks import SchemaError, load_task_package
 from .evaluator import TaskEvaluator
+from .run_spec import (
+    REPORT_FILENAME,
+    RunSpec,
+    RunSpecError,
+    load_run_spec,
+)
 from ..utils.filesystem import copy_tree, ensure_dir, tree_digest, write_text
 
 
@@ -110,7 +116,7 @@ class HarborTaskMaterializer:
 
         self._write_instruction(evaluation, task_dir)
         self._write_environment(unit, task_dir)
-        self._write_tests(evaluation, task_dir)
+        self._write_tests(unit, task_dir)
         self._write_solution(evaluation, task_dir)
         self._write_task_config(unit, task_dir, config)
         self._write_manifest(package, evaluation, task_dir, config)
@@ -156,7 +162,8 @@ class HarborTaskMaterializer:
 
         shutil.copytree(source, destination, symlinks=True, copy_function=link_or_copy)
 
-    def _write_tests(self, evaluation: EvaluationPaths, task_dir: Path) -> None:
+    def _write_tests(self, unit: HarborTaskUnit, task_dir: Path) -> None:
+        evaluation = unit.evaluation
         tests_dir = ensure_dir(task_dir / "tests")
         copy_tree(evaluation.verifier, tests_dir / "verifier")
         if evaluation.oracle.is_dir():
@@ -165,8 +172,20 @@ class HarborTaskMaterializer:
             shutil.copy2(evaluation.oracle, tests_dir / "oracle.md")
 
         test_script = tests_dir / "test.sh"
-        write_text(test_script, self._verifier_wrapper())
+        write_text(test_script, self._verifier_wrapper(self._load_run_spec(unit)))
         test_script.chmod(0o755)
+
+    @staticmethod
+    def _load_run_spec(unit: HarborTaskUnit) -> Optional[RunSpec]:
+        """读任务的 run_spec.json，坏 spec 当场报 HarborAdapterError。
+
+        Harbor 的 verifier 容器里没有第二次机会加载它（wrapper 是静态脚本），
+        所以校验全部在 materialize 时做掉。
+        """
+        try:
+            return load_run_spec(unit.evaluation.root, unit.package.task_id)
+        except RunSpecError as exc:
+            raise HarborAdapterError(str(exc)) from exc
 
     @staticmethod
     def _write_solution(evaluation: EvaluationPaths, task_dir: Path) -> None:
@@ -181,9 +200,80 @@ class HarborTaskMaterializer:
         copy_tree(source, task_dir / "solution")
         (task_dir / "solution" / "solve.sh").chmod(0o755)
 
-    @staticmethod
-    def _verifier_wrapper() -> str:
-        return r'''#!/usr/bin/env bash
+    # Harbor 的 verifier 容器里这些路径是常量（见 _write_task_config 的
+    # shared_env）；run_spec 的 $PTDBENCH_* 引用在这里展开成字面量，wrapper
+    # 里就不用做运行时替换。
+    _HARBOR_SPEC_PATHS = {
+        "PTDBENCH_WORKSPACE": "/workspace",
+        "PTDBENCH_RESULTS": "/logs/artifacts",
+    }
+
+    @classmethod
+    def _verifier_wrapper(cls, spec: Optional[RunSpec]) -> str:
+        """solution 层的 wrapper：report 门槛 → 系统重跑 → test.sh。
+
+        Harbor 只有 agent / verifier 两个 stage，rerun 折进 verifier 容器：同一
+        台机器、同一个 workspace（environment_mode = "shared"，可写），agent 交
+        的 report.md 和它装进 PYTHONUSERBASE 的包都在。和 docker 后端
+        `_run_rerun` 对应的差别只有一处：那边 rerun 是独立 sandbox；这边脚本
+        自己把 PTDBENCH_STAGE 顶成 rerun 再跑实验，跑完恢复成 verifier。
+
+        report 门槛对**所有** solution 任务生效（含没有 run_spec 的
+        critic_value_head / aime25）：没交 report 就不重跑也不判分，直接 0 分。
+        issue 层没有这段（level 由运行时的 PTDBENCH_EVALUATION_LEVEL 判断，
+        wrapper 对两个层级是同一份）。
+        """
+        rerun_section = ""
+        if spec is not None:
+            log_roots = " ".join(shlex.quote(root) for root in spec.log_roots)
+            expanded_env = spec.expand_env(cls._HARBOR_SPEC_PATHS)
+            env_exports = "\n".join(
+                f"export {key}={shlex.quote(value)}"
+                for key, value in expanded_env.items()
+            )
+            command_line = f"bash -c {shlex.quote(spec.command)}"
+            # 超时能落实就落实：timeout 不在（个别精简镜像）就裸跑，交给
+            # Harbor 自己的 verifier 超时兜底。
+            if spec.timeout_s is not None:
+                command_line = (
+                    f"command -v timeout >/dev/null 2>&1 "
+                    f"&& exec timeout {spec.timeout_s}s {command_line}; "
+                    f"exec {command_line}"
+                )
+            env_note = (
+                "# run_spec 的 env（$PTDBENCH_* 已在 materialize 时展开）。它盖在"
+                "任务 metadata env 之上：run_spec 是协议要求的生效值。"
+                if env_exports
+                else ""
+            )
+            rerun_section = f'''# --- PTDBench rerun: re-run the experiment on the agent's workspace ------
+# command / env 来自任务的 run_spec.json（materialize 时展开内联）。
+# 先清日志：agent 阶段就算违反协议自己跑过，旧日志也不算数，判分只认这一遍。
+for _root in {log_roots}; do
+  rm -rf "$PTDBENCH_RESULTS/$_root"
+done
+unset _root
+{env_note}
+{env_exports}
+
+# activate hook 的 once-only guard（PTDBENCH_ACTIVATED）不会随 stage 重跑，
+# 所以这里照 hook 的 rerun 分支显式给这三个变量，跑完清掉——判分不能依赖
+# agent 装进 workspace user base 的包。
+PTDBENCH_STAGE=rerun
+PYTHONUSERBASE=/workspace/.ptdbench-user
+PIP_USER=1
+PIP_BREAK_SYSTEM_PACKAGES=1
+export PTDBENCH_STAGE PYTHONUSERBASE PIP_USER PIP_BREAK_SYSTEM_PACKAGES
+( cd /workspace && {command_line} )
+_rerun_status=$?
+unset PTDBENCH_STAGE PYTHONUSERBASE PIP_USER PIP_BREAK_SYSTEM_PACKAGES
+export PTDBENCH_STAGE=verifier
+echo "ptdbench: rerun exit=$_rerun_status" >&2
+# rerun 失败也继续判分：判分脚本对着空日志/残缺日志自然会打 0，与 docker
+# 后端"verifier 总是跑"保持一致。
+
+'''
+        return f'''#!/usr/bin/env bash
 set +e
 
 # Harbor 用 `bash -c` 而不是登录 shell 执行命令，/etc/profile.d 不会自动生效；
@@ -192,7 +282,20 @@ if [ -f /etc/profile.d/ptdbench-activate.sh ]; then
   . /etc/profile.d/ptdbench-activate.sh
 fi
 
-bash "$PTDBENCH_VERIFIER/test.sh"
+# --- PTDBench report gate: no report.md, no rerun, no grading -------------
+if [ "$PTDBENCH_EVALUATION_LEVEL" = "solution" ] && [ ! -s "$PTDBENCH_WORKSPACE/{REPORT_FILENAME}" ]; then
+  echo "ptdbench: agent did not submit {REPORT_FILENAME} in the workspace; skipping rerun and verifier" >&2
+  echo '{{"passed": false, "score": 0.0, "metrics": {{"failure": "agent did not submit {REPORT_FILENAME}"}}}}' > "$PTDBENCH_RESULTS/result.json"
+  cp "$PTDBENCH_RESULTS/result.json" /logs/verifier/ptdbench-result.json
+  printf '0\\n' > /logs/verifier/reward.txt
+  exit 1
+fi
+if [ "$PTDBENCH_EVALUATION_LEVEL" = "solution" ]; then
+  # report 归档进 results，与 docker 后端一致：workspace 跑完会被收走，
+  # 复盘"agent 到底改了什么"要有据可查。
+  cp "$PTDBENCH_WORKSPACE/{REPORT_FILENAME}" "$PTDBENCH_RESULTS/{REPORT_FILENAME}" 2>/dev/null || true
+fi
+{rerun_section}bash "$PTDBENCH_VERIFIER/test.sh"
 verifier_status=$?
 
 # 结构化结果放进 verifier 日志，确保远程 Harbor environment 也会下载回来。
@@ -204,7 +307,7 @@ fi
 # Harbor 只消费 reward 文件；PTDBench 的完整 metrics 仍由 result.json 承载。
 score=""
 if [ -f "$result_file" ]; then
-  score="$(tr '\n' ' ' < "$result_file" | sed -nE 's/.*"score"[[:space:]]*:[[:space:]]*(-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?).*/\1/p')"
+  score="$(tr '\\n' ' ' < "$result_file" | sed -nE 's/.*"score"[[:space:]]*:[[:space:]]*(-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?).*/\\1/p')"
 fi
 if ! printf '%s' "$score" | grep -Eq '^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$'; then
   if [ "$verifier_status" -eq 0 ]; then
@@ -214,7 +317,7 @@ if ! printf '%s' "$score" | grep -Eq '^-?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]
   fi
 fi
 
-printf '%s\n' "$score" > /logs/verifier/reward.txt
+printf '%s\\n' "$score" > /logs/verifier/reward.txt
 exit "$verifier_status"
 '''
 

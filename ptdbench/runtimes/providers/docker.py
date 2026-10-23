@@ -380,6 +380,10 @@ class DockerRuntime(SandboxRuntime):
         prepare は模型・データセットのダウンロードだけで GPU は不要。`docker create`
         は --gpus を受け付けるが `docker start` 時に NVIDIA runtime hook が実際の
         デバイスノードをバインドしようとして失敗する環境がある。
+
+        rerun 要跑真训练，和 agent 一样按任务声明拿卡（agent 阶段虽然也给了，
+        但协议禁止 agent 启动训练——GPU 留着是给离线小检查和容差，真正用满它
+        的是 rerun）。
         """
         if request.stage == "prepare":
             return []
@@ -411,17 +415,20 @@ class DockerRuntime(SandboxRuntime):
     def _mounts(self, request: SandboxRequest) -> Sequence[DockerMount]:
         """每个阶段挂什么，以及谁能写。
 
-        三张表的差别就是这套设计的访问控制，值得挨条说清楚：
+        四张表的差别就是这套设计的访问控制，值得挨条说清楚：
 
-        * **workspace**：prepare 和 agent 可写，verifier 只读。prepare 要写是因为
-          权重就下在任务脚本引用的那个相对路径上（`./Qwen2.5-0.5B-Instruct`）；
-          verifier 只读是因为判分不能改现场。
-        * **/task**：prepare 和 agent 挂的是 visible_task（只有 instruction），
-          verifier 挂的是整个 evaluation 目录（含 oracle 和判分脚本）。这条是"别剧透"——
-          prepare 跑的是任务自带的脚本，没有理由让它读到答案。
-        * **prepared**：prepare 可写，后两个阶段只读。verifier 要读 prepare 交付的
-          模型路径，但不能读到一份 agent 改过的——否则判分依据是可以被应试者编辑的。
-        * **models / datasets**：prepare 可写，后两个阶段只读。见
+        * **workspace**：prepare、agent 和 rerun 可写，verifier 只读。prepare 要
+          写是因为权重就下在任务脚本引用的那个相对路径上
+          （`./Qwen2.5-0.5B-Instruct`）；rerun 要写是因为训练本身要落
+          checkpoint；verifier 只读是因为判分不能改现场。
+        * **/task**：prepare、agent、rerun 挂的是 visible_task（只有
+          instruction），verifier 挂的是整个 evaluation 目录（含 oracle 和判分
+          脚本）。这条是"别剧透"——rerun 跑的是任务声明的命令，没有理由让它
+          读到答案。
+        * **prepared**：prepare 可写，后三个阶段只读。verifier 要读 prepare
+          交付的模型路径，但不能读到一份 agent 改过的——否则判分依据是可以被
+          应试者编辑的。
+        * **models / datasets**：prepare 可写，verifier 只读。见
           SandboxRequest.host_models。
         """
         if request.stage == "prepare":
@@ -442,6 +449,15 @@ class DockerRuntime(SandboxRuntime):
                 DockerMount(request.host_visible_task, "/task", read_only=True),
                 DockerMount(request.host_results, "/results"),
             ]
+        elif request.stage == "rerun":
+            # rerun 在 agent 之后：workspace 仍可写——训练脚本要写 checkpoint、
+            # ray 要写临时目录；results 可写，日志从这里被判分读到。和 agent 的
+            # 差别只在 /task：一样只挂 visible_task，跑实验不需要 oracle。
+            mounts = [
+                DockerMount(request.host_workspace, "/workspace"),
+                DockerMount(request.host_visible_task, "/task", read_only=True),
+                DockerMount(request.host_results, "/results"),
+            ]
         else:
             mounts = [
                 DockerMount(request.host_workspace, "/workspace", read_only=True),
@@ -453,6 +469,7 @@ class DockerRuntime(SandboxRuntime):
             mounts.append(
                 DockerMount(request.host_environment, PTDBENCH_ENVIRONMENT_DIR, read_only=True)
             )
+        # prepared：prepare 可写，后三个阶段只读，判据见 SandboxRequest.host_prepared。
         if request.stage != "prepare" and request.host_prepared is not None:
             mounts.append(DockerMount(request.host_prepared, PREPARED_DIR, read_only=True))
         # 下载缓存：prepare 写，verifier 只读，agent 看不到。判据见

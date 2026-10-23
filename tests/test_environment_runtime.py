@@ -63,6 +63,11 @@ class MountTableTests(unittest.TestCase):
     def test_agent_can_write_the_workspace(self) -> None:
         self.assertFalse(self._mounts(make_request("agent"))["/workspace"].read_only)
 
+    def test_rerun_can_write_the_workspace(self) -> None:
+        # rerun 在 agent 的 workspace 里重跑实验：训练要写 checkpoint / 日志，
+        # 只读的话第一步就失败。
+        self.assertFalse(self._mounts(make_request("rerun"))["/workspace"].read_only)
+
     def test_verifier_gets_a_read_only_workspace(self) -> None:
         # 判分不能改现场。
         self.assertTrue(self._mounts(make_request("verifier"))["/workspace"].read_only)
@@ -75,6 +80,13 @@ class MountTableTests(unittest.TestCase):
             mount = self._mounts(make_request(stage))["/task"]
             self.assertEqual(mount.host_path, ROOT / "visible", stage)
             self.assertTrue(mount.read_only, stage)
+
+    def test_rerun_never_sees_the_oracle_or_grader(self) -> None:
+        # rerun 是 harness 发起的，但跑的还是 agent 留下的 workspace：判分脚本
+        # 和 oracle 对它同样不可见，免得实验日志里带出判分内容。
+        mount = self._mounts(make_request("rerun"))["/task"]
+        self.assertEqual(mount.host_path, ROOT / "visible")
+        self.assertTrue(mount.read_only)
 
     def test_verifier_sees_the_whole_evaluation_root(self) -> None:
         mount = self._mounts(make_request("verifier"))["/task"]
@@ -89,7 +101,7 @@ class MountTableTests(unittest.TestCase):
     def test_agent_and_verifier_get_prepared_read_only(self) -> None:
         # verifier 要读 prepare 交付的模型/数据集，但不能读到一份 agent 改过的，
         # 否则判分依据是可以被应试者编辑的。
-        for stage in ("agent", "verifier"):
+        for stage in ("agent", "rerun", "verifier"):
             self.assertTrue(self._mounts(make_request(stage))[PREPARED_DIR].read_only, stage)
 
     def test_prepared_is_absent_when_the_run_has_none(self) -> None:
@@ -116,9 +128,12 @@ class MountTableTests(unittest.TestCase):
         # HF 缓存的目录名就是仓库名（datasets--<owner>--<repo>），而仓库名可能
         # 直接点出要诊断的缺陷（仓库名照着缺陷起）。agent 也不需要它：
         # prepare 交付的字节已经硬链进 workspace。
-        mounts = self._mounts(make_request("agent"))
-        for container_path in (MODELS_DIR, DATASETS_DIR):
-            self.assertNotIn(container_path, mounts, container_path)
+        # rerun 同理不挂：它跑的命令来自任务声明，不需要缓存，还少一条把
+        # 仓库名写进 results 日志的通路。
+        for stage in ("agent", "rerun"):
+            mounts = self._mounts(make_request(stage))
+            for container_path in (MODELS_DIR, DATASETS_DIR):
+                self.assertNotIn(container_path, mounts, stage)
 
     def test_stages_without_a_download_cache_still_run(self) -> None:
         # 没有共享缓存只是"这次的下载不会被下一次复用"，不是错误。
@@ -139,8 +154,8 @@ class MountTableTests(unittest.TestCase):
         self.assertTrue(mount.read_only)
 
     def test_later_stages_never_mount_tooling(self) -> None:
-        # agent / verifier 不跑 prepare，工具装了也没用，而且它们是另起的容器。
-        for stage in ("agent", "verifier"):
+        # agent / rerun / verifier 不跑 prepare，工具装了也没用，而且它们是另起的容器。
+        for stage in ("agent", "rerun", "verifier"):
             self.assertNotIn(
                 TOOLING_DIR,
                 self._mounts(make_request(stage, host_tooling=ROOT / "docker")),
@@ -156,7 +171,7 @@ class MountTableTests(unittest.TestCase):
     # --- environment：三个阶段都只读 ----------------------------------------
 
     def test_environment_is_read_only_where_it_is_mounted(self) -> None:
-        for stage in ("prepare", "verifier"):
+        for stage in ("prepare", "rerun", "verifier"):
             mount = self._mounts(make_request(stage))[PTDBENCH_ENVIRONMENT_DIR]
             self.assertEqual(mount.host_path, ROOT / "environment", stage)
             self.assertTrue(mount.read_only, stage)
@@ -178,7 +193,7 @@ class MountTableTests(unittest.TestCase):
         self.assertNotIn("/results", self._mounts(make_request("prepare")))
 
     def test_no_mount_is_declared_twice(self) -> None:
-        for stage in ("prepare", "agent", "verifier"):
+        for stage in ("prepare", "agent", "rerun", "verifier"):
             mounts = DockerRuntime()._mounts(make_request(stage))
             targets = [mount.container_path for mount in mounts]
             self.assertEqual(len(targets), len(set(targets)), f"{stage}: {targets}")
@@ -234,8 +249,9 @@ class GpuWiringTests(unittest.TestCase):
 
     def test_every_stage_can_reach_the_gpu_it_declares(self) -> None:
         # prepare 要 GPU 把 HF 权重转成 torch_dist，agent 要跑训练。verifier 也拿得到
-        # 是因为 task_env 对三个阶段一视同仁——它不声明就自然没有。
-        for stage in ("prepare", "agent", "verifier"):
+        # 是因为 task_env 对三个阶段一视同仁——它不声明就自然没有。rerun 跑训练，
+        # 同样按任务卡片拿卡。
+        for stage in ("prepare", "agent", "rerun", "verifier"):
             request = make_request(stage, task_env={"NVIDIA_VISIBLE_DEVICES": "0"})
             self.assertIn("--gpus", DockerRuntime._gpu_args(request), stage)
 
@@ -266,21 +282,23 @@ class StandardEnvTests(unittest.TestCase):
 
     def test_every_stage_is_told_which_stage_it_is(self) -> None:
         # activate hook 按 PTDBENCH_STAGE 决定每个阶段的差异。
-        for stage in ("prepare", "agent", "verifier"):
+        for stage in ("prepare", "agent", "rerun", "verifier"):
             env = self._env(stage)
             self.assertEqual(env["PTDBENCH_STAGE"], stage, stage)
             self.assertNotIn("PTDBENCH_CONDA_ENV", env, stage)
 
     def test_prepare_and_agent_never_learn_where_the_oracle_is(self) -> None:
-        for stage in ("prepare", "agent"):
+        for stage in ("prepare", "agent", "rerun"):
             env = self._env(stage)
             self.assertEqual(env["PTDBENCH_ORACLE"], "", stage)
             self.assertEqual(env["PTDBENCH_VERIFIER"], "", stage)
             self.assertEqual(env["PTDBENCH_TASK_ROOT"], "/task", stage)
 
     def test_agent_never_learns_the_task_id(self) -> None:
-        # 任务 id 往往直接点出缺陷（verl_grpo_uid_after_repeat）。
+        # 任务 id 往往直接点出缺陷（verl_grpo_uid_after_repeat）。rerun 是
+        # harness 发起的，同样不给：它的输出就是判分输入，少一条信息通路。
         self.assertEqual(self._env("agent")["PTDBENCH_TASK_ID"], "")
+        self.assertEqual(self._env("rerun")["PTDBENCH_TASK_ID"], "")
         for stage in ("prepare", "verifier"):
             self.assertNotEqual(self._env(stage)["PTDBENCH_TASK_ID"], "", stage)
 
@@ -299,15 +317,16 @@ class StandardEnvTests(unittest.TestCase):
         self.assertEqual(env["PTDBENCH_DATASETS"], DATASETS_DIR)
 
     def test_the_download_cache_is_exported_where_it_is_mounted(self) -> None:
-        # 挂得到的阶段拿真实路径；agent 挂不到，就得是空串——"你看不到"，而不是
-        # "路径在那儿但目录是空的"。两边共用 sees_download_cache()。
+        # 挂得到的阶段拿真实路径；agent / rerun 挂不到，就得是空串——"你看不到"，
+        # 而不是"路径在那儿但目录是空的"。两边共用 sees_download_cache()。
         for stage in ("prepare", "verifier"):
             env = self._env(stage)
             self.assertEqual(env["PTDBENCH_MODELS"], MODELS_DIR, stage)
             self.assertEqual(env["PTDBENCH_DATASETS"], DATASETS_DIR, stage)
-        env = self._env("agent")
-        self.assertEqual(env["PTDBENCH_MODELS"], "")
-        self.assertEqual(env["PTDBENCH_DATASETS"], "")
+        for stage in ("agent", "rerun"):
+            env = self._env(stage)
+            self.assertEqual(env["PTDBENCH_MODELS"], "", stage)
+            self.assertEqual(env["PTDBENCH_DATASETS"], "", stage)
 
     def test_unmounted_directories_are_the_empty_string(self) -> None:
         # "你看不到"，而不是"路径在那儿但目录是空的"——后者会让 prepare.sh 把模型
@@ -334,9 +353,11 @@ class NetworkPolicyEnvTests(unittest.TestCase):
         env = DockerRuntime().standard_env(make_request("prepare"))
         self.assertEqual(env["WANDB_MODE"], "offline")
 
-    def test_agent_and_verifier_are_pinned_offline(self) -> None:
+    def test_agent_rerun_and_verifier_are_pinned_offline(self) -> None:
         # 一次 silent 的联网下载可能把评测跑在一份没人校验过的权重上，还看不出来。
-        for stage in ("agent", "verifier"):
+        # rerun 与它们同一边：实验必须用 prepare 交付的那份资产重跑，它的输出
+        # 就是判分输入。
+        for stage in ("agent", "rerun", "verifier"):
             env = DockerRuntime().standard_env(make_request(stage))
             self.assertEqual(env["HF_HUB_OFFLINE"], "1", stage)
             self.assertEqual(env["TRANSFORMERS_OFFLINE"], "1", stage)

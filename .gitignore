@@ -15,6 +15,7 @@ task_construct/
 # 评测用的模型网关凭据（judge 走 OpenAI 兼容路径、agent 走 Anthropic 原生路径）。
 # 是真实 key，绝不能进 git。
 .env
+.env.bak-*
 
 # devspace 上的 agent CLI 载荷。同 models/ 的理由：一百多 MB，且 README.md 里
 # 记了重新生成的命令并钉死了 sha256。README 和 provision.sh 要跟踪，包不跟踪。

@@ -281,6 +281,93 @@ class HarborTaskMaterializerTests(FixtureTestCase):
         self.assertIn("ptdbench-result.json", wrapper)
         self.assertIn("/logs/verifier/reward.txt", wrapper)
 
+    def test_wrapper_gates_on_report_before_rerun_and_grading(self):
+        # 新协议的提交门槛：没交 report.md 就不重跑也不判分。门槛必须先于
+        # rerun 段和 test.sh，且对没有 run_spec 的 solution 任务同样生效。
+        for with_spec in (False, True):
+            with self.subTest(with_spec=with_spec):
+                if with_spec:
+                    self._add_run_spec()
+                wrapper = (self.materialize() / "tests" / "test.sh").read_text(
+                    encoding="utf-8"
+                )
+                gate = f'[ ! -s "$PTDBENCH_WORKSPACE/report.md" ]'
+                self.assertIn(gate, wrapper)
+                self.assertIn('"$PTDBENCH_EVALUATION_LEVEL" = "solution"', wrapper)
+                for marker in (
+                    'bash "$PTDBENCH_VERIFIER/test.sh"',
+                    "PTDBench rerun",
+                ) if with_spec else ('bash "$PTDBENCH_VERIFIER/test.sh"',):
+                    self.assertIn(marker, wrapper)
+                    self.assertLess(wrapper.index(gate), wrapper.index(marker))
+                self.assertIn("agent did not submit report.md", wrapper)
+                self.assertIn("cp \"$PTDBENCH_WORKSPACE/report.md\"", wrapper)
+
+    def test_wrapper_embeds_the_rerun_spec(self):
+        # run_spec 的 command / env / log roots 要内联进 wrapper：Harbor 的
+        # verifier 容器里没有第二次机会读 spec。
+        self._add_run_spec()
+        wrapper = (self.materialize() / "tests" / "test.sh").read_text(encoding="utf-8")
+
+        # $PTDBENCH_* 在 materialize 时展开成 Harbor 的常量路径。
+        self.assertIn('export LOG_DIR=/logs/artifacts/experiment_logs', wrapper)
+        self.assertIn(
+            'rm -rf "$PTDBENCH_RESULTS/$_root"', wrapper
+        )
+        self.assertIn("for _root in experiment_logs", wrapper)
+        self.assertIn("PTDBENCH_STAGE=rerun", wrapper)
+        self.assertIn("export PTDBENCH_STAGE=verifier", wrapper)
+        # 超时能落实就落实：timeout 在就包住命令。
+        self.assertIn("exec timeout 3600s", wrapper)
+        # agent 留下的用户包不能泄进判分：rerun 段换自己的 PYTHONUSERBASE。
+        rerun_i = wrapper.index("PTDBench rerun")
+        verify_i = wrapper.index('bash "$PTDBENCH_VERIFIER/test.sh"')
+        self.assertIn("PYTHONUSERBASE=/workspace/.ptdbench-user", wrapper[rerun_i:verify_i])
+        # rerun 失败也要继续判分：判分脚本对着残缺日志自然会打 0。
+        self.assertIn("rerun exit=", wrapper)
+
+    def test_wrapper_without_a_run_spec_has_no_rerun_section(self):
+        # 没有 run_spec 的任务（verifier 自己驱动训练 / 纯协议修复）不重跑。
+        wrapper = (self.materialize() / "tests" / "test.sh").read_text(encoding="utf-8")
+        self.assertNotIn("PTDBench rerun", wrapper)
+        self.assertNotIn("PTDBENCH_STAGE=rerun", wrapper)
+
+    def test_a_broken_run_spec_fails_materialization(self):
+        # 坏 spec 在 materialize 时就报 HarborAdapterError，而不是容器里炸。
+        spec_dir = (
+            self.task_root
+            / "evaluations"
+            / "solution"
+            / "verifier"
+            / "resources"
+        )
+        spec_dir.mkdir(parents=True)
+        (spec_dir / "run_spec.json").write_text('{"schema_version": 9}', encoding="utf-8")
+        with self.assertRaises(HarborAdapterError):
+            self.materialize()
+
+    def _add_run_spec(self) -> None:
+        spec_dir = (
+            self.task_root
+            / "evaluations"
+            / "solution"
+            / "verifier"
+            / "resources"
+        )
+        spec_dir.mkdir(parents=True)
+        (spec_dir / "run_spec.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "command": "bash train.sh",
+                    "env": {"LOG_DIR": "$PTDBENCH_RESULTS/experiment_logs"},
+                    "timeout_s": 3600,
+                    "log_roots": ["experiment_logs"],
+                }
+            ),
+            encoding="utf-8",
+        )
+
     def test_each_task_gets_its_own_directory_under_one_batch(self):
         units = [
             make_unit(self.package, "solution"),

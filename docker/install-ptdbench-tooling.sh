@@ -64,6 +64,59 @@ PY
     fi
 fi
 
+# --- pinlib hook ------------------------------------------------------------
+# Tasks whose pinned assets were generated under a newer data stack than the
+# devspace image's (e.g. qwen3vl_geo3k's parquet/PIL pins embed pyarrow 26 /
+# datasets 4.4.1 / Pillow 13) need that exact stack importable by prepare's
+# embedded python. The prepare recipe forces the parquet-writing subprocess's
+# PYTHONPATH to the workspace verl checkout, so an env-var injection cannot
+# reach it; a .pth in system site-packages can. The stack itself lives on the
+# persistent shared fs (/user), only the one-line hook goes in the ephemeral
+# /usr/local. Opt-in per task via prepare_env PTDBENCH_PINLIB=<dir>; with it
+# unset any stale hook is removed so other tasks keep the image's own stack.
+HOOK_SITE="$(python3 -c 'import site; print(site.getsitepackages()[0])' 2>/dev/null || true)"
+if [ -n "${PTDBENCH_PINLIB:-}" ]; then
+    if [ -d "$PTDBENCH_PINLIB" ] && [ -n "$HOOK_SITE" ]; then
+        printf 'import sys; sys.path.insert(0, "%s")\n' "$PTDBENCH_PINLIB" \
+            > "$HOOK_SITE/00-ptdbench-pinlib.pth"
+        echo "[install-ptdbench-tooling] pinlib hook -> $HOOK_SITE/00-ptdbench-pinlib.pth"
+    else
+        echo "[install-ptdbench-tooling] WARN: PTDBENCH_PINLIB=$PTDBENCH_PINLIB not found; pins may fail" >&2
+    fi
+elif [ -n "$HOOK_SITE" ] && [ -f "$HOOK_SITE/00-ptdbench-pinlib.pth" ]; then
+    rm -f "$HOOK_SITE/00-ptdbench-pinlib.pth"
+    echo "[install-ptdbench-tooling] removed stale pinlib hook"
+fi
+
+# --- agent CLI staging (qwen-coder) -----------------------------------------
+# qwen_code.py's install() bootstraps node through NVM from
+# raw.githubusercontent.com and then `npm install -g` pulls the CLI tarball
+# from cdn.npmmirror.com; neither host is on the devspace egress whitelist
+# (curl 35 / ECONNRESET), so that install path cannot succeed on a devspace.
+# The persistent shared fs carries a pre-assembled bundle (outputs/
+# activate_qwen.sh documents how it was built); stage it like the pinlib
+# hook: symlink into the ephemeral /usr/local during prepare, opt-in per
+# task via prepare_env PTDBENCH_QWEN_CODE=<dir>. Unset -> no-op.
+QWEN_PREFIX="${PTDBENCH_QWEN_CODE:-}"
+if [ -n "$QWEN_PREFIX" ]; then
+    if [ -x "$QWEN_PREFIX/node_modules/.bin/qwen" ]; then
+        ln -sfn "$QWEN_PREFIX/node_modules/.bin/qwen" /usr/local/bin/qwen
+        echo "[install-ptdbench-tooling] qwen-code -> /usr/local/bin/qwen"
+        # cli-entry.js starts with `#!/usr/bin/env node`; a devspace that has
+        # never run a node-based agent also needs a resolvable node.
+        if ! command -v node >/dev/null 2>&1; then
+            NODE_BIN=/user/linjiayin/node-v22.11.0-linux-x64/bin/node
+            if [ -x "$NODE_BIN" ]; then
+                ln -sfn "$NODE_BIN" /usr/local/bin/node
+            else
+                echo "[install-ptdbench-tooling] WARN: no node at $NODE_BIN for qwen-code" >&2
+            fi
+        fi
+    else
+        echo "[install-ptdbench-tooling] WARN: PTDBENCH_QWEN_CODE=$QWEN_PREFIX has no qwen CLI" >&2
+    fi
+fi
+
 # --- fetch -----------------------------------------------------------------
 # The shims resolve python3 at call time, so they run under the image's own
 # interpreter and its huggingface_hub / datasets (same as the old Dockerfile).

@@ -7,7 +7,7 @@ import shutil
 import sys
 import tempfile
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -31,6 +31,7 @@ from ..runtimes import (
     SandboxRuntime,
     create_runtime,
 )
+from .run_spec import REPORT_FILENAME, load_run_spec
 from ..utils.filesystem import copy_tree, ensure_dir, tree_digest, write_text
 
 
@@ -76,7 +77,13 @@ class TaskEvaluator:
         config: EvaluationConfig | None = None,
         strict: bool = True,
     ) -> EvaluationResult:
-        """运行一次 agent + verifier 评测。"""
+        """运行一次 agent + (rerun) + verifier 评测。
+
+        solution 层的顺序是 agent → rerun → verifier：agent 修代码、提交
+        report.md，但**不跑训练**；rerun 由 harness 用 agent 留下的 workspace
+        按任务的 run_spec.json 重跑实验；verifier 照旧只认
+        $PTDBENCH_RESULTS 下这一遍的新日志。issue 层没有 rerun。
+        """
         config = config or EvaluationConfig(backend=self.backend)
         self.log_level = config.log_level
         if self.log_level not in {"quiet", "debug"}:
@@ -155,31 +162,60 @@ class TaskEvaluator:
                     backend=self.runtime.name,
                 )
 
-            verifier_result = self._run_verifier(
-                package,
-                evaluation,
-                run,
-                config,
-                artifact=artifact,
-                agent_spec=agent_spec,
-            )
+            # solution 层的提交门槛：agent 修完必须交 /workspace/report.md。
+            # 没交等于没完成协议，rerun 和 verifier 都不跑——尤其对
+            # verifier 自己驱动训练的任务（critic_value_head），不拦这一道
+            # 就会出现"什么都没交也有分"。
+            report_file = run.workspace / REPORT_FILENAME
+            has_report = report_file.is_file() and report_file.stat().st_size > 0
+            rerun_result = None
+            verifier_result = None
+            if evaluation.level == "solution" and not has_report:
+                self._append_run_log(
+                    run.results, f"[SKIP] rerun reason=no_{REPORT_FILENAME}"
+                )
+                self._append_run_log(
+                    run.results, f"[SKIP] verifier reason=no_{REPORT_FILENAME}"
+                )
+            else:
+                if has_report:
+                    # report 归档进 results：workspace 跑完会被清理，判分侧
+                    # 复盘"agent 到底改了什么"要有据可查。
+                    shutil.copy2(report_file, run.results / REPORT_FILENAME)
+                rerun_result = self._run_rerun(
+                    package, evaluation, run, config, artifact=artifact
+                )
+                verifier_result = self._run_verifier(
+                    package,
+                    evaluation,
+                    run,
+                    config,
+                    artifact=artifact,
+                    agent_spec=agent_spec,
+                )
             workspace_after_hash = tree_digest(run.workspace)
             metrics = self._extract_metrics(run.results, verifier_result)
             stages_ok = (
                 (agent_setup_result is None or agent_setup_result.returncode == 0)
                 and (agent_result is None or agent_result.returncode == 0)
+                and (rerun_result is None or rerun_result.returncode == 0)
             )
+            if not has_report and evaluation.level == "solution":
+                metrics["passed"] = False
+                metrics["failure"] = (
+                    f"agent did not submit {REPORT_FILENAME} in the workspace"
+                )
             result = EvaluationResult(
                 task_id=package.task_id,
                 evaluation_level=evaluation.level,
-                passed=stages_ok
-                and bool(metrics.get("passed", verifier_result.returncode == 0)),
+                passed=stages_ok and bool(metrics.get("passed", False)),
                 score=self._extract_score(metrics) if stages_ok else 0.0,
                 metrics=metrics,
                 report_dir=run.results,
                 agent_spec=agent_spec,
                 agent_setup=agent_setup_result,
                 agent=agent_result,
+                rerun=rerun_result,
                 verifier=verifier_result,
                 workspace_before_hash=workspace_before_hash,
                 workspace_after_hash=workspace_after_hash,
@@ -480,6 +516,85 @@ class TaskEvaluator:
             "result": result.to_dict() if hasattr(result, "to_dict") else result,
         }
         write_text(trace_path, json.dumps(payload, indent=2, ensure_ascii=False))
+
+    def _run_rerun(
+        self,
+        package: TaskPackage,
+        evaluation: EvaluationPaths,
+        run: PreparedRun,
+        config: EvaluationConfig,
+        artifact: Optional[EnvironmentArtifact],
+    ) -> Optional[CommandResult]:
+        """按任务的 run_spec.json 用 agent 留下的 workspace 重跑实验。
+
+        没有 run_spec.json 就返回 None（verifier 自己驱动训练的
+        critic_value_head_random_init、纯协议修复的 aime25）：这些任务
+        提交 report 后直接进 verifier，agent 侧的约束由 instruction 承担。
+        run_spec.json 存在但不合法是任务定义的错，load_run_spec 会当场抛
+        RunSpecError——不是在训练跑了一半的时候才冒出来。
+        """
+        if evaluation.level != "solution":
+            return None
+        spec = load_run_spec(evaluation.root, package.task_id)
+        if spec is None:
+            return None
+        # 判分只认这一遍的新日志：先把 spec 声明的 log roots 清掉。agent 阶段
+        # 就算违反协议自己跑过训练，留下的旧日志也不算数。
+        for log_root in spec.log_roots:
+            shutil.rmtree(run.results / log_root, ignore_errors=True)
+        # spec.env 里的 $PTDBENCH_RESULTS 等引用要换成当前后端的真实路径
+        # （docker 是 /results，local 是宿主机目录）。standard_env 只读
+        # request 的路径字段、不读 env，所以先建请求再展开不会绕圈。
+        request = SandboxRequest(
+            stage="rerun",
+            task_id=package.task_id,
+            host_task_root=run.visible_task,
+            host_visible_task=run.visible_task,
+            host_workspace=run.workspace,
+            host_results=run.results,
+            evaluation_level=evaluation.level,
+            host_environment=self._environment_mount(package),
+            # rerun 也要读 prepare 交付的权重：只读挂，agent 改不了它，
+            # 实验跑在 prepare 交付的那份资产上这条才有保证。
+            host_prepared=run.prepared,
+            env={},
+            # 实验里 ray 集群、本地检索服务都要 loopback；离线由
+            # _network_policy_env 的 HF_HUB_OFFLINE 等变量保证，不走断网。
+            network="bridge",
+            timeout_s=spec.timeout_s if spec.timeout_s is not None else config.timeout_s,
+            workdir="workspace",
+            task_env=dict(package.environment.env),
+        )
+        resolved = {
+            key: value
+            for key, value in self.runtime.standard_env(request).items()
+            if key.startswith("PTDBENCH_") and value
+        }
+        request = replace(request, env=spec.expand_env(resolved))
+        if artifact is None:
+            if self.runtime.needs_environment_image:
+                raise ValueError("rerun runtime needs a built environment artifact")
+            artifact = EnvironmentArtifact(backend=self.runtime.name)
+        timeout_s = spec.timeout_s if spec.timeout_s is not None else config.timeout_s
+        self._append_run_log(run.results, "[START] rerun")
+        sandbox = self.runtime.create_sandbox(request, artifact=artifact)
+        try:
+            result = self.runtime.exec(
+                sandbox,
+                CommandSpec(
+                    shell=spec.command,
+                    timeout_s=timeout_s,
+                    # 训练一跑几个小时：像 prepare 一样流式落盘，出事时
+                    # rerun.stdout.log 里能看到它死在哪一步。
+                    live_log_name="rerun",
+                    live_log_to_stderr=config.log_level == "debug",
+                ),
+            )
+        finally:
+            self.runtime.close_sandbox(sandbox)
+        self._write_stage_logs(run.results, "rerun", result)
+        self._append_command_summary(run.results, "rerun", result)
+        return result
 
     def _run_verifier(
         self,

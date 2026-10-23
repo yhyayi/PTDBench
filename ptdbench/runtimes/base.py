@@ -48,7 +48,12 @@ class SandboxInstance:
 
 @dataclass(frozen=True)
 class SandboxRequest:
-    """一次 prepare / agent / verifier 运行需要的宿主机资源。"""
+    """一次 prepare / agent / rerun / verifier 运行需要的宿主机资源。
+
+    agent 之后、verifier 之前多了一个 rerun 阶段：solution 层协议里 agent
+    只修代码不跑实验，实验由 harness 用 agent 留下的 workspace 重跑一遍，
+    判分只认这一遍的新日志。
+    """
 
     stage: str
     task_id: str
@@ -89,8 +94,10 @@ class SandboxRequest:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "task_env", dict(self.task_env))
-        if self.stage not in {"prepare", "agent", "verifier"}:
-            raise ValueError("sandbox stage must be 'prepare', 'agent' or 'verifier'")
+        if self.stage not in {"prepare", "agent", "rerun", "verifier"}:
+            raise ValueError(
+                "sandbox stage must be 'prepare', 'agent', 'rerun' or 'verifier'"
+            )
         if self.workdir not in {"workspace", "task_root", "prepared"}:
             raise ValueError(
                 "sandbox workdir must be 'workspace', 'task_root' or 'prepared'"
@@ -108,6 +115,11 @@ def sees_environment_dir(request: SandboxRequest) -> bool:
     prepare.sh 写着任务是怎么搭起来的——下哪个 HF 仓库、解哪个归档、校验哪些
     sha256——其中任何一个名字都可能直接点出要诊断的缺陷。
 
+    rerun 是 harness 自己发起的，不是 agent 的延伸：它跑的是任务声明的
+    run_spec，读 environment/ 没有额外风险，但它也没有需要——保守起见和
+    verifier 一样看得见（判分脚本和 run_spec 资源同级，都在 evaluation
+    目录里，不在 environment/ 里）。
+
     以前三个阶段共用一张挂载表，agent 也挂着；"别把答案写进 prepare.sh" 是写在
     prepare.sh 文件头里的一条约定，靠任务作者自觉。约定覆盖不到"仓库名本身就是
     答案"这种情况，所以改成机制。
@@ -121,13 +133,17 @@ def sees_download_cache(request: SandboxRequest) -> bool:
     prepare 要写（下载落点），verifier 要读（判分常要读 checkpoint 或对齐数据集
     样本）。**agent 不给**：HF 缓存的目录名就是仓库名（datasets--<owner>--<repo>），
     而仓库名有时就是照着它承载的那个缺陷起的，等于把答案写在目录名里。
+    rerun 同理不挂——它跑的命令来自任务声明，不需要，也少一条向 agent 泄漏
+    仓库名的通路（agent 阶段虽然看不到，但 rerun 的日志会留在 results 里，
+    agent 改不了 results，这条纯粹是少挂一个没用的东西）。
+
     agent 也不需要它：prepare 交付的权重/数据集已经被
     materialize() 硬链进 workspace，是真实字节，缓存挂不挂都读得到。
 
     挂载表和环境变量都走这一个判据，免得两边漂移——漂移的表现是 PTDBENCH_MODELS
     指着一个没挂上的路径，报出来是"目录是空的"而不是"你看不到"。
     """
-    return request.stage != "agent"
+    return request.stage in {"prepare", "verifier"}
 
 
 class SandboxRuntime(ABC):
@@ -199,16 +215,21 @@ class SandboxRuntime(ABC):
             oracle = self.path(request, "oracle")
             verifier = self.path(request, "verifier")
         else:
-            # prepare 和 agent 都只看得到 visible_task：prepare 跑的是任务自己提供的
-            # 脚本，没有理由让它读到 oracle 或判分脚本。
+            # prepare / agent / rerun 都只看得到 visible_task：prepare 跑的是任务
+            # 自己提供的脚本，agent 和 rerun 都不该读到 oracle 或判分脚本。
             task_root = visible_task
             visible = visible_task
             oracle = ""
             verifier = ""
         env = {
-            # agent 阶段给空：任务 id 往往直接点出缺陷（verl_grpo_uid_after_repeat），
-            # 和 oracle 一样不该让 agent 读到。
-            "PTDBENCH_TASK_ID": "" if request.stage == "agent" else request.task_id,
+            # agent 和 rerun 阶段给空：任务 id 往往直接点出缺陷
+            # （verl_grpo_uid_after_repeat），和 oracle 一样不该让 agent 读到；
+            # rerun 是 harness 发起的，不给它额外多任何信息。
+            "PTDBENCH_TASK_ID": (
+                ""
+                if request.stage in {"agent", "rerun"}
+                else request.task_id
+            ),
             "PTDBENCH_EVALUATION_LEVEL": request.evaluation_level,
             "PTDBENCH_TASK_ROOT": task_root,
             "PTDBENCH_VISIBLE_TASK": visible,
@@ -248,7 +269,8 @@ class SandboxRuntime(ABC):
 
         agent 和 verifier 反过来：任何一次 silent 的联网下载，都可能把评测跑在一份
         没人校验过的权重上，还看不出来。所以这里把它们关死，任务要的数据必须是
-        prepare 阶段交付的那份。
+        prepare 阶段交付的那份。rerun 与它们同一边：实验必须用 prepare 交付的
+        那份资产重跑，而且它的输出就是判分输入，更不能联网。
         """
         if request.stage == "prepare":
             # prepare 也不该往 W&B 发东西——它只是在下载。

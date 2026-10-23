@@ -86,16 +86,20 @@ if [ -f "$PTDBENCH_PREPARED/env" ]; then
     unset _ptdbench_line _ptdbench_key
 fi
 
-# --- 2. where a stray install may write, agent stage only --------------------
+# --- 2. where a stray install may write, agent and rerun stages ---------------
 # An agent that runs `pip install` should land in its own workspace rather than
 # modify the image's site-packages -- and the verifier must not see it, because
-# grading cannot depend on anything the agent installed.
+# grading cannot depend on anything the agent installed. The rerun stage gets
+# the same treatment: it reuses the agent's workspace, so anything the agent
+# installed into PYTHONUSERBASE must be importable when the experiment runs,
+# or a workspace that legitimately fixed a missing dependency would break at
+# rerun time.
 #
 # PIP_BREAK_SYSTEM_PACKAGES is there for the Ubuntu 24.04 images, whose system
 # interpreter is marked externally managed: pip refuses even a --user install
 # there without it. With PIP_USER set the install still lands in the workspace
 # user base, which is the thing that marker exists to protect.
-if [ "$PTDBENCH_STAGE" = "agent" ]; then
+if [ "$PTDBENCH_STAGE" = "agent" ] || [ "$PTDBENCH_STAGE" = "rerun" ]; then
     PYTHONUSERBASE="${PYTHONUSERBASE:-/workspace/.ptdbench-user}"
     PIP_USER=1
     PIP_BREAK_SYSTEM_PACKAGES=1
