@@ -55,7 +55,7 @@ VAL_DO_SAMPLE=${VAL_DO_SAMPLE:-True}
 REWARD_NUM_WORKERS=${REWARD_NUM_WORKERS:-32}
 
 PROJECT_NAME=${PROJECT_NAME:-verl_grpo_taco}
-EXPERIMENT_NAME=${EXPERIMENT_NAME:-taco_qwen2_5_1.5b_cp_oom}
+EXPERIMENT_NAME=${EXPERIMENT_NAME:-taco_qwen2_5_1.5b}
 # test_freq stays above the step budget so this run is the training updates,
 # not a held-out eval.
 TEST_FREQ=${TEST_FREQ:-1000}

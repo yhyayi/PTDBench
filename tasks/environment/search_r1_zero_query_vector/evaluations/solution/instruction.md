@@ -19,15 +19,7 @@ background, and do not use `nohup`, `&`, `tmux`, `screen`, or any detach
 mechanism. The system runs the experiment itself after you finish (see below);
 anything you launch is wasted and scores nothing — and it leaves a GPU busy or
 a stale run-name behind, which can make the graded rerun refuse to start.
-
-Cheap, non-training checks are allowed and encouraged: run
-
-```bash
-python3 run.py --check
-```
-
-from `/workspace` to validate the interpreter, the assets, the local imports,
-and the data row counts without a GPU or any training.
+Cheap, non-training checks are fine.
 
 When you are done, submit a report at `/workspace/report.md`. It must
 summarize:
@@ -37,8 +29,6 @@ summarize:
 2. **Changes** — every file you changed and what you changed in it.
 3. **Expected effect** — which metric the fix should move and in which
    direction.
-4. **How you verified the fix without training** — the checks you ran
-   (`python3 run.py --check` and anything else).
 
 A missing or empty `/workspace/report.md` scores 0.
 

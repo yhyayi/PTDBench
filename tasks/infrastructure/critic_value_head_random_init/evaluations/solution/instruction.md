@@ -42,29 +42,17 @@ summarize:
 2. **Changes** — every file you changed and what you changed in it.
 3. **Expected effect** — the metric the fix should move and its expected
    value.
-4. **How you verified the fix without training** — the checks you ran.
 
 A missing or empty `/workspace/report.md` scores 0.
 
 ## How you will be checked
 
-After you submit the report, the system runs `./run.sh` end-to-end in your
-repaired workspace (a full run needs 2 GPUs and takes roughly 15 minutes, plus
-a one-off pass to build and validate the Endless Terminals prompt set on the
-first run) and a task-specific verifier grades the fresh results:
-
-1. **Offline** — `python3 tools/check_value_head.py` must pass, i.e. a freshly
-   built value head must have an all-zero weight *and* bias. This needs only
-   torch; run it as often as you like, it takes seconds. It is the cheap way
-   to confirm the fix without training.
-2. **End to end** — the system's `./run.sh` run must complete and Stage B must
-   report `first_value_loss < 1.0` and `warmup_value_loss_mean < 1.0` over at
-   least one critic optimizer step, on rollouts that really generated
-   episodes.
-
-Do not weaken the check by suppressing the metric, shortening the warmup to
-zero steps, or changing the reward scale, the advantage estimator or
-`--value-clip`: the verifier asserts that critic optimizer steps, generated
-rollouts and non-zero response lengths are all present. (It does not look for
-a reward metric — Stage B is critic-only, and slime logs `rollout/rewards`
-from inside `train_actor`, so a correct Stage B has none.)
+After you submit the report, the system runs the experiment end-to-end in
+your repaired workspace (a full run needs 2 GPUs and takes roughly 15 minutes,
+plus a one-off pass to build and validate the Endless Terminals prompt set on
+the first run) and a task-specific verifier grades the fresh results: the
+value-loss metric over the critic's warmup window, plus structural checks
+that critic optimizer steps, generated rollouts and non-zero response lengths
+are all present, so the metric cannot be improved by suppressing it,
+shortening the warmup, or changing the reward scale, the advantage estimator
+or `--value-clip`. Cheap, non-training checks are fine.

@@ -17,3 +17,7 @@ frozen historical trace was logged in (`eval_reward_key: score`, see
   point: a repaired run must come in **below** it, not above.
 
 Pass is score `1`; all failures are score `0`.
+
+## System rerun (`run_spec.json`)
+
+The solution protocol is debug-then-report: the agent fixes the workspace, submits `/workspace/report.md`, and does **not** launch training. This directory's `run_spec.json` drives the harness rerun stage — the command, environment (with `$PTDBENCH_*` references expanded per backend), timeout, and log roots — executed in the agent's workspace before this verifier runs. The harness deletes the declared log roots (`experiment_logs`) before the rerun, so grading only ever sees this fresh run's logs.

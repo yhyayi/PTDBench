@@ -9,3 +9,7 @@ logs must be below `$PTDBENCH_RESULTS/experiment_logs`.
 are mandatory. The severe-candidate 0.25 nat and paired 2x limits belong to
 the paired reference check. They are not solution-score requirements or
 reward-improvement targets.
+
+## System rerun (`run_spec.json`)
+
+The solution protocol is debug-then-report: the agent fixes the workspace, submits `/workspace/report.md`, and does **not** launch training. This directory's `run_spec.json` drives the harness rerun stage — the command, environment (with `$PTDBENCH_*` references expanded per backend), timeout, and log roots — executed in the agent's workspace before this verifier runs. The harness deletes the declared log roots (`experiment_logs`) before the rerun, so grading only ever sees this fresh run's logs.

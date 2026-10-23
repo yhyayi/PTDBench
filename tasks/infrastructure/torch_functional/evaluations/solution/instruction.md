@@ -11,18 +11,38 @@ Use held-out evaluation evidence together with rollout, truncation, runtime,
 optimization, and training signals. Training reward alone does not establish
 held-out health.
 
-If you find a defect, fix it in the staged workspace at `/workspace`. Then run
-the experiment as a foreground process and wait until it returns. Do not use
-the network. Do not use `nohup`, `&`, `tmux`, `screen`, or any detach
-mechanism. The dataset, held-out set, and model are fixed.
+## Your job
 
-The launch script is:
+If you find a defect, fix it in the staged workspace at `/workspace`. **Do not
+launch training.** Do not start the experiment, in the foreground or
+background, and do not use `nohup`, `&`, `tmux`, `screen`, or any detach
+mechanism. The system runs the experiment itself after you finish (see below);
+mechanism. The system runs the experiment itself after you finish (see below);
+anything you launch is wasted and scores nothing. Cheap, non-training checks
+are fine.
+
+When you are done, submit a report at `/workspace/report.md`. It must
+summarize:
+
+1. **Root cause** — the defect you found, and the evidence in the workspace
+   (logs, metrics, code) that connects it to the observed behavior.
+2. **Changes** — every file you changed and what you changed in it.
+3. **Expected effect** — which metric the fix should move and in which
+   direction.
+
+A missing or empty `/workspace/report.md` scores 0.
+
+## What the system will run
+
+After you submit the report, the system deletes everything under
+`$PTDBENCH_RESULTS/experiment_logs`, then re-runs the experiment in your
+repaired workspace as a foreground process, using the launch script:
 
 ```text
 examples/grpo_trainer/run_qwen2_5_1.5b_instruct_taco_fsdp.sh
 ```
 
-The effective run must use:
+with this environment:
 
 ```text
 MODEL_PATH=/workspace/Qwen2.5-1.5B-Instruct
@@ -32,11 +52,15 @@ LOG_DIR=$PTDBENCH_RESULTS/experiment_logs
 WANDB_MODE=offline
 WANDB_DIR=$PTDBENCH_RESULTS/experiment_logs
 WANDB_API_KEY=offline
+TOTAL_TRAINING_STEPS=400
+TEST_FREQ=50
 ```
 
-Create `$PTDBENCH_RESULTS/experiment_logs` first. Write the training and
-evaluation log into that directory. Offline W&B data must be created below
-`$PTDBENCH_RESULTS/experiment_logs/wandb`. The run is scored only from files
-under `$PTDBENCH_RESULTS/experiment_logs`; logs written anywhere else are
-ignored. Do not copy, edit, or fabricate log metrics. Otherwise the run is
-scored 0.
+Offline W&B data will land below
+`$PTDBENCH_RESULTS/experiment_logs/wandb`. A task-specific grading script then
+reads **only this fresh run's** files under `$PTDBENCH_RESULTS/experiment_logs`
+and scores the key metrics; logs written anywhere else are ignored. Make sure
+your repaired workspace still runs correctly under these exact settings — for
+example, if you change where logs are written, keep them going to
+`$PTDBENCH_RESULTS/experiment_logs`. Do not copy, edit, or fabricate log
+metrics. Otherwise the run is scored 0.

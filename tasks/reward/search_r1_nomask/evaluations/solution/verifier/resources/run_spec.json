@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "command": "mkdir -p \"$PTDBENCH_RESULTS/experiment_logs\" && bash examples/search-r1/run_qwen2.5_3B.sh",
+  "env": {
+    "LOG_DIR": "$PTDBENCH_RESULTS/experiment_logs",
+    "WANDB_MODE": "offline",
+    "WANDB_DIR": "$PTDBENCH_RESULTS/experiment_logs"
+  },
+  "timeout_s": 64800,
+  "log_roots": ["experiment_logs"]
+}

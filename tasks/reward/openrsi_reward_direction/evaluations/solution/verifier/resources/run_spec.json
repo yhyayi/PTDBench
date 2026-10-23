@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "command": "mkdir -p \"$PTDBENCH_RESULTS/experiment_logs\" && bash examples/openmle_rl/scripts/run_openrsi_reward_direction.sh",
+  "env": {
+    "LOG_DIR": "$PTDBENCH_RESULTS/experiment_logs"
+  },
+  "timeout_s": 28800,
+  "log_roots": ["experiment_logs"]
+}

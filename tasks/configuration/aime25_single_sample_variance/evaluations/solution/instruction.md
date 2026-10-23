@@ -24,15 +24,7 @@ or verifier file. Do not use the network.
 
 This task is a protocol repair, not a training run — there is nothing to
 launch. **Do not start any evaluation or training run**; cheap, non-training
-checks are allowed and encouraged: run
-
-```bash
-python3 run_eval.py --protocol-only
-```
-
-from `/workspace` to confirm the repaired configuration reports
-`samples_per_question: 32` and `expected_generations: 960` without generating
-anything.
+checks are fine.
 
 When you are done, submit a report at `/workspace/report.md`. It must
 summarize:
@@ -41,8 +33,6 @@ summarize:
 2. **Changes** — every file you changed and what you changed in it.
 3. **Expected effect** — how the repaired protocol addresses the
    unreliability.
-4. **How you verified the fix** — the checks you ran
-   (`run_eval.py --protocol-only` and anything else).
 
 A missing or empty `/workspace/report.md` scores 0.
 

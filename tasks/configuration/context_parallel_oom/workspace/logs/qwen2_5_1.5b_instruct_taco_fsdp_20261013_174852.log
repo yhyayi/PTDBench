@@ -1,4 +1,4 @@
-/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/trainer/main_ppo.py:171: UserWarning: Disabled critic as algorithm.adv_estimator != gae. If it is not intended, please set critic.enable=True
+/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/trainer/main_ppo.py:171: UserWarning: Disabled critic as algorithm.adv_estimator != gae. If it is not intended, please set critic.enable=True
   use_critic=need_critic(config),
 [validate_config] All configuration checks passed successfully!
 [2026-10-13 17:49:02,635][megatron.core.distributed.fsdp.src.megatron_fsdp.param_and_grad_buffer][INFO] - Detected Megatron Core, using Megatron-FSDP with Megatron.
@@ -191,7 +191,7 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(TaskRunner pid=8432)[0m                                          'speculative_num_draft_tokens': 4,
 [36m(TaskRunner pid=8432)[0m                                          'speculative_num_steps': 3},
 [36m(TaskRunner pid=8432)[0m                                  'override_config': {'attn_implementation': 'sdpa'},
-[36m(TaskRunner pid=8432)[0m                                  'path': '/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/Qwen2.5-1.5B-Instruct',
+[36m(TaskRunner pid=8432)[0m                                  'path': '/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/Qwen2.5-1.5B-Instruct',
 [36m(TaskRunner pid=8432)[0m                                  'target_modules': 'all-linear',
 [36m(TaskRunner pid=8432)[0m                                  'tiled_mlp': {'enabled': False,
 [36m(TaskRunner pid=8432)[0m                                                'num_shards': 4},
@@ -380,7 +380,7 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(TaskRunner pid=8432)[0m                                                   'enable': False,
 [36m(TaskRunner pid=8432)[0m                                                   'file': '/tmp/ray/session_latest/metrics/prometheus/prometheus.yml',
 [36m(TaskRunner pid=8432)[0m                                                   'port': 9090,
-[36m(TaskRunner pid=8432)[0m                                                   'served_model_name': '/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/Qwen2.5-1.5B-Instruct'},
+[36m(TaskRunner pid=8432)[0m                                                   'served_model_name': '/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/Qwen2.5-1.5B-Instruct'},
 [36m(TaskRunner pid=8432)[0m                                    'prompt_length': 2048,
 [36m(TaskRunner pid=8432)[0m                                    'qat': {'_target_': 'verl.workers.config.QATEngineConfig',
 [36m(TaskRunner pid=8432)[0m                                            'activation_observer': 'static_minmax',
@@ -403,7 +403,7 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(TaskRunner pid=8432)[0m                                    'top_p': 1,
 [36m(TaskRunner pid=8432)[0m                                    'trace': {'_target_': 'verl.workers.config.TraceConfig',
 [36m(TaskRunner pid=8432)[0m                                              'backend': None,
-[36m(TaskRunner pid=8432)[0m                                              'experiment_name': 'taco_qwen2_5_1.5b_cp_oom',
+[36m(TaskRunner pid=8432)[0m                                              'experiment_name': 'taco_qwen2_5_1.5b',
 [36m(TaskRunner pid=8432)[0m                                              'max_samples_per_step_per_worker': None,
 [36m(TaskRunner pid=8432)[0m                                              'project_name': 'ptdbench-train',
 [36m(TaskRunner pid=8432)[0m                                              'token2text': False},
@@ -605,13 +605,13 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(TaskRunner pid=8432)[0m           'tokenizer': None,
 [36m(TaskRunner pid=8432)[0m           'tool_config_path': None,
 [36m(TaskRunner pid=8432)[0m           'train_batch_size': 16,
-[36m(TaskRunner pid=8432)[0m           'train_files': '/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/taco_verl/train.parquet',
+[36m(TaskRunner pid=8432)[0m           'train_files': '/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/taco_verl/train.parquet',
 [36m(TaskRunner pid=8432)[0m           'train_max_samples': -1,
 [36m(TaskRunner pid=8432)[0m           'truncation': 'error',
 [36m(TaskRunner pid=8432)[0m           'trust_remote_code': False,
 [36m(TaskRunner pid=8432)[0m           'use_shm': False,
 [36m(TaskRunner pid=8432)[0m           'val_batch_size': None,
-[36m(TaskRunner pid=8432)[0m           'val_files': '/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/taco_verl/test.parquet',
+[36m(TaskRunner pid=8432)[0m           'val_files': '/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/taco_verl/test.parquet',
 [36m(TaskRunner pid=8432)[0m           'val_max_samples': -1,
 [36m(TaskRunner pid=8432)[0m           'validation_shuffle': False,
 [36m(TaskRunner pid=8432)[0m           'video_key': 'videos'},
@@ -689,7 +689,7 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(TaskRunner pid=8432)[0m  'ray_kwargs': {'ray_init': {'num_cpus': None}, 'timeline_json_file': None},
 [36m(TaskRunner pid=8432)[0m  'reward': {'_target_': 'verl.workers.config.RewardConfig',
 [36m(TaskRunner pid=8432)[0m             'custom_reward_function': {'name': 'compute_score',
-[36m(TaskRunner pid=8432)[0m                                        'path': '/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/utils/reward_score/taco.py'},
+[36m(TaskRunner pid=8432)[0m                                        'path': '/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/utils/reward_score/taco.py'},
 [36m(TaskRunner pid=8432)[0m             'num_workers': 32,
 [36m(TaskRunner pid=8432)[0m             'reward_manager': {'_target_': 'verl.workers.config.reward.RewardManagerConfig',
 [36m(TaskRunner pid=8432)[0m                                'module': {'_target_': 'verl.trainer.config.config.ModuleConfig',
@@ -803,11 +803,11 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(TaskRunner pid=8432)[0m  'trainer': {'balance_batch': True,
 [36m(TaskRunner pid=8432)[0m              'critic_warmup': 0,
 [36m(TaskRunner pid=8432)[0m              'default_hdfs_dir': None,
-[36m(TaskRunner pid=8432)[0m              'default_local_dir': 'checkpoints/ptdbench-train/taco_qwen2_5_1.5b_cp_oom',
+[36m(TaskRunner pid=8432)[0m              'default_local_dir': 'checkpoints/ptdbench-train/taco_qwen2_5_1.5b',
 [36m(TaskRunner pid=8432)[0m              'del_local_ckpt_after_load': False,
 [36m(TaskRunner pid=8432)[0m              'device': 'cuda',
 [36m(TaskRunner pid=8432)[0m              'esi_redundant_time': 0,
-[36m(TaskRunner pid=8432)[0m              'experiment_name': 'taco_qwen2_5_1.5b_cp_oom',
+[36m(TaskRunner pid=8432)[0m              'experiment_name': 'taco_qwen2_5_1.5b',
 [36m(TaskRunner pid=8432)[0m              'log_val_generations': 0,
 [36m(TaskRunner pid=8432)[0m              'logger': ['console', 'wandb'],
 [36m(TaskRunner pid=8432)[0m              'max_actor_ckpt_to_keep': None,
@@ -849,7 +849,7 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(TaskRunner pid=8432)[0m                                 'storage_backend': 'SimpleStorage'},
 [36m(TaskRunner pid=8432)[0m                     'enable': False,
 [36m(TaskRunner pid=8432)[0m                     'metrics': {'enabled': False, 'port': 0}}}
-[36m(TaskRunner pid=8432)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/trainer/main_ppo_v0.py:191: UserWarning: Disabled critic as algorithm.adv_estimator != gae. If it is not intended, please set critic.enable=True
+[36m(TaskRunner pid=8432)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/trainer/main_ppo_v0.py:191: UserWarning: Disabled critic as algorithm.adv_estimator != gae. If it is not intended, please set critic.enable=True
 [36m(TaskRunner pid=8432)[0m   use_critic=need_critic(config),
 [36m(TaskRunner pid=8432)[0m [validate_config] All configuration checks passed successfully!
 [36m(TaskRunner pid=8432)[0m Using dataset class: RLHFDataset
@@ -876,9 +876,9 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(TaskRunner pid=8432)[0m Filtering prompts longer than 2048 tokens (num_proc=1):   0%|          | 0/184 [00:00<?, ? examples/s]
 [36m(TaskRunner pid=8432)[0m Filtering prompts longer than 2048 tokens (num_proc=1): 100%|██████████| 184/184 [00:00<00:00, 208.64 examples/s]
 [36m(TaskRunner pid=8432)[0m Filtering prompts longer than 2048 tokens (num_proc=1): 100%|██████████| 184/184 [00:01<00:00, 183.00 examples/s]
-[36m(TaskRunner pid=8432)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/trainer/main_ppo_v0.py:232: FutureWarning: Warning: Class 'verl.trainer.ppo.ray_trainer.RayPPOTrainer' is deprecated. Please use 'Legacy trainer is deprecated, and wil be removed in v0.9.0. Please use `trainer.use_v1=True` instead.' instead.
+[36m(TaskRunner pid=8432)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/trainer/main_ppo_v0.py:232: FutureWarning: Warning: Class 'verl.trainer.ppo.ray_trainer.RayPPOTrainer' is deprecated. Please use 'Legacy trainer is deprecated, and wil be removed in v0.9.0. Please use `trainer.use_v1=True` instead.' instead.
 [36m(TaskRunner pid=8432)[0m   trainer = RayPPOTrainer(
-[36m(TaskRunner pid=8432)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/trainer/ppo/ray_trainer.py:348: UserWarning: Disabled critic as algorithm.adv_estimator != gae. If it is not intended, please set critic.enable=True
+[36m(TaskRunner pid=8432)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/trainer/ppo/ray_trainer.py:348: UserWarning: Disabled critic as algorithm.adv_estimator != gae. If it is not intended, please set critic.enable=True
 [36m(TaskRunner pid=8432)[0m   self.use_critic = need_critic(self.config)
 [36m(TaskRunner pid=8432)[0m filter dataset len: 184
 [36m(TaskRunner pid=8432)[0m Size of train dataloader: 523, Size of val dataloader: 1
@@ -969,21 +969,21 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(WorkerDict pid=9848)[0m Skipping monkey patch for Qwen2ForCausalLM as use_fused_kernels is False or fused_kernels_backend is torch
 [36m(WorkerDict pid=9846)[0m After FSDP, memory allocated (GB): 0.72, memory reserved (GB): 2.77, device memory used/total (GB): 4.05/79.18
 [36m(WorkerDict pid=9846)[0m Total steps: 100, num_warmup_steps: 0
-[36m(WorkerDict pid=9846)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
+[36m(WorkerDict pid=9846)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
 [36m(WorkerDict pid=9846)[0m   FSDP.set_state_dict_type(
 [36m(WorkerDict pid=9846)[0m [worker_mem] stage=init_model:actor:after role=actor_rollout pid=9846 rank=0 local_rank=0 rss=2.22GiB host_avail=1931.7GiB host_used=83.7GiB gpu_free=75.13GiB gpu_total=79.18GiB allocated=0.72GiB reserved=2.77GiB
 [36m(WorkerDict pid=9846)[0m [worker_mem] stage=init_model:rollout:before role=actor_rollout pid=9846 rank=0 local_rank=0 rss=2.22GiB host_avail=1931.8GiB host_used=83.6GiB gpu_free=75.13GiB gpu_total=79.18GiB allocated=0.72GiB reserved=2.77GiB
-[36m(WorkerDict pid=9851)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
+[36m(WorkerDict pid=9851)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
 [36m(WorkerDict pid=9851)[0m   FSDP.set_state_dict_type(
 [36m(WorkerDict pid=9851)[0m [worker_mem] stage=init_model:actor:after role=actor_rollout pid=9851 rank=5 local_rank=0 rss=2.22GiB host_avail=1931.9GiB host_used=83.4GiB gpu_free=75.13GiB gpu_total=79.18GiB allocated=0.72GiB reserved=2.77GiB
-[36m(WorkerDict pid=9852)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
+[36m(WorkerDict pid=9852)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
 [36m(WorkerDict pid=9852)[0m   FSDP.set_state_dict_type(
-[36m(WorkerDict pid=9849)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
+[36m(WorkerDict pid=9849)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
 [36m(WorkerDict pid=9849)[0m   FSDP.set_state_dict_type(
-[36m(WorkerDict pid=9850)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
+[36m(WorkerDict pid=9850)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
 [36m(WorkerDict pid=9850)[0m   FSDP.set_state_dict_type(
 [36m(WorkerDict pid=9852)[0m [worker_mem] stage=init_model:actor:after role=actor_rollout pid=9852 rank=6 local_rank=0 rss=1.64GiB host_avail=1931.9GiB host_used=83.4GiB gpu_free=75.13GiB gpu_total=79.18GiB allocated=0.72GiB reserved=2.77GiB
-[36m(WorkerDict pid=9853)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
+[36m(WorkerDict pid=9853)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
 [36m(WorkerDict pid=9853)[0m   FSDP.set_state_dict_type(
 [36m(WorkerDict pid=9853)[0m [worker_mem] stage=init_model:actor:after role=actor_rollout pid=9853 rank=7 local_rank=0 rss=2.23GiB host_avail=1932.0GiB host_used=83.4GiB gpu_free=75.13GiB gpu_total=79.18GiB allocated=0.72GiB reserved=2.77GiB
 [36m(WorkerDict pid=9851)[0m [worker_mem] stage=init_model:rollout:before role=actor_rollout pid=9851 rank=5 local_rank=0 rss=2.22GiB host_avail=1931.9GiB host_used=83.4GiB gpu_free=75.13GiB gpu_total=79.18GiB allocated=0.72GiB reserved=2.77GiB
@@ -1005,13 +1005,13 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(WorkerDict pid=9852)[0m [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
 [36m(WorkerDict pid=9853)[0m [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
 [36m(WorkerDict pid=9853)[0m [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[36m(WorkerDict pid=9847)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
+[36m(WorkerDict pid=9847)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
 [36m(WorkerDict pid=9847)[0m   FSDP.set_state_dict_type(
 [36m(WorkerDict pid=9847)[0m [worker_mem] stage=init_model:actor:after role=actor_rollout pid=9847 rank=1 local_rank=0 rss=2.22GiB host_avail=1932.6GiB host_used=82.8GiB gpu_free=75.13GiB gpu_total=79.18GiB allocated=0.72GiB reserved=2.77GiB
 [36m(WorkerDict pid=9847)[0m [worker_mem] stage=init_model:rollout:before role=actor_rollout pid=9847 rank=1 local_rank=0 rss=2.22GiB host_avail=1932.6GiB host_used=82.8GiB gpu_free=75.13GiB gpu_total=79.18GiB allocated=0.72GiB reserved=2.77GiB
 [36m(WorkerDict pid=9847)[0m [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
 [36m(WorkerDict pid=9847)[0m [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[36m(WorkerDict pid=9848)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
+[36m(WorkerDict pid=9848)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine/fsdp/transformer_impl.py:464: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
 [36m(WorkerDict pid=9848)[0m   FSDP.set_state_dict_type(
 [36m(WorkerDict pid=9848)[0m [worker_mem] stage=init_model:actor:after role=actor_rollout pid=9848 rank=2 local_rank=0 rss=2.22GiB host_avail=1932.6GiB host_used=82.8GiB gpu_free=75.13GiB gpu_total=79.18GiB allocated=0.72GiB reserved=2.77GiB
 [36m(WorkerDict pid=9848)[0m [worker_mem] stage=init_model:rollout:before role=actor_rollout pid=9848 rank=2 local_rank=0 rss=2.22GiB host_avail=1932.6GiB host_used=82.8GiB gpu_free=75.13GiB gpu_total=79.18GiB allocated=0.72GiB reserved=2.77GiB
@@ -1065,7 +1065,7 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(vLLMHttpServer pid=13155)[0m INFO:2026-10-13 17:51:36,008:override_generation_config: {'temperature': 1.0, 'top_k': -1, 'top_p': 1, 'repetition_penalty': 1.0, 'max_new_tokens': 30720}
 [36m(vLLMHttpServer pid=13155)[0m INFO:2026-10-13 17:51:36,008:enable_sleep_mode: True
 [36m(vLLMHttpServer pid=13155)[0m ['serve',
-[36m(vLLMHttpServer pid=13155)[0m  '/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/Qwen2.5-1.5B-Instruct',
+[36m(vLLMHttpServer pid=13155)[0m  '/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/Qwen2.5-1.5B-Instruct',
 [36m(vLLMHttpServer pid=13155)[0m  '--dtype',
 [36m(vLLMHttpServer pid=13155)[0m  'bfloat16',
 [36m(vLLMHttpServer pid=13155)[0m  '--load_format',
@@ -1420,31 +1420,31 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(vLLMHttpServer pid=13157)[0m WARNING 10-13 17:52:27 [api_router.py:30] LoRA dynamic loading & unloading is enabled in the API server. This should ONLY be used for local development!
 [36m(vLLMHttpServer pid=13166)[0m WARNING 10-13 17:52:27 [model.py:1355] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'repetition_penalty': 1.0, 'temperature': 1.0, 'top_k': -1, 'top_p': 1, 'max_tokens': 30720}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
 [36m(vLLMHttpServer pid=13157)[0m WARNING 10-13 17:52:27 [model.py:1355] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'repetition_penalty': 1.0, 'temperature': 1.0, 'top_k': -1, 'top_p': 1, 'max_tokens': 30720}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
-[36m(vLLMHttpServer pid=13155)[0m INFO:2026-10-13 17:52:27,489:Initializing a V1 LLM engine with config: model='/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/Qwen2.5-1.5B-Instruct', speculative_config=None, tokenizer='/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/Qwen2.5-1.5B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=32768, download_dir=None, load_format=dummy, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False), seed=42, served_model_name=/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/Qwen2.5-1.5B-Instruct, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'level': None, 'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'splitting_ops': ['vllm::unified_attention', 'vllm::unified_attention_with_output', 'vllm::unified_mla_attention', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::linear_attention', 'vllm::plamo2_mamba_mixer', 'vllm::gdn_attention_core', 'vllm::kda_attention', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'compile_sizes': [], 'compile_ranges_split_points': [32768], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': True, 'static_all_moe_layers': []}
+[36m(vLLMHttpServer pid=13155)[0m INFO:2026-10-13 17:52:27,489:Initializing a V1 LLM engine with config: model='/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/Qwen2.5-1.5B-Instruct', speculative_config=None, tokenizer='/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/Qwen2.5-1.5B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=32768, download_dir=None, load_format=dummy, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False), seed=42, served_model_name=/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/Qwen2.5-1.5B-Instruct, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'level': None, 'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'splitting_ops': ['vllm::unified_attention', 'vllm::unified_attention_with_output', 'vllm::unified_mla_attention', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::linear_attention', 'vllm::plamo2_mamba_mixer', 'vllm::gdn_attention_core', 'vllm::kda_attention', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'compile_sizes': [], 'compile_ranges_split_points': [32768], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': True, 'static_all_moe_layers': []}
 [36m(TaskRunner pid=8432)[0m LLMServerManager: ['10.163.247.156:33229', '10.163.247.156:38959', '10.163.247.156:38947', '10.163.247.156:44257', '10.163.247.156:45655', '10.163.247.156:36281', '10.163.247.156:34259', '10.163.247.156:37101']
 [36m(TaskRunner pid=8432)[0m wandb: Tracking run with wandb version 0.25.0
 [36m(TaskRunner pid=8432)[0m wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
-[36m(TaskRunner pid=8432)[0m wandb: Run data is saved locally in /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/logs/wandb/offline-run-20261013_175228-ut3x02ir
+[36m(TaskRunner pid=8432)[0m wandb: Run data is saved locally in /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/logs/wandb/offline-run-20261013_175228-ut3x02ir
 [36m(TaskRunner pid=8432)[0m wandb: Detected [openai] in use.
 [36m(TaskRunner pid=8432)[0m wandb: Use W&B Weave for improved LLM call tracing. Install Weave with `pip install weave` then add `import weave` to the top of your script.
 [36m(TaskRunner pid=8432)[0m wandb: For more information, check out the docs at: https://weave-docs.wandb.ai/
-[36m(TaskRunner pid=8432)[0m Checkpoint tracker file does not exist: /user/liyaohu4170/checkpoints/ptdbench-train/taco_qwen2_5_1.5b_cp_oom/latest_checkpointed_iteration.txt
+[36m(TaskRunner pid=8432)[0m Checkpoint tracker file does not exist: /user/liyaohu4170/checkpoints/ptdbench-train/taco_qwen2_5_1.5b/latest_checkpointed_iteration.txt
 [36m(TaskRunner pid=8432)[0m Training from scratch
-[36m(WorkerDict pid=9851)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9851)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9851)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9852)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9852)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9852)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9849)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9849)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9849)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9847)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9847)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9847)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9850)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9850)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9850)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9853)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9853)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9853)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9846)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9846)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9846)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9848)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9848)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9848)[0m   torch.cuda.memory._set_allocator_settings(settings)
 [36m(vLLMHttpServer pid=13155)[0m (EngineCore_DP0 pid=14455) WARNING 10-13 17:52:30 [scheduler.py:1834] reset_connector called but no KV connector is configured.
 [36m(vLLMHttpServer pid=13157)[0m (EngineCore_DP0 pid=14463) WARNING 10-13 17:52:30 [scheduler.py:1834] reset_connector called but no KV connector is configured.
@@ -1463,21 +1463,21 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(vLLMHttpServer pid=13160)[0m (EngineCore_DP0 pid=14462) WARNING 10-13 17:52:31 [scheduler.py:1834] reset_connector called but no KV connector is configured.
 [36m(vLLMHttpServer pid=13162)[0m (EngineCore_DP0 pid=14483) WARNING 10-13 17:52:31 [scheduler.py:1834] reset_connector called but no KV connector is configured.
 [36m(vLLMHttpServer pid=13166)[0m (EngineCore_DP0 pid=14470) WARNING 10-13 17:52:31 [scheduler.py:1834] reset_connector called but no KV connector is configured.
-[36m(WorkerDict pid=9851)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9851)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9851)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9852)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9852)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9852)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9849)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9849)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9849)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9847)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9847)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9847)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9850)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9850)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9850)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9853)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9853)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9853)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9846)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9846)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9846)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9848)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9848)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9848)[0m   torch.cuda.memory._set_allocator_settings(settings)
 [36m(vLLMHttpServer pid=13155)[0m (EngineCore_DP0 pid=14455) WARNING 10-13 17:52:33 [scheduler.py:1834] reset_connector called but no KV connector is configured.
 [36m(vLLMHttpServer pid=13157)[0m (EngineCore_DP0 pid=14463) WARNING 10-13 17:52:33 [scheduler.py:1834] reset_connector called but no KV connector is configured.
@@ -1870,21 +1870,21 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(WorkerDict pid=9848)[0m softmax.
 [36m(WorkerDict pid=9848)[0m 
 [36m(WorkerDict pid=9848)[0m   warnings.warn(
-[36m(WorkerDict pid=9851)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9851)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9851)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9852)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9852)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9852)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9849)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9849)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9849)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9847)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9847)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9847)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9850)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9850)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9850)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9853)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9853)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9853)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9846)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9846)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9846)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=9848)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
+[36m(WorkerDict pid=9848)[0m /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=9848)[0m   torch.cuda.memory._set_allocator_settings(settings)
 [36m(vLLMHttpServer pid=13155)[0m (EngineCore_DP0 pid=14455) WARNING 10-13 17:56:23 [scheduler.py:1834] reset_connector called but no KV connector is configured.
 [36m(vLLMHttpServer pid=13157)[0m (EngineCore_DP0 pid=14463) WARNING 10-13 17:56:23 [scheduler.py:1834] reset_connector called but no KV connector is configured.
@@ -12363,14 +12363,14 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'VLLM_LOGGING_L
 [36m(TaskRunner pid=8432)[0m wandb:                                +97 ...
 [36m(TaskRunner pid=8432)[0m wandb: 
 [36m(TaskRunner pid=8432)[0m wandb: You can sync this run to the cloud by running:
-[36m(TaskRunner pid=8432)[0m wandb: wandb sync /user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/logs/wandb/offline-run-20261013_175228-ut3x02ir
-[36m(TaskRunner pid=8432)[0m wandb: Find logs at: ./ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/logs/wandb/offline-run-20261013_175228-ut3x02ir/logs
+[36m(TaskRunner pid=8432)[0m wandb: wandb sync /user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/logs/wandb/offline-run-20261013_175228-ut3x02ir
+[36m(TaskRunner pid=8432)[0m wandb: Find logs at: ./ptdbench/tasks/verl_implementation/taco_grpo/workspace/logs/wandb/offline-run-20261013_175228-ut3x02ir/logs
 [36m(TaskRunner pid=8432)[0m Training Progress:  78%|███████▊  | 78/100 [1:40:32<28:21, 77.34s/it]
-Error executing job with overrides: ['algorithm.adv_estimator=grpo', 'data.train_files=/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/taco_verl/train.parquet', 'data.val_files=/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/taco_verl/test.parquet', 'data.train_batch_size=16', 'data.max_prompt_length=2048', 'data.max_response_length=30720', 'data.filter_overlong_prompts=True', 'data.truncation=error', 'data.dataloader_num_workers=0', 'algorithm.use_kl_in_reward=False', 'actor_rollout_ref.model.path=/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/Qwen2.5-1.5B-Instruct', 'actor_rollout_ref.model.use_remove_padding=True', 'actor_rollout_ref.model.enable_gradient_checkpointing=False', '+actor_rollout_ref.model.override_config.attn_implementation=sdpa', 'actor_rollout_ref.actor.optim.lr=1e-6', 'actor_rollout_ref.actor.ppo_mini_batch_size=16', 'actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1', 'actor_rollout_ref.actor.use_kl_loss=False', 'actor_rollout_ref.actor.kl_loss_coef=0', 'actor_rollout_ref.actor.kl_loss_type=low_var_kl', 'actor_rollout_ref.actor.entropy_coeff=0', 'actor_rollout_ref.actor.fsdp_config.param_offload=False', 'actor_rollout_ref.actor.fsdp_config.optimizer_offload=False', 'actor_rollout_ref.actor.ulysses_sequence_parallel_size=1', 'actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1', 'actor_rollout_ref.rollout.tensor_model_parallel_size=1', 'actor_rollout_ref.rollout.name=vllm', 'actor_rollout_ref.rollout.gpu_memory_utilization=0.4', 'actor_rollout_ref.rollout.enable_chunked_prefill=False', 'actor_rollout_ref.rollout.enforce_eager=False', 'actor_rollout_ref.rollout.free_cache_engine=True', 'actor_rollout_ref.rollout.max_model_len=32768', 'actor_rollout_ref.rollout.max_num_batched_tokens=32768', 'actor_rollout_ref.rollout.n=8', 'actor_rollout_ref.rollout.val_kwargs.temperature=0.7', 'actor_rollout_ref.rollout.val_kwargs.do_sample=True', 'actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1', 'actor_rollout_ref.ref.fsdp_config.param_offload=True', 'actor_rollout_ref.ref.ulysses_sequence_parallel_size=1', 'reward.num_workers=32', 'reward.reward_manager.name=naive', 'reward.custom_reward_function.path=/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/utils/reward_score/taco.py', 'reward.custom_reward_function.name=compute_score', 'trainer.critic_warmup=0', 'trainer.logger=["console","wandb"]', 'trainer.project_name=ptdbench-train', 'trainer.experiment_name=taco_qwen2_5_1.5b_cp_oom', 'trainer.n_gpus_per_node=8', 'trainer.nnodes=1', 'trainer.save_freq=100', 'trainer.test_freq=1000', 'trainer.total_epochs=15', 'trainer.total_training_steps=100', 'trainer.use_v1=False']
+Error executing job with overrides: ['algorithm.adv_estimator=grpo', 'data.train_files=/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/taco_verl/train.parquet', 'data.val_files=/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/taco_verl/test.parquet', 'data.train_batch_size=16', 'data.max_prompt_length=2048', 'data.max_response_length=30720', 'data.filter_overlong_prompts=True', 'data.truncation=error', 'data.dataloader_num_workers=0', 'algorithm.use_kl_in_reward=False', 'actor_rollout_ref.model.path=/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/Qwen2.5-1.5B-Instruct', 'actor_rollout_ref.model.use_remove_padding=True', 'actor_rollout_ref.model.enable_gradient_checkpointing=False', '+actor_rollout_ref.model.override_config.attn_implementation=sdpa', 'actor_rollout_ref.actor.optim.lr=1e-6', 'actor_rollout_ref.actor.ppo_mini_batch_size=16', 'actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1', 'actor_rollout_ref.actor.use_kl_loss=False', 'actor_rollout_ref.actor.kl_loss_coef=0', 'actor_rollout_ref.actor.kl_loss_type=low_var_kl', 'actor_rollout_ref.actor.entropy_coeff=0', 'actor_rollout_ref.actor.fsdp_config.param_offload=False', 'actor_rollout_ref.actor.fsdp_config.optimizer_offload=False', 'actor_rollout_ref.actor.ulysses_sequence_parallel_size=1', 'actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1', 'actor_rollout_ref.rollout.tensor_model_parallel_size=1', 'actor_rollout_ref.rollout.name=vllm', 'actor_rollout_ref.rollout.gpu_memory_utilization=0.4', 'actor_rollout_ref.rollout.enable_chunked_prefill=False', 'actor_rollout_ref.rollout.enforce_eager=False', 'actor_rollout_ref.rollout.free_cache_engine=True', 'actor_rollout_ref.rollout.max_model_len=32768', 'actor_rollout_ref.rollout.max_num_batched_tokens=32768', 'actor_rollout_ref.rollout.n=8', 'actor_rollout_ref.rollout.val_kwargs.temperature=0.7', 'actor_rollout_ref.rollout.val_kwargs.do_sample=True', 'actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1', 'actor_rollout_ref.ref.fsdp_config.param_offload=True', 'actor_rollout_ref.ref.ulysses_sequence_parallel_size=1', 'reward.num_workers=32', 'reward.reward_manager.name=naive', 'reward.custom_reward_function.path=/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/utils/reward_score/taco.py', 'reward.custom_reward_function.name=compute_score', 'trainer.critic_warmup=0', 'trainer.logger=["console","wandb"]', 'trainer.project_name=ptdbench-train', 'trainer.experiment_name=taco_qwen2_5_1.5b', 'trainer.n_gpus_per_node=8', 'trainer.nnodes=1', 'trainer.save_freq=100', 'trainer.test_freq=1000', 'trainer.total_epochs=15', 'trainer.total_training_steps=100', 'trainer.use_v1=False']
 Traceback (most recent call last):
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/trainer/main_ppo.py", line 183, in main
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/trainer/main_ppo.py", line 183, in main
     run_ppo(config, task_runner_class=TaskRunner)
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/trainer/main_ppo.py", line 93, in run_ppo
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/trainer/main_ppo.py", line 93, in run_ppo
     ray.get(runner.run.remote(config))
   File "/usr/local/lib/python3.12/dist-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
     return fn(*args, **kwargs)
@@ -12386,15 +12386,15 @@ Traceback (most recent call last):
 ray.exceptions.RayTaskError(OutOfMemoryError): [36mray::TaskRunner.run()[39m (pid=8432, ip=10.163.247.156, actor_id=5236cac0aa3f7d60aab8e09801000000, repr=<verl.trainer.main_ppo_v0.TaskRunner object at 0x7ee779d145c0>)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/trainer/main_ppo_v0.py", line 248, in run
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/trainer/main_ppo_v0.py", line 248, in run
     trainer.fit()
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/trainer/ppo/ray_trainer.py", line 1700, in fit
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/trainer/ppo/ray_trainer.py", line 1700, in fit
     actor_output = self._update_actor(batch)
                    ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/trainer/ppo/ray_trainer.py", line 1368, in _update_actor
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/trainer/ppo/ray_trainer.py", line 1368, in _update_actor
     actor_output = self.actor_rollout_wg.update_actor(batch_td)
                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/single_controller/ray/base.py", line 56, in __call__
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/single_controller/ray/base.py", line 56, in __call__
     output = ray.get(output)
              ^^^^^^^^^^^^^^^
            ^^^^^^^^^^^^^^^^^^^
@@ -12409,52 +12409,52 @@ ray.exceptions.RayTaskError(OutOfMemoryError): [36mray::WorkerDict.actor_rollou
            ^^^^^^^^^^^^^^^^^^^^^
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/single_controller/ray/base.py", line 939, in func
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/single_controller/ray/base.py", line 939, in func
     return getattr(self.worker_dict[key], name)(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/single_controller/base/decorator.py", line 431, in inner
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/single_controller/base/decorator.py", line 431, in inner
     return func(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/utils/transferqueue_utils.py", line 329, in inner
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/utils/transferqueue_utils.py", line 329, in inner
     return func(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/utils/profiler/profile.py", line 203, in wrapper
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/utils/profiler/profile.py", line 203, in wrapper
     return func(self_instance, *args, **kwargs_inner)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine_workers.py", line 69, in wrapper
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine_workers.py", line 69, in wrapper
     return func(self, data, *args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine_workers.py", line 711, in update_actor
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine_workers.py", line 711, in update_actor
     output = self.actor.train_mini_batch(data=data)
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/single_controller/base/decorator.py", line 431, in inner
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/single_controller/base/decorator.py", line 431, in inner
     return func(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/utils/transferqueue_utils.py", line 329, in inner
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/utils/transferqueue_utils.py", line 329, in inner
     return func(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine_workers.py", line 302, in train_mini_batch
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine_workers.py", line 302, in train_mini_batch
     actor_output = self.train_batch(mini_batch_td)
                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/single_controller/base/decorator.py", line 431, in inner
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/single_controller/base/decorator.py", line 431, in inner
     return func(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/utils/transferqueue_utils.py", line 329, in inner
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/utils/transferqueue_utils.py", line 329, in inner
     return func(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/utils/profiler/profile.py", line 203, in wrapper
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/utils/profiler/profile.py", line 203, in wrapper
     return func(self_instance, *args, **kwargs_inner)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine_workers.py", line 351, in train_batch
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine_workers.py", line 351, in train_batch
     output = self.engine.train_batch(data, loss_function=self.loss_fn)
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine/base.py", line 127, in train_batch
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine/base.py", line 127, in train_batch
     outputs = self.forward_backward_batch(data, loss_function, forward_only=False)
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine/fsdp/transformer_impl.py", line 664, in forward_backward_batch
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine/fsdp/transformer_impl.py", line 664, in forward_backward_batch
     loss, meta_info = self.forward_step(micro_batch, loss_function=loss_function, forward_only=forward_only)
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/context_parallel_oom/workspace/verl/workers/engine/fsdp/transformer_impl.py", line 1377, in forward_step
+  File "/user/liyaohu4170/ptdbench/tasks/verl_implementation/taco_grpo/workspace/verl/workers/engine/fsdp/transformer_impl.py", line 1377, in forward_step
     raw_output = self.module(
                  ^^^^^^^^^^^^
   File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl

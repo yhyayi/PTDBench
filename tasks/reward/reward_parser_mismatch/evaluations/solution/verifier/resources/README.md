@@ -15,3 +15,7 @@ The verifier writes `experiment_metrics.json`, `metrics.json`, and `result.json`
 This grader is adapted from `verl_implementation/torch_functional` with two deviations required by the VIMPO PPO-Critic log format: it tolerates numpy scalar reprs (`...:np.float64(0.0)`) and captures every val-core metric on each `step:N` line (the template captured only the first), and it selects the terminal value via `select_final` rather than the peak.
 
 > **Calibration note (maintainers).** `historical_final_baseline` is the buggy run's real terminal value (`0.0`). `required_final_score` and `required_training_reward` are evidence-based conservative drafts and are **not yet calibrated** against a real oracle-fixed rerun. Calibrate before using this task for scoring; `../oracle/task.yaml` carries `needs_manual_review: true`.
+
+## System rerun (`run_spec.json`)
+
+The solution protocol is debug-then-report: the agent fixes the workspace, submits `/workspace/report.md`, and does **not** launch training. This directory's `run_spec.json` drives the harness rerun stage — the command, environment (with `$PTDBENCH_*` references expanded per backend), timeout, and log roots — executed in the agent's workspace before this verifier runs. The harness deletes the declared log roots (`experiment_logs`) before the rerun, so grading only ever sees this fresh run's logs.
