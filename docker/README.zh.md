@@ -26,6 +26,7 @@
 | 环境名 | 上游镜像 | 栈 | 任务 |
 |---|---|---|---|
 | `verl` | `verlai/verl:vllm017.latest` | vLLM 0.17，torch 2.10 / CUDA 12.9 | `reward_design/*`、`verl_hyper/*`、`verl_implementation/*` |
+| `verl-vllm085` | `verlai/verl:app-verl0.4-vllm0.8.5-mcore0.12.2-te2.2` | vLLM 0.8.5，VERL 0.4-era，torch 2.6 / CUDA 12.4 | `algorithm/verl_gsm8k_flat_eval` |
 | `slime-rc0` | `slimerl/slime:v0.5.0rc0-cu126` | sglang 0.5.0rc0，torch 2.8 / CUDA 12.6 | `rlve_hyper/*` |
 | `slime-v0.3.2` | `slimerl/slime:v0.3.2-cu130` | sglang 0.5.15.post1，CUDA 13.0 | `slime_retool*`、`slime_search_r1*` |
 | `python3.11-slim` | `python:3.11-slim` | 纯 CPython，无 GPU | `example/swe_slugfix` |
