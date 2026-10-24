@@ -5,7 +5,7 @@
 # recipe（examples/search-r1/run_qwen2.5_3B.sh），要的资产也完全一样。改这里要连
 # 那边一起改——容器环境或资产上的任何差别，都会让两边的运行不可比。
 #
-# 跑在独立的 prepare 阶段容器里：root、`slime-v0.3.2` 镜像、**唯一有网的
+# 跑在独立的 prepare 阶段容器里：root、`slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12` 镜像、**唯一有网的
 # 阶段**，而且 $PTDBENCH_WORKSPACE、$PTDBENCH_MODELS 和 $PTDBENCH_DATASETS 都可写。
 # agent / verifier 阶段的断网由框架按阶段设（runtimes/base.py 里 _network_policy_env 的
 # HF_HUB_OFFLINE / TRANSFORMERS_OFFLINE / HF_DATASETS_OFFLINE），任务的
@@ -16,7 +16,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # faiss-gpu —— 只有 search-r1 这两个任务要
 # ---------------------------------------------------------------------------
-# 为什么不写进 docker/images/slime-v0.3.2.Dockerfile：那个镜像是**四个 slime 任务
+# 为什么不写进 docker/images/slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12.Dockerfile：那个镜像是**四个 slime 任务
 # 共用的**，加一个包等于改掉
 # slime_retool / slime_retool_length_hack 的运行环境。它们的 outcome 是按没有
 # faiss 的那套栈记下来的，不该被另一个任务的需求动到。

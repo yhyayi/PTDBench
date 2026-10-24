@@ -14,7 +14,7 @@ training:
   algo: gspo
   script: examples/openmle_rl/scripts/run_openrsi_reward_direction.sh
 environment:
-  image: slime-v0.3.2
+  image: slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12
   env:
     # WANDB_API_KEY must be non-empty even in offline mode: the launcher passes
     # it as an unquoted --wandb-key, and an empty expansion merges the flag with

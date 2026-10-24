@@ -24,11 +24,12 @@ below); a run you start is wasted and scores nothing.
 Make a freshly constructed critic predict exactly 0 everywhere, so that its
 first reported value loss is `mean(R²) = pass_rate ≤ 1`.
 
-The critic's value head is installed by
-`slime/backends/megatron_utils/model_provider.py`. The workspace overrides that
-one file: edit `slime_patch/model_provider.py`, which `run.sh` installs into
-`/root/slime` at startup (Step 0). Editing `/root/slime` directly instead will
-be overwritten on the next run.
+The critic's value head is installed by `LinearForLastLayer` in
+`slime/backends/megatron_utils/model_provider.py`. The full slime source tree is
+bundled in the workspace: edit
+`slime/slime/backends/megatron_utils/model_provider.py` directly. `run.sh` runs
+this bundled slime (it is put ahead of the image's install on `PYTHONPATH`), so
+your edit there is what takes effect.
 
 Keep the change minimal and keep it correct for the actor: the same module
 builds both roles, and the actor's `[vocab_size, hidden_size]` LM head must

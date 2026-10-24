@@ -389,7 +389,7 @@ int main(int argc, char** argv){
 - **CUDA 13 驱动不匹配（已解决）**：slime v0.3.2 原先的 cu130 构建在 wuxi_train/speech-wx
   的节点起不来（`cuda>=13.0` 驱动太旧），连 `--gpu 0` 也被 nvidia hook 拦。现已把 v0.3.2
   重建到 cu129（`ptdbench-slime-v0.3.2-cu129`, id 25607131），`slime_retool*` / `slime_search_r1*`
-  可直接在 speech-wx 跑；`slime-rc0`(cu126) 与 verl(cu129) 一直 OK。
+  可直接在 speech-wx 跑；`slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12` 与 `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12` 一直 OK。
 - **ephemeral 很小**：一切大文件必须落 `/user`，不能写容器 rootfs（否则「临时存储超限」）。
 - **mount 全禁**：不要在实现里依赖任何 bind/tmpfs/overlay/pivot_root/bwrap/apptainer。
 - **search_r1 的 90GB wiki-18 索引**预热量大，且卡上面的 cu130 驱动问题。

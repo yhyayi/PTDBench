@@ -9,7 +9,7 @@
 #
 # Tasks: configuration/opd_bf16_actor_dtype.
 #
-# The base matches the ppo-critic-vimpo image (CUDA 12.8.1 / Ubuntu 24.04); the
+# The base matches the vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12 image (CUDA 12.8.1 / Ubuntu 24.04); the
 # only additions are uv and the shared tooling block. The workspace verl source
 # is NOT baked: on_policy_distillation.sh puts workspace/verl on PYTHONPATH.
 FROM docker.m.daocloud.io/nvidia/cuda:12.8.1-devel-ubuntu24.04

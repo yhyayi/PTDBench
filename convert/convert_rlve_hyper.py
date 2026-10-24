@@ -385,7 +385,7 @@ def metadata_for(
             "script_args": ["ptdbench", "solution_rerun", "_"],
         },
         "environment": {
-            "image": "slime-rc0",
+            "image": "slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12",
             "assets": "environment/assets.yaml",
         },
         "outcome": {

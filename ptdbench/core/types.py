@@ -181,9 +181,9 @@ DOCKER_DIR = _REPO_ROOT / "docker"
 IMAGES_DIR = DOCKER_DIR / "images"
 IMAGE_DOCKERFILE_SUFFIX = ".Dockerfile"
 # 镜像 tag 写在 Dockerfile 头部的 `# ptdbench-image: <tag>` 一行里，例如
-# ptdbench/verl:vllm0.17-torch2.10-cu129。tag 描述的是栈（框架、推理引擎、CUDA
-# 版本），多个任务共用；不从内容派生 hash。升级栈就改 tag，只改工具脚本则保持
-# tag 不变、显式跑 `ptdbench build-images --rebuild`。
+# ptdbench:verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12。tag 描述的是栈
+# （框架、推理引擎、torch / flash-attn / CUDA 版本），多个任务共用；不从内容派生 hash。
+# 升级栈就改 tag，只改工具脚本则保持 tag 不变、显式跑 `ptdbench build-images --rebuild`。
 IMAGE_TAG_HEADER = "# ptdbench-image:"
 
 # 下载缓存在宿主机上的默认位置。跟仓库并排而不是藏在 run 目录里，是因为 run 目录

@@ -2,7 +2,7 @@
 # verl_implementation/torch_functional —— 训练前要准备的东西。
 #
 # 由 environment/{Dockerfile,hydrate-assets.sh} 迁移而来。跑在独立的 prepare 阶段
-# 容器里：root、已激活 `verl` 环境、**唯一有网的阶段**，$PTDBENCH_WORKSPACE、
+# 容器里：root、已激活 `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12` 环境、**唯一有网的阶段**，$PTDBENCH_WORKSPACE、
 # $PTDBENCH_PREPARED、$PTDBENCH_MODELS、$PTDBENCH_DATASETS 都可写。
 #
 # 本任务是 reward_design/task_function_call 的拷贝（readme.md：
@@ -103,4 +103,4 @@ TACO_DIGESTS
 #
 # 要改回去的话：把 reward_design/task_evaluator/environment/prepare.sh 末尾那一节整段
 # 搬过来即可（装进 $PTDBENCH_PREPARED/pysite 并往 $PTDBENCH_PREPARED/env 写 PYTHONPATH）。
-# 不要改 docker/images/verl.Dockerfile——那个镜像是所有 verl 任务共用的。
+# 不要改 docker/images/verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12.Dockerfile——那个镜像是所有 verl 任务共用的。

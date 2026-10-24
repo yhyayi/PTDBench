@@ -14,7 +14,7 @@ training:
   algo: PPO-Critic
   script: run_buggy.sh
 environment:
-  image: ppo-critic-vimpo
+  image: vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12
 
   env:
     # run_buggy.sh 固定 4 卡：CUDA_VISIBLE_DEVICES=0,1,2,3 + N_GPUS_PER_NODE=4。

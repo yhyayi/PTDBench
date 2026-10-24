@@ -37,9 +37,9 @@
 
 | 镜像（metadata `image`） | 平台 id | 覆盖的任务（`--prepare-glob`） |
 |---|---|---|
-| `slime-rc0`（cu126） | `25607122` | `tasks/rlve_hyper/*/environment/prepare.sh` |
-| `slime-v0.3.2`（cu129） | `25607131` | `tasks/slime_retool/environment/prepare.sh tasks/slime_retool_length_hack/environment/prepare.sh` |
-| `verl`（cu129） | `25607123` | `tasks/reward_design/*/environment/prepare.sh tasks/verl_hyper/*/*/environment/prepare.sh tasks/verl_implementation/*/*/environment/prepare.sh` |
+| `slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12` | `25607122` | `tasks/rlve_hyper/*/environment/prepare.sh` |
+| `slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12` | `25607131` | `tasks/slime_retool/environment/prepare.sh tasks/slime_retool_length_hack/environment/prepare.sh` |
+| `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12` | `25607123` | `tasks/reward_design/*/environment/prepare.sh tasks/verl_hyper/*/*/environment/prepare.sh tasks/verl_implementation/*/*/environment/prepare.sh` |
 
 ```bash
 # 公共参数（每条命令都带）；不加 --run 即 dry-run，只打印将提交的 cctl job 命令
@@ -49,19 +49,19 @@ COMMON=(--project xinfer-chenyinghao
         --git-path git@github.com:<org>/ptdbench.git --git-ref main
         --cluster-user chenyinghao)
 
-# ① slime-rc0（cu126）: rlve_hyper 四个子任务
+# ① slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12: rlve_hyper 四个子任务
 python harbor/scripts/cybertron_preheat.py "${COMMON[@]}" \
   --image 25607122 \
   --prepare-glob 'tasks/rlve_hyper/*/environment/prepare.sh' \
   --run
 
-# ② slime-v0.3.2（cu129）: slime_retool + length_hack（search_r1* 见下方说明，暂缓）
+# ② slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12: slime_retool + length_hack（search_r1* 见下方说明，暂缓）
 python harbor/scripts/cybertron_preheat.py "${COMMON[@]}" \
   --image 25607131 \
   --prepare-glob 'tasks/slime_retool/environment/prepare.sh tasks/slime_retool_length_hack/environment/prepare.sh' \
   --run
 
-# ③ verl（cu129）: reward_design ×2 + verl_hyper ×1 + verl_implementation ×3
+# ③ verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12: reward_design ×2 + verl_hyper ×1 + verl_implementation ×3
 python harbor/scripts/cybertron_preheat.py "${COMMON[@]}" \
   --image 25607123 \
   --prepare-glob 'tasks/reward_design/*/environment/prepare.sh tasks/verl_hyper/*/*/environment/prepare.sh tasks/verl_implementation/*/*/environment/prepare.sh' \
@@ -108,7 +108,7 @@ python harbor/scripts/cybertron_preheat.py "${COMMON[@]}" \
   重置（`SSLEOFError`，job 1108023）。已把那份 sha 钉死的 7772B sdist vendored 进
   `tasks/reward_design/task_evaluator/environment/vendor/pyext-0.7.tar.gz`，`prepare.sh` 优先用它（无外网也能过），
   URL 作兜底，两条路都校 sha。其余 URL/pip 下载若也命中白名单，同法 vendor。
-- **search_r1（`slime_search_r1` / `_nomask`）暂缓**：metadata 也绑 `slime-v0.3.2`，但数据量大（~79GB +
+- **search_r1（`slime_search_r1` / `_nomask`）暂缓**：metadata 也绑 `slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12`，但数据量大（~79GB +
   wiki-18 索引）且有 cu130/确定性复现的未决问题，之前 deferred，未纳入 ② 。要预热时单独一条，`--prepare-glob
   'tasks/slime_search_r1/environment/prepare.sh tasks/slime_search_r1_nomask/environment/prepare.sh'`。
 - 已缓存约 ~20GB（slime_retool*/rlve/verl 的 prepare 已跑通）；缓存是宝贵数据，**切勿 `rm -rf`**。

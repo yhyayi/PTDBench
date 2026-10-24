@@ -34,7 +34,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 # ------------------------------------------------------- 1. the fix itself
 echo "== check 1/2: value head is zero at construction =="
 
-TARGET="${WORKSPACE}/slime_patch/model_provider.py"
+TARGET="${WORKSPACE}/slime/slime/backends/megatron_utils/model_provider.py"
 [ -f "${TARGET}" ] || fail "missing ${TARGET}"
 
 python3 "${WORKSPACE}/tools/check_value_head.py" "${TARGET}"

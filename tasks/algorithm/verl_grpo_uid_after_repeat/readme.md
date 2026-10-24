@@ -8,7 +8,7 @@
 | **Framework** | verl `0.9.0.dev` @ `6f2aa24abfc01cc72811b376aeb3936503885096`，GRPO |
 | **Model** | Llama-3.2-1B-Instruct |
 | **Dataset** | DAPO-Math-17k |
-| **Environment** | `verl` 镜像；`prepare.sh` 交付权重与 parquet |
+| **Environment** | `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12` 镜像；`prepare.sh` 交付权重与 parquet |
 | **Resources** | 2 × H800 |
 | **Recorded runs** | defect / control 各一次，2026-10-16 |
 | **Recorded runtime** | 约 13.5 min（60 步） |
@@ -129,7 +129,9 @@ backend 不缓冲、不依赖 Ray。
 
 让 run 跑完前先看 step 1：`critic/advantages/min` 决定整个实验。
 
-镜像用 `verl`（`docker/images/verl.Dockerfile`），verl + vLLM 0.17、torch 2.10 /
+镜像用 `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12`
+（`docker/images/verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12.Dockerfile`），
+verl + vLLM 0.17、torch 2.10 /
 CUDA 12.9 / Ubuntu 22.04——同一 commit 的兄弟任务在这上面录过。CPU-only 的
 `rank-distillation-cpu` 跑不了 vLLM rollout，slime 镜像是另一个框架。
 

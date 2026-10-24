@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "task_id": "miles_async_rollout_inflight_not_evicted",
+  "log_roots": [
+    "experiment_logs"
+  ],
+  "train_seconds": 28800,
+  "step_metric_key": "train_steps",
+  "required_train_steps": "120",
+  "historical_defective_train_steps": "92",
+  "historical_control_train_steps": "148",
+  "solve_rate_metric_key": "rollout_solve_rate_last_window",
+  "solve_window_frac": "0.1",
+  "required_solve_rate": "0.48",
+  "historical_defective_solve_rate": "0.4601",
+  "historical_control_solve_rate": "0.5388",
+  "step_weight": "0.8",
+  "solve_rate_weight": "0.2"
+}

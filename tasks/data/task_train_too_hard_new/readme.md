@@ -7,7 +7,7 @@
 - Evaluation levels: `issue`
 - Model: `Qwen2.5-1.5B-Instruct`
 - Training framework: `verl` (GRPO)
-- Environment image: `verl`
+- Environment image: `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12`
 - Primary source evaluation metric: `val-core/taco/acc/mean@1`
 
 This document is for maintainers and reviewers. It is not exposed to the
@@ -120,7 +120,7 @@ neutral repository name is still open.
 
 ## Environment requirement
 
-- Image: `verl` (`docker/images/verl.Dockerfile`); assets come from
+- Image: `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12` (`docker/images/verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12.Dockerfile`); assets come from
   `environment/prepare.sh`.
 - The recorded run had `pyext==0.7` installed (see the wandb requirements);
   issue evaluation does not run the scorer, so `prepare.sh` does not install it.

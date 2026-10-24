@@ -19,10 +19,12 @@
 #              where the value loss is reported as inflated.
 #
 # Everything the value head's initial weights depend on lives in
-# slime_patch/model_provider.py: slime unconditionally replaces any model
-# provider's `output_layer` with `LinearForLastLayer` (model_provider.py:111),
-# so that class is the single point of control.  This script installs the
-# workspace's copy over slime's own before training starts.
+# slime/slime/backends/megatron_utils/model_provider.py: slime unconditionally
+# replaces any model provider's `output_layer` with `LinearForLastLayer`
+# (model_provider.py:111), so that class is the single point of control.  The
+# full slime source tree is bundled in the workspace (slime/) and is the copy
+# that runs -- this script puts it ahead of the image's install on PYTHONPATH,
+# so editing slime/ here is what takes effect, with nothing to install first.
 #
 # Reward/advantage setup is deliberately vanilla so the value loss is readable:
 # with `--gamma 1.0 --lambd 1.0` GAE telescopes and `returns_t` equals the
@@ -48,7 +50,7 @@ export PYTHONDONTWRITEBYTECODE=1
 
 MODEL_DIR="${MODEL_DIR:-${WS}/Qwen3-1.7B}"
 ET_SRC="${ET_SRC:-${WS}/endless-terminals}"
-SLIME_HOME="${SLIME_HOME:-/root/slime}"
+SLIME_HOME="${SLIME_HOME:-${WS}/slime}"
 OUT_DIR="${OUT_DIR:-${WS}/outputs}"
 CKPT_ROOT="${CKPT_ROOT:-/ckpt}"
 
@@ -129,15 +131,21 @@ RAY_TMP="${RAY_TMP:-/tmp/ray_ppo}"
 
 mkdir -p "${OUT_DIR}" "${CKPT_ROOT}" "${ET_SCRATCH}"
 
-# --------------------------------------------------------------- 0. the patch
-install -m 644 "${WS}/slime_patch/model_provider.py" \
-    "${SLIME_HOME}/slime/backends/megatron_utils/model_provider.py"
-echo "=== value head initialisation now in effect ==="
-# Grep the whole file rather than a line range: the two workspaces carry
-# different comment blocks, so the decisive line is not at a fixed line number
-# in both, and a range would print nothing for one of them.
-grep -n "self\.weight\.data\.\(zero_\|normal_\)" \
-    "${SLIME_HOME}/slime/backends/megatron_utils/model_provider.py" || true
+# --------------------------------------------------------- 0. the slime source
+# The full slime source tree is bundled in the workspace (${SLIME_HOME}) and is
+# put ahead of the image's editable install on PYTHONPATH below, so it is the
+# copy that trains -- there is nothing to install, and the value head's initial
+# weights are exactly what ${SLIME_HOME}/.../model_provider.py says here.
+MODEL_PROVIDER="${SLIME_HOME}/slime/backends/megatron_utils/model_provider.py"
+test -f "${MODEL_PROVIDER}" || {
+    echo "FATAL: bundled slime source not found at ${MODEL_PROVIDER}" >&2
+    exit 1
+}
+echo "=== value head initialisation in effect (bundled slime) ==="
+# Grep the whole file rather than a line range: the fixed and defective copies
+# carry different comment blocks, so the decisive line is not at a fixed line
+# number in both, and a range would print nothing for one of them.
+grep -n "self\.weight\.data\.\(zero_\|normal_\)" "${MODEL_PROVIDER}" || true
 echo
 
 # ------------------------------------------------------- 1. the prompt dataset
@@ -376,7 +384,7 @@ HAS_NVLINK=0
 
 RUNTIME_ENV_JSON="{
   \"env_vars\": {
-    \"PYTHONPATH\": \"/root/Megatron-LM/:${WS}\",
+    \"PYTHONPATH\": \"/root/Megatron-LM/:${SLIME_HOME}:${WS}\",
     \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\",
     \"NCCL_NVLS_ENABLE\": \"${HAS_NVLINK}\",
     \"ET_DATA_ROOT\": \"${ET_DATA_ROOT}\",
@@ -394,8 +402,9 @@ submit() {   # submit <log-file> <extra args...>
     # The entrypoint is an absolute path on purpose: `ray job submit` does not
     # run it in this shell's directory but in the cwd of the Ray head (here
     # /workspace, since no `working_dir` is uploaded), so a bare `train.py`
-    # would not be found. `import slime` works from any cwd -- the image
-    # installs it -- so only the script path needs spelling out.
+    # would not be found. Running ${SLIME_HOME}/train.py puts the bundled slime
+    # tree on the driver's sys.path[0]; the ray workers get it from ${SLIME_HOME}
+    # on PYTHONPATH (RUNTIME_ENV_JSON above), ahead of the image's install.
     ray job submit \
         --address "http://127.0.0.1:${DASH_PORT}" \
         --runtime-env-json "${RUNTIME_ENV_JSON}" \

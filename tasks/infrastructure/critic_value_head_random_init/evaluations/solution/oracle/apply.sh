@@ -3,14 +3,15 @@
 #
 #     ./apply.sh /path/to/buggy_workspace
 #
-# One hunk in slime_patch/model_provider.py: zero-initialise the critic's value
-# head instead of drawing it from N(0, init_method_std). Idempotent -- running
-# it on an already-fixed workspace reports that and exits 0.
+# One hunk in slime/slime/backends/megatron_utils/model_provider.py:
+# zero-initialise the critic's value head instead of drawing it from
+# N(0, init_method_std). Idempotent -- running it on an already-fixed workspace
+# reports that and exits 0.
 set -euo pipefail
 
 WS="${1:?usage: apply.sh <workspace-dir>}"
 PATCH="$(cd "$(dirname "$0")" && pwd)/value_head_zero_init.patch"
-TARGET="${WS}/slime_patch/model_provider.py"
+TARGET="${WS}/slime/slime/backends/megatron_utils/model_provider.py"
 
 [ -f "${TARGET}" ] || { echo "no such file: ${TARGET}" >&2; exit 1; }
 

@@ -4,7 +4,7 @@
 # 由 torch_functional 的 environment/ 原样复用（同一份模型仓、同一份 TACO 归档、
 # 同一组 SHA-256）。缺陷不在这些资产里，而在启动脚本的 context parallel：
 # ulysses_sequence_parallel_size 默认为 1。跑在独立的 prepare 阶段容器里：root、
-# 已激活 `verl` 环境、**唯一有网的阶段**，$PTDBENCH_WORKSPACE、
+# 已激活 `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12` 环境、**唯一有网的阶段**，$PTDBENCH_WORKSPACE、
 # $PTDBENCH_PREPARED、$PTDBENCH_MODELS、$PTDBENCH_DATASETS 都可写。
 #
 # legacy Dockerfile 的做法：装一份打过补丁的 pyext、从 HF 下模型和数据集归档烤进
@@ -99,4 +99,4 @@ TACO_DIGESTS
 #
 # 要改回去的话：把 reward_design/task_evaluator/environment/prepare.sh 末尾那一节整段
 # 搬过来即可（装进 $PTDBENCH_PREPARED/pysite 并往 $PTDBENCH_PREPARED/env 写 PYTHONPATH）。
-# 不要改 docker/images/verl.Dockerfile——那个镜像是所有 verl 任务共用的。
+# 不要改 docker/images/verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12.Dockerfile——那个镜像是所有 verl 任务共用的。

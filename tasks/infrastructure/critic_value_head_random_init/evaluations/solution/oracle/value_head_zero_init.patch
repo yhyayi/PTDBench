@@ -1,6 +1,6 @@
---- a/slime_patch/model_provider.py
-+++ b/slime_patch/model_provider.py
-@@ -69,10 +69,14 @@
+--- a/slime/slime/backends/megatron_utils/model_provider.py
++++ b/slime/slime/backends/megatron_utils/model_provider.py
+@@ -86,10 +86,14 @@
              if bias:
                  self.bias.sequence_parallel = True
  

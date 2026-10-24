@@ -7,7 +7,7 @@
 # 数据、权重、ref checkpoint 有任何一处不同，两条曲线的对比就不再说明问题。
 # 改这个文件之前先确认另一份要不要一起改。
 #
-# 跑在独立的 prepare 阶段容器里：root、`slime-v0.3.2` 镜像、**唯一有网的
+# 跑在独立的 prepare 阶段容器里：root、`slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12` 镜像、**唯一有网的
 # 阶段**，而且 $PTDBENCH_WORKSPACE、$PTDBENCH_MODELS 和 $PTDBENCH_DATASETS 都可写。
 #
 # 四份资产，三份下载、一份现场转。目录名由 examples/retool/retool_qwen3_4b_rl.sh

@@ -9,7 +9,8 @@ critic's value head is initialised with random weights instead of zeros.
 ## Root cause
 
 `LinearForLastLayer.__init__` — `slime/backends/megatron_utils/model_provider.py`
-(the workspace overrides it at `slime_patch/model_provider.py`). The constructor
+(bundled in the workspace at `slime/slime/backends/megatron_utils/model_provider.py`).
+The constructor
 draws the weight from `normal_(mean=0.0, std=init_method_std)` (`init_method_std`
 is the backbone's 0.02 LM-head scale). `LinearForLastLayer` is installed
 **unconditionally** as the critic's output layer with `output_size=1`, after the

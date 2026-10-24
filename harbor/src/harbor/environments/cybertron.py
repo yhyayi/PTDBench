@@ -109,10 +109,18 @@ _TERMINAL_STATUSES = {"Failed", "Killed", "Stopped", "Error", "Cancelled"}
 # (inline dict) or ``image_map_path`` (a JSON file of the same shape) rather
 # than editing this default; precedence is documented on ``_resolve_image_id``.
 #
-# slime-v0.3.2 was rebuilt on CUDA 12.9 (image_name ptdbench-slime-v0.3.2-cu129,
-# id 25607131) to clear the cu130 driver mismatch on wuxi_train/speech-wx (see
-# cybertron-cuda13-driver-mismatch). slime-rc0 (cu126, 25607122) and
-# verl-vllm017 (cu129, 25607123) run on speech-wx as-is.
+# NOTE: these keys are Cybertron-registered platform image names, a scheme
+# SEPARATE from the ptdbench env names in docker/images/*.Dockerfile (harbor
+# migration is still pending; see docker/README.zh.md §5). The env names each
+# corresponds to, for cross-reference:
+#   ptdbench-verl-vllm017      <- verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12
+#   ptdbench-slime-rc0         <- slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12
+#   ptdbench-slime-v0.3.2-cu129 <- slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12
+#
+# The slime v0.3.2 env was rebuilt on CUDA 12.9 (platform image_name
+# ptdbench-slime-v0.3.2-cu129, id 25607131) to clear the cu130 driver mismatch on
+# wuxi_train/speech-wx (see cybertron-cuda13-driver-mismatch). The slime v0.5.0rc0
+# env (cu126, 25607122) and the verl env (cu129, 25607123) run on speech-wx as-is.
 _DEFAULT_IMAGE_MAP: dict[str, str] = {
     "ptdbench/ptdbench-slime-rc0:latest": "25607122",
     "ptdbench/ptdbench-slime-v0.3.2-cu129:latest": "25607131",

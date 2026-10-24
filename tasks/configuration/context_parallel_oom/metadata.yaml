@@ -14,7 +14,7 @@ training:
   algo: grpo
   script: examples/grpo_trainer/run_qwen2_5_1.5b_instruct_taco_fsdp.sh
 environment:
-  image: verl
+  image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12
   env:
     # 启动脚本固定 8 卡：run_qwen2_5_1.5b_instruct_taco_fsdp.sh
     # NGPUS_PER_NODE=8，FSDP actor 与 vLLM rollout 共享这一组卡。

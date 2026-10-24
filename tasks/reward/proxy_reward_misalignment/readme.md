@@ -138,8 +138,8 @@ for real, and the verifier reconstructs the metric from the logs under
 
 ## Environment
 
-`metadata.environment.image: ppo-critic-vimpo` resolves to the shared image
-`docker/images/ppo-critic-vimpo.Dockerfile` (Python 3.12, CUDA 12.8, torch
+`metadata.environment.image: vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12` resolves to the shared image
+`docker/images/vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12.Dockerfile` (Python 3.12, CUDA 12.8, torch
 2.8.0, vLLM 0.11.0, Ray 2.56.0, transformers 4.57.6, flash-attn 2.8.3.post1).
 This stack is deliberately **not** the shared `verl` image (vLLM 0.17 / torch
 2.10 / CUDA 12.9): the workspace ships its own veRL + VIMPO recipe written

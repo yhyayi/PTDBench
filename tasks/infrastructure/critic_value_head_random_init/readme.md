@@ -14,7 +14,7 @@ where it reads like checkpoint corruption.
 | **Model** | Qwen3-1.7B |
 | **Dataset** | Endless Terminals (1489 of 2492 tasks admitted; train 1039 / val 150 / test 300) |
 | **Framework** | `slime` v0.3.2 (Megatron train + SGLang rollout + Ray), Multi-Turn PPO, `run.sh` |
-| **Environment** | `slime-v0.3.2` · 2×80GB GPU (1 also works) |
+| **Environment** | `slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12` · 2×80GB GPU (1 also works) |
 | **Evaluations** | issue · solution |
 | **Recorded runs** | 1 defective + 1 control run, 1×H800, Stage A 2 rollouts + Stage B 30 rollouts |
 
@@ -181,14 +181,14 @@ evaluations/solution/oracle/measured_runs/{defective,fixed}/   the measured runs
                                    the Results section below, including every held-out episode
 ```
 
-Only the defective side is published. The fix is a single hunk in
-`slime_patch/model_provider.py`; applying
+Only the defective side is published. The fix is a single hunk in the bundled
+slime tree, `slime/slime/backends/megatron_utils/model_provider.py`; applying
 `evaluations/solution/oracle/value_head_zero_init.patch` to `workspace/` yields
 the control side the measured runs were produced from:
 
 ```console
 $ patch -p1 -d workspace --fuzz=0 < evaluations/solution/oracle/value_head_zero_init.patch
-# one hunk, in slime_patch/model_provider.py
+# one hunk, in slime/slime/backends/megatron_utils/model_provider.py
 ```
 
 ### Inside the workspace
@@ -196,7 +196,9 @@ $ patch -p1 -d workspace --fuzz=0 < evaluations/solution/oracle/value_head_zero_
 ```
 run.sh                       the two-stage reproduction (see below)
 configs/model_args.sh        Qwen3-1.7B Megatron architecture flags
-slime_patch/model_provider.py  the one slime file the workspace overrides -- THE FIX SITE
+slime/                       the full slime v0.3.2 source tree (commit a3f50097); run.sh
+                             runs this copy via PYTHONPATH
+slime/slime/backends/megatron_utils/model_provider.py  THE FIX SITE
 et/build_dataset.py          Endless Terminals -> slime prompt set, with validation
 et/make_splits.py            deterministic train / val / test split of the admitted tasks
 et/sandbox.py                per-episode terminal sandbox
@@ -217,7 +219,7 @@ Under the harness, `environment/prepare.sh` fetches Qwen3-1.7B and the raw
 Endless Terminals tasks into the workspace (`workspace/Qwen3-1.7B` and
 `workspace/endless-terminals`, which `run.sh`'s `MODEL_DIR` / `ET_SRC` defaults
 read), and the agent then runs `./run.sh` from `/workspace` on the
-`slime-v0.3.2` image. The short decider-only reproduction is `EVAL_INTERVAL=0`;
+`slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12` image. The short decider-only reproduction is `EVAL_INTERVAL=0`;
 the full score curve below is `NUM_ROLLOUTS_B=30 EVAL_INTERVAL=5`.
 
 The two recorded runs were produced directly, pointing `run.sh` at local mounts
@@ -257,8 +259,9 @@ After that, on one H800:
 
 `run.sh` is a two-stage script:
 
-- **Step 0-2** install `slime_patch/model_provider.py` over `/root/slime`, then
-  build, validate and split the prompt set (cached in `ET_DATA_ROOT`).
+- **Step 0-2** point `SLIME_HOME` at the bundled `slime/` tree (put ahead of the
+  image's install on `PYTHONPATH`), then build, validate and split the prompt set
+  (cached in `ET_DATA_ROOT`).
 - **Stage A** — "the previous training run": PPO from the HuggingFace weights,
   saving a Megatron checkpoint to `${CKPT_ROOT}/actor`.
 - **Stage B** — "the model was reloaded": load that checkpoint, run
@@ -516,7 +519,8 @@ The `issue` level uses the standard shared protocol (`instruction.md` +
 `verifier/{test.sh,judge.py,judge_prompt.md}`, byte-identical to the other
 LLM-judge tasks); only `oracle.md` is task-specific. It diagnoses the workspace
 as a historical snapshot — the root cause is visible in
-`slime_patch/model_provider.py` — and does not launch training.
+`slime/slime/backends/megatron_utils/model_provider.py` — and does not launch
+training.
 
 The `solution` level is a deterministic metric verifier: the agent applies the
 fix and reruns, and Stage B's first critic step must land inside the reward

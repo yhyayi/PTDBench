@@ -121,8 +121,8 @@ def install_stub_finder(force: bool = False) -> None:
 def default_targets() -> list[str]:
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     candidates = [
-        os.path.join(here, "slime_patch", "model_provider.py"),
-        os.path.join(os.environ.get("SLIME_HOME", "/root/slime"), REL),
+        os.path.join(here, "slime", REL),
+        os.path.join(os.environ.get("SLIME_HOME", os.path.join(here, "slime")), REL),
     ]
     seen, out = set(), []
     for path in candidates:

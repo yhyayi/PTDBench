@@ -156,8 +156,8 @@ graded horizon to 199 without first running a defective 200-step run.
 
 ## Environment requirement
 
-- Image: `slime-v0.3.2` (`environment: image: slime-v0.3.2`), the upstream
-  `slimerl/slime:v0.3.2-cu130` image pinned by digest — CUDA 13.0, sglang
+- Image: `slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12` (`environment: image: slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12`), the upstream
+  `slimerl/slime:v0.3.2-cu129` image pinned by digest — CUDA 12.9, sglang
   0.5.15.post1. There is no per-task Dockerfile.
 - `environment/prepare.sh` installs `faiss-gpu-cuvs` into `$PTDBENCH_PREPARED`
   (not into the image, which all four slime tasks share) and

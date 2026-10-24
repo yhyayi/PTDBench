@@ -2,7 +2,7 @@
 # ppo_critic/reward_parser_mismatch —— 训练前要准备的东西。
 #
 # 由 bundle 的 environment/Dockerfile 迁移而来。跑在独立的 prepare 阶段容器里：
-# root、已激活 `ppo-critic-vimpo` 环境、**唯一有网的阶段**，$PTDBENCH_WORKSPACE、
+# root、已激活 `vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12` 环境、**唯一有网的阶段**，$PTDBENCH_WORKSPACE、
 # $PTDBENCH_PREPARED、$PTDBENCH_MODELS、$PTDBENCH_DATASETS 都可写。
 #
 # legacy Dockerfile 只做了三件事：装 cu128/torch2.8/vllm0.11 依赖栈、把 workspace
@@ -15,7 +15,7 @@
 #
 # 不需要装任何任务专属包：reward 函数（ptdbench_case/buggy_reward_fn.py）只 import
 # `re` 和 workspace 自带的 verl.utils.reward_score.naive_dapo.grade_answer，其依赖
-# （mathruler 等）已在 docker/images/ppo-critic-vimpo.Dockerfile 的 44 个 runtime 包里。
+# （mathruler 等）已在 docker/images/vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12.Dockerfile 的 44 个 runtime 包里。
 #
 # 也不需要 `pip install -e /workspace`：verl 的 __version__ 读自 verl/version/version
 # 文件（不查已安装包元数据），镜像里 PYTHONPATH=/workspace，所以 `import verl` /

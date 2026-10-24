@@ -85,15 +85,22 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m ptdbench evaluate tasks/slime_retool \
 ```
 
 运行前需要确保 Docker daemon 已启动，并允许 Docker Desktop 访问当前仓库目录。
-评测器按 `metadata.yaml` 的 `environment.image` 决定镜像：`image: verl` 对应
-`docker/images/verl.Dockerfile`，镜像 tag 由 Dockerfile 头部的 `# ptdbench-image:` 一行声明（如 `ptdbench/verl:vllm0.17-torch2.10-cu129`）。本地没有这个镜像时
+评测器按 `metadata.yaml` 的 `environment.image` 决定镜像：`image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12` 对应
+`docker/images/verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12.Dockerfile`，镜像 tag 由 Dockerfile 头部的 `# ptdbench-image:` 一行声明（如 `ptdbench:verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12`）。本地没有这个镜像时
 先构建再跑，已有就直接复用；prepare/agent/verifier 三个阶段用同一个镜像、各自起容器。
 想提前构建，或者改了 Dockerfile 之后需要重建（只改工具脚本时 tag 不变，改动不会被自动发现），用：
 
 ```bash
 python3 -m ptdbench build-images                  # 构建 docker/images/ 下所有缺失的镜像
-python3 -m ptdbench build-images verl slime-rc0   # 只构建指定的
-python3 -m ptdbench build-images --rebuild verl   # 已存在也重建
+
+# 只构建指定的
+python3 -m ptdbench build-images \
+    verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12 \
+    slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12
+
+# 已存在也重建
+python3 -m ptdbench build-images --rebuild \
+    verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12
 ```
 
 `--backend` 是整次评测唯一的 runtime backend，agent 和 verifier 始终使用同一个 backend；
@@ -351,7 +358,7 @@ training:
   algo: grpo
   script: scripts/training/Qwen2.5-0.5B-Instruct/rlve.sh
 environment:
-  image: slime-rc0
+  image: slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12
 outcome:
   failure_type: training_collapse
   failure_reason: '--attention-dropout=0.5 keeps held-out eval moving the wrong way
@@ -398,14 +405,16 @@ training:
 
 ```yaml
 environment:
-  image: verl                       # docker/images/ 下的 <name>.Dockerfile
+  image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12   # docker/images/ 下的 <name>.Dockerfile
   prepare: environment/prepare.sh   # 可选，默认就是这个路径
   env:                              # 可选，逐任务不同的环境变量
     CUDA_VISIBLE_DEVICES: "0,1"
 ```
 
 - `image`：必填，用哪个环境镜像。可选值就是 `docker/images/` 下 `*.Dockerfile` 的文件名
-  （目前是 `verl`、`slime-rc0`、`slime-v0.3.2`），没有第二份常量表。
+  （如 `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12`、
+  `slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12`、
+  `slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12`），没有第二份常量表。
   镜像 tag 写在 Dockerfile 头部 `# ptdbench-image: <tag>`，描述的是栈（框架、推理引擎、CUDA），
   多个任务共用，不带 hash；构建上下文是 `docker/`。
 - 要加新环境就加一个 `docker/images/<name>.Dockerfile`：`FROM` 必须钉 digest

@@ -20,29 +20,106 @@
 
 ## 2. 总体形态：一个环境一个镜像
 
-`docker/images/` 下每个 `<name>.Dockerfile` 就是一个环境，构建出的镜像 tag 固定为
-`ptdbench/<name>:latest`：
+`docker/images/` 下每个 `<name>.Dockerfile` 就是一个环境。所有镜像共用同一个 repo 名
+`ptdbench`，彼此靠 tag 区分：环境名 `<name>` 就是 tag，构建 / 拉取出的镜像是
+`ptdbench:<name>`。
+
+### 命名（tag）规范
+
+tag 描述的是这套栈，多个任务共用，不从内容派生 hash。它**只编码「烤进镜像、单个任务在
+`prepare.sh` 里换不动」的那一层**——编译型 / 绑 torch+CUDA ABI / 基础镜像层。能用
+`pip install --target` 在 prepare 阶段覆盖掉的纯 Python 包（`transformers`、`tokenizers`、
+`datasets`、`accelerate`、`ray` …，见本节下面「可覆盖的包不进 tag」）**不进 tag**；它们的
+精确版本一律交给 `FROM` 的 digest（+ 自建镜像的 requirements）去钉。
+
+#### 固定槽位，缺位即不存在
+
+tag 按**固定顺序**拼接；每个槽缺席不是「省略」，而是**该组件在镜像里确实不存在**：
+
+```
+[<框架>-<版本>-]<引擎><版本>-torch<版本>-flashattn<版本>-cu<版本>-py<版本>
+```
+
+| 槽 | 写法 | 缺位的含义 |
+|---|---|---|
+| 框架（领头） | `slime-v0.3.2`（烤进镜像）、`verl-`（family 标签，见下） | 框架不烤进镜像（随任务 workspace bind-mount 进来，如 ppo-critic 的 veRL） |
+| 推理引擎 | `vllm0.11.0`、`sglang0.5.15` | 镜像不烤任何 rollout / inference 引擎 |
+| torch | `torch2.11.0` | 无 torch |
+| flash-attn | `flashattn2.8.3` | 镜像里**确实没装** flash-attn |
+| CUDA | `cu128` | 无 CUDA（CPU 镜像） |
+| python | `py3.12` | —（python 基本总在场，这一槽只承载信息、不承载缺位信号） |
+
+领头的框架槽只在**框架确实烤进镜像**时写版本（`slime-v0.3.2`、`slime-v0.5.0rc0`）。
+veRL 系列的 verl 框架其实不烤进镜像（`import verl` 在 base 里会失败，框架随 workspace
+来），所以 `verl-` 只是一个给「这批 veRL 任务共用」的 family 标签、不带版本，后面照常接
+真实的引擎 / torch / flashattn 槽。
+
+例：
+
+- `vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12` —— 框架领头缺位 = veRL 随 workspace 来。
+- `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12` —— 同样 veRL 随 workspace 来，只是
+  挂了个 `verl-` family 标签把它和上一行区分开。
+- `slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12` —— 框架烤进镜像，领头是
+  `slime-v0.3.2`，torch / flashattn 如实列出（镜像里确实装了）。
+- `torch2.13-py3.12` —— 无引擎、无 CUDA、无 flash-attn，三个缺位准确表达「CPU、不跑
+  rollout、无 FA」（rank-distillation 那类）。
+
+格式约定：全小写、无 `+`。引擎 / `torch` / `flash-attn` 写**完整的 major.minor.patch**
+（`vllm0.11.0`、`torch2.11.0`、`flashattn2.8.3`），只有 `.post1` / `.dev2` 这类纯发布后缀
+交给 digest；但真正区分栈的预发布标记要保留（`slime-v0.5.0rc0` 就是因为 `0.5.0rc0 ≠ 0.5.15`
+才分家，`flashattn2.7.4` 则是把 `2.7.4.post1` 的 `.post1` 丢给 digest）。CUDA 仍写 `cuNNN`
+不写 `cuda12.9`，`py` 仍用 major.minor（`py3.12`）——这两槽不承诺到 patch。
+
+#### 「缺位即不存在」是一个承诺——槽位必须反映镜像真实内容
+
+因为缺位有语义，`flashattn` / `py` 这些槽写的是**镜像里实际存在的东西（含传递依赖）**，
+不是「我在 Dockerfile 里显式装的」——upstream 的 verl / slime 镜像往往传递性地带了
+flash-attn，你没显式装也得如实填上，否则「缺位 = 没装」就成了谎。建议配一条构建后一致性
+检查（`import flash_attn` / `python --version` / `pip show vllm` 断言与 tag 吻合），顺带挡住
+「换了 base 镜像忘改 tag」。
+
+#### 可覆盖的包不进 tag
+
+判据是**覆盖成本**，不是「影响不影响数值」：纯 Python / 装 wheel 即可的包，任务能在
+`prepare.sh` 里 `pip install --target` + `prepared/env` 的 `PYTHONPATH` 自己换掉（见本节
+下文第 4 段），镜像就不必替它们承诺，于是不进 tag。`transformers` 跨任务从 4.46 到 5.x
+都有，但它正是这类——哪个任务要别的版本自己覆盖，不该逼出一个新镜像。
+
+#### Dockerfile 的两种形态
+
+无论 tag 怎么拼，每个 Dockerfile 都塌缩成「一行钉死 digest 的 `FROM` + 一段统一工具块」
+（见第 4 节）。`FROM` 要么指向上游框架官方镜像，要么指向我们自建后推到仓库的预构建镜像
+（镜像本身有详细构建过程时，先构建好推上去，详细过程另行维护，不塞进运行时 Dockerfile）。
+
+按这套 tag 命名还让「看着不同、其实同一套栈」的环境显形、便于合并——但是否真能合并，要靠
+在合并后的镜像上重跑任务、确认成绩不动来判断，不能只看 tag 像就合（见第 1 节「可复现优先
+于统一」）。
+
+下面是当前的环境（向上述 tag 规范的迁移仍在进行）：
 
 | 环境名 | 上游镜像 | 栈 | 任务 |
 |---|---|---|---|
-| `verl` | `verlai/verl:vllm017.latest` | vLLM 0.17，torch 2.10 / CUDA 12.9 | `reward_design/*`、`verl_hyper/*`、`verl_implementation/*` |
-| `slime-rc0` | `slimerl/slime:v0.5.0rc0-cu126` | sglang 0.5.0rc0，torch 2.8 / CUDA 12.6 | `rlve_hyper/*` |
-| `slime-v0.3.2` | `slimerl/slime:v0.3.2-cu130` | sglang 0.5.15.post1，CUDA 13.0 | `slime_retool*`、`slime_search_r1*` |
+| `vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12` | 自建（`FROM nvidia/cuda:12.8.1`） | vLLM 0.11.0，torch 2.8.0 / flash-attn 2.8.3 / CUDA 12.8 / py3.12（veRL 随 workspace 来） | `reward_parser_mismatch`、`proxy_reward_misalignment`、`aime25_single_sample_variance`（ppo_critic 系） |
+| `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12` | `verlai/verl:vllm017.latest` | vLLM 0.17.0，torch 2.10.0 / flash-attn 2.8.3 / CUDA 12.9 / py3.12.13（veRL 随 workspace 来） | `reward_design/*`、`verl_hyper/*`、`verl_implementation/*` |
+| `slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12` | `slimerl/slime:v0.5.0rc0-cu126` | sglang 0.5.0rc0，torch 2.8.0 / flash-attn 2.7.4 / CUDA 12.6 / py3.12.11 | `rlve_hyper/*` |
+| `slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12` | `slimerl/slime:v0.3.2-cu129` | sglang 0.5.15.post1，torch 2.11.0 / flash-attn 2.8.3 / CUDA 12.9 / py3.12.3 | `slime_retool*`、`slime_search_r1*` |
 | `python3.11-slim` | `python:3.11-slim` | 纯 CPython，无 GPU | `example/swe_slugfix` |
 
 任务在 `metadata.yaml` 里只写环境名：
 
 ```yaml
 environment:
-  image: verl
+  image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12
 ```
 
-可选值就是 `docker/images/` 下的文件名，代码里没有第二份常量表（`known_images()` 直接列目录）。
+环境名就是 `docker/images/<name>.Dockerfile` 去掉 `.Dockerfile` 后缀的那一段（`known_images()`
+直接列目录，代码里没有第二份常量表）。
 写了不存在的名字、或者还在用旧的 `conda` / `requirements` / `dockerfile` 字段，
 `ptdbench validate` 会直接报错。
 
-**上游镜像原样使用。** 每个 Dockerfile 只有两部分：一行钉死 digest 的 `FROM`，加上一段
-所有镜像完全相同的 PTDBench 工具块（见第 4 节）。不在镜像里重新编译框架栈 —— 上游镜像就是
+**基础镜像原样使用。** 每个 Dockerfile 只有两部分：一行钉死 digest 的 `FROM`（指向上游
+框架镜像，或我们自建后推到仓库的预构建镜像），加上一段所有镜像完全相同的 PTDBench 工具块
+（见第 4 节）。运行时 Dockerfile 里不重新编译框架栈 —— 基础镜像就是
 这些任务录制时的运行时底座，框架源码则随任务的 workspace 一起来。
 
 **为什么 slime 有两个环境**：不是新旧补丁关系，而是两套端到端不同的栈。retool /
@@ -62,7 +139,7 @@ site-packages 的改动不会带到 agent / verifier 容器里。
 
 ### 按需构建
 
-评测时 docker backend 先检查任务的镜像 `ptdbench/<name>:latest` 是否已存在：存在就直接用，
+评测时 docker backend 先检查任务的镜像 `ptdbench:<name>` 是否已存在：存在就直接用，
 不存在才用 `docker/images/<name>.Dockerfile` 构建（构建上下文是 `docker/`）。
 prepare / agent / verifier 三个阶段用同一个镜像，各自起容器。
 
@@ -70,8 +147,15 @@ prepare / agent / verifier 三个阶段用同一个镜像，各自起容器。
 
 ```sh
 python3 -m ptdbench build-images                  # docker/images/ 下所有缺失的镜像
-python3 -m ptdbench build-images verl slime-rc0   # 只处理指定的
-python3 -m ptdbench build-images --rebuild verl   # 已存在也重建
+
+# 只处理指定的
+python3 -m ptdbench build-images \
+    verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12 \
+    slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12
+
+# 已存在也重建
+python3 -m ptdbench build-images --rebuild \
+    verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12
 ```
 
 **tag 是固定的，不从内容派生。** 所以改了 Dockerfile 或工具块（`ptdbench_fetch.py` 等）之后，
@@ -91,7 +175,8 @@ python3 -m ptdbench build-images --rebuild verl   # 已存在也重建
 
 ### 加一个新环境
 
-1. 新建 `docker/images/<name>.Dockerfile`，开头注释写清上游镜像、栈和用它的任务；
+1. 新建 `docker/images/<name>.Dockerfile`，开头注释写清基础镜像、栈和用它的任务，并写
+   `# ptdbench-image: ptdbench:<name>` 一行声明镜像 tag（harness 从这行解析 tag）；
 2. `FROM` 钉 digest；
 3. 从已有 Dockerfile 里把 `# ---- PTDBench tooling: keep identical in every docker/images/*.Dockerfile ----`
    之后的部分原样复制过来 —— 测试会检查所有 Dockerfile 这一段逐字相同；

@@ -52,7 +52,7 @@ RUN python -m pip config set global.index-url \
 #     --extra-index-url https://download.pytorch.org/whl/cpu
 #     --index-strategy unsafe-best-match --generate-hashes
 # Inline (not COPY'd): docker/.dockerignore allowlists only ptdbench-activate.sh,
-# so requirements must be inlined.  Same pattern as ppo-critic-vimpo.Dockerfile.
+# so requirements must be inlined.  Same pattern as vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12.Dockerfile.
 RUN python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu \
         --index-strategy unsafe-best-match \
         --require-hashes \

@@ -14,7 +14,7 @@ training:
   algo: ppo
   script: run.sh
 environment:
-  image: slime-v0.3.2
+  image: slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12
   env:
     # run.sh defaults NUM_GPUS=2 TP_SIZE=2; both evaluation instructions state a
     # full two-stage run needs 2 GPUs. (NUM_GPUS=1 TP_SIZE=1 also works on one

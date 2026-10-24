@@ -5,8 +5,8 @@ Expected verdict: **unhealthy**.
 ## The component
 
 The **critic's value head** — `LinearForLastLayer` in
-`slime/backends/megatron_utils/model_provider.py` (the workspace's copy is
-`slime_patch/model_provider.py`), at the line
+`slime/backends/megatron_utils/model_provider.py` (bundled in the workspace at
+`slime/slime/backends/megatron_utils/model_provider.py`), at the line
 
 ```python
 self.weight.data.normal_(mean=0.0, std=init_method_std)

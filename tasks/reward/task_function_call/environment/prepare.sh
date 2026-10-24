@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 训练前要准备的东西。
 #
-# 跑在独立的 prepare 阶段容器里：root、已激活 `verl` 环境、**唯一有网的阶段**，
+# 跑在独立的 prepare 阶段容器里：root、已激活 `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12` 环境、**唯一有网的阶段**，
 # $PTDBENCH_WORKSPACE、$PTDBENCH_PREPARED、$PTDBENCH_MODELS、$PTDBENCH_DATASETS
 # 都可写。
 #

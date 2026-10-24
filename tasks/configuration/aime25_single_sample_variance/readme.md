@@ -111,8 +111,8 @@ The judge scores verdict, root-cause, and evidence agreement (weights
 
 ## Environment
 
-`metadata.environment.image: ppo-critic-vimpo` resolves to the shared image
-`docker/images/ppo-critic-vimpo.Dockerfile`, the same image the three ppo_critic
+`metadata.environment.image: vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12` resolves to the shared image
+`docker/images/vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12.Dockerfile`, the same image the three ppo_critic
 training tasks use. This task rides it only for a Python interpreter: its two
 graded steps (`run_eval.py --protocol-only` and the evidence `sha256sum -c`) run
 with the standard library alone, never touch the rollout/eval stack, and the

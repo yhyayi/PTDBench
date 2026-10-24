@@ -217,7 +217,7 @@ fallback execs straight into `module.__dict__`. For the single `getattr(mod,
 exactly why each task has to be aligned separately. To reinstate it, lift the
 trailing section of the sibling's `prepare.sh` (installs into
 `$PTDBENCH_PREPARED/pysite` and appends `PYTHONPATH` to `$PTDBENCH_PREPARED/env`).
-Do **not** edit `docker/images/verl.Dockerfile`; that image is shared by every
+Do **not** edit `docker/images/verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12.Dockerfile`; that image is shared by every
 verl task.
 
 **Known residual leak.** The model now comes from the official

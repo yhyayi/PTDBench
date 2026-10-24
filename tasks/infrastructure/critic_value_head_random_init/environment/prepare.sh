@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # slime_critic_value_head_random_init —— 训练前要准备的东西。
 #
-# 跑在独立的 prepare 阶段容器里：root、`slime-v0.3.2` 镜像、**唯一有网的阶段**，
+# 跑在独立的 prepare 阶段容器里：root、`slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12` 镜像、**唯一有网的阶段**，
 # $PTDBENCH_WORKSPACE、$PTDBENCH_PREPARED、$PTDBENCH_MODELS、$PTDBENCH_DATASETS 都可写。
 #
 # 两份资产，都从 HF 下载到 workspace 里。目录名由 run.sh 的默认值决定，**一个字都
@@ -13,8 +13,10 @@
 #   run.sh:ET_SRC     ->  $WS/endless-terminals （再由 `python3 -m et.build_dataset
 #                                                 --src "$ET_SRC"` 转写 + 校验）
 #
-# 镜像自带 slime 源码树（/root/slime），run.sh 的 Step 0 把 slime_patch/ 里那一个
-# 文件覆盖上去，所以这里**不**下载 slime 本体。
+# slime 源码树已经随 workspace 一起打包进来了（workspace/slime/，就是镜像里
+# /root/slime 的那份 commit a3f50097），run.sh 用 SLIME_HOME=$WS/slime 把它放到
+# PYTHONPATH 最前面、优先于镜像里的安装——所以这里**不**下载 slime 本体，镜像只负责
+# 提供 Megatron-LM / torch / ray / sglang 等运行时。
 #
 # 第一次 run.sh 还会把全部 2492 个 Endless Terminals 任务转写并验证一遍（~40min CPU，
 # 写到 ET_DATA_ROOT=/tmp/et_prompts，被后续每次运行复用）——那一步属于 agent 阶段的

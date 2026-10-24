@@ -14,7 +14,7 @@ training:
   algo: grpo
   script: examples/retool/retool_qwen3_4b_rl.sh
 environment:
-  image: slime-v0.3.2
+  image: slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12
   env:
     # recipe 固定要 8 卡：ray start --num-gpus 8 + --actor-num-gpus-per-node 8，
     # 再按 --rollout-num-gpus-per-engine 2 切 sglang engine。

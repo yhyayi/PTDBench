@@ -29,9 +29,9 @@
   一种启动方式（类似 docker）**。
 - 三个镜像已在 Cybertron 构建好并注册（平台数字镜像 id）：
   - `ptdbench-verl-vllm017`（cu129）
-  - `ptdbench-slime-rc0`（cu126）= 仓库里的 `slime-rc0`，平台 id `25607122`
-  - `ptdbench-slime`（v0.3.2）= 仓库里的 `slime-v0.3.2`，已重建到 cu129，平台 id `25607131`
-    - ⚠️ 用户口头说的 `ptdbench-slime-v0.3.1` 与仓库 `slime-v0.3.2` 对不上，需核对。
+  - `ptdbench-slime-rc0`（cu126）= 仓库里的 `slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12`，平台 id `25607122`
+  - `ptdbench-slime`（v0.3.2）= 仓库里的 `slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12`，已重建到 cu129，平台 id `25607131`
+    - ⚠️ 用户口头说的 `ptdbench-slime-v0.3.1` 与仓库 `slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12` 对不上，需核对。
 
 ---
 
@@ -173,7 +173,7 @@ harbor 的 `start/stop/GPU/配额/计费` 仍走 cctl，只有 `exec/upload/down
 等价于把 §2 契约里 exec 的**传输层**从「k8s exec」换成「app 层网络」，保留 `start→exec→exec→stop` 生命周期。
 
 **通用改动**
-- 三个镜像（verl/slime-rc0/slime-v0.3.2）各烤进一个小 exec-agent：HTTP/websocket server，接口 = 「跑命令
+- 三个镜像（`verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12` / `slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12` / `slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12`）各烤进一个小 exec-agent：HTTP/websocket server，接口 = 「跑命令
   → 回 stdout/stderr/exit code」+「收/发文件」，单端口多路复用，**必须带 token 鉴权**（暴露 URL 可被他人访问，
   否则等于开放 GPU 任意执行）。
 - `CybertronEnvironment.exec/upload/download` → 对 URL 发 HTTP；`start/stop` → cctl。
@@ -404,7 +404,7 @@ roleRef:
 3. ~~集群文件系统挂载~~ **✅ 已解决**：pod 内 `/user` 自动挂载集群 fs（fs 218 wuxi_train），
    走 §5.6.4 子路 1。剩下的仅是 prepare 缓存预热的**执行**：起一次性 BATCH job 跑全部
    `prepare.sh` 写到 `/user/chenyinghao/ptdbench-cache`。（speech-wx 已确认是 **H100** 池。）
-4. 核对镜像名 `ptdbench-slime-v0.3.1` vs 仓库 `slime-v0.3.2`。
+4. 核对镜像名 `ptdbench-slime-v0.3.1` vs 仓库 `slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12`。
 5. 若拿到权限，据 §5 展开 `cybertron` backend 的实现计划（volume/挂载声明、prepare 走
    `cctl file-task` 预热、exec/cp 的两种权限形态分支）。
 6. **§5.6.6 的决定性未知**：Cybertron pod 给不给挂载特权？→ 一个 GPU 探测 job 依次试
@@ -462,8 +462,10 @@ harbor 已有一个**纯 SSH** 的 backend：`harbor/src/harbor/environments/ec2
 | `stop(delete)` | `cctl devspace stop <id>`（+ 停心跳）。 |
 | 健康检查 | `cctl devspace get -F status` + `ssh ... true`。 |
 
-镜像名映射同 §5：harbor `ptdbench/<name>:latest` → cybertron 数字镜像 id（verl=vllm017 /
-slime-rc0=25607122 / slime-v0.3.2=25607131）。
+镜像名映射同 §5：harbor `ptdbench/<name>:latest` → cybertron 数字镜像 id
+（`verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12`=platform vllm017 /
+`slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12`=25607122 /
+`slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12`=25607131）。
 
 ### 8.3 devspace 的三个生命周期坑（backend 必须处理）
 

@@ -72,25 +72,25 @@ class EnvironmentPlanTests(unittest.TestCase):
         # prepare.sh 几乎每个任务都有；逼着每份 metadata.yaml 再抄一遍路径只会
         # 增加抄错的机会。
         package = self._load(
-            "environment:\n  image: verl\n",
+            "environment:\n  image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12\n",
             prepare="#!/usr/bin/env bash\n",
         )
         plan = package.environment
         self.assertTrue(package.report.ok, package.report.to_dict())
-        self.assertEqual(plan.image, "verl")
-        self.assertEqual(plan.environment_image, EnvironmentImage("verl"))
+        self.assertEqual(plan.image, "verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12")
+        self.assertEqual(plan.environment_image, EnvironmentImage("verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12"))
         self.assertEqual(plan.prepare.name, "prepare.sh")
 
     def test_explicit_prepare_wins_over_the_convention(self) -> None:
         package = self._load(
-            "environment:\n  image: verl\n  prepare: environment/fetch.sh\n",
+            "environment:\n  image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12\n  prepare: environment/fetch.sh\n",
         )
         self.assertEqual(package.environment.prepare.name, "fetch.sh")
 
     def test_absent_prepare_leaves_the_plan_empty_rather_than_dangling(self) -> None:
         # plan 里带一个不存在的路径，会把"任务没写 prepare.sh"和"写了但路径错了"
         # 混成同一种状态，而后者必须报错。
-        plan = self._load("environment:\n  image: slime-v0.3.2\n").environment
+        plan = self._load("environment:\n  image: slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12\n").environment
         self.assertIsNone(plan.prepare)
 
     def test_unknown_image_is_a_schema_error(self) -> None:
@@ -137,14 +137,14 @@ class EnvironmentPlanTests(unittest.TestCase):
         # 忽略的话，任务作者会以为它们还在起作用。
         for key in ("conda", "dockerfile", "requirements"):
             self.assertEqual(
-                self._environment_issues({"image": "verl", key: "x"}),
+                self._environment_issues({"image": "verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12", key: "x"}),
                 [f"metadata.environment.{key}"],
                 key,
             )
 
     def test_validator_rejects_a_non_path_prepare(self) -> None:
         self.assertEqual(
-            self._environment_issues({"image": "verl", "prepare": 3}),
+            self._environment_issues({"image": "verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12", "prepare": 3}),
             ["metadata.environment.prepare"],
         )
 
@@ -160,7 +160,7 @@ class EnvironmentEnvTests(unittest.TestCase):
     def test_env_is_parsed_into_the_plan(self):
         package = self._load(
             "environment:\n"
-            "  image: verl\n"
+            "  image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12\n"
             "  env:\n"
             '    CUDA_VISIBLE_DEVICES: "0,1"\n'
             '    NVIDIA_VISIBLE_DEVICES: "0,1"\n'
@@ -171,13 +171,13 @@ class EnvironmentEnvTests(unittest.TestCase):
         )
 
     def test_absent_env_is_an_empty_mapping(self):
-        self.assertEqual(self._load("environment:\n  image: verl\n").environment.env, {})
+        self.assertEqual(self._load("environment:\n  image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12\n").environment.env, {})
 
     def test_tasks_cannot_hijack_the_harness_channel(self):
         # PTDBENCH_* 是 harness 告诉容器"你是哪个 stage"的通道。
         with self.assertRaises(SchemaError) as ctx:
             self._load(
-                "environment:\n  image: verl\n  env:\n    PTDBENCH_STAGE: verifier\n"
+                "environment:\n  image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12\n  env:\n    PTDBENCH_STAGE: verifier\n"
             )
         self.assertIn("PTDBENCH_STAGE", str(ctx.exception))
 
@@ -186,13 +186,13 @@ class EnvironmentEnvTests(unittest.TestCase):
         # "只用 0 号卡" 和 "写错了" 就再也分不出来。
         with self.assertRaises(SchemaError) as ctx:
             self._load(
-                "environment:\n  image: verl\n  env:\n    CUDA_VISIBLE_DEVICES: 0\n"
+                "environment:\n  image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12\n  env:\n    CUDA_VISIBLE_DEVICES: 0\n"
             )
         self.assertIn("CUDA_VISIBLE_DEVICES", str(ctx.exception))
 
     def test_scalar_env_is_rejected(self):
         with self.assertRaises(SchemaError):
-            self._load("environment:\n  image: verl\n  env: nope\n")
+            self._load("environment:\n  image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12\n  env: nope\n")
 
 
 class EnvironmentEnvRuntimeTests(unittest.TestCase):
@@ -235,16 +235,16 @@ class EnvironmentEnvRuntimeTests(unittest.TestCase):
 
 class EnvironmentImageTests(unittest.TestCase):
     def test_image_name_maps_to_a_fixed_tag_and_its_dockerfile(self):
-        image = EnvironmentImage("verl")
-        self.assertEqual(image.tag, "ptdbench/verl:vllm0.17-torch2.10-cu129")
-        self.assertEqual(image.dockerfile, IMAGES_DIR / "verl.Dockerfile")
+        image = EnvironmentImage("verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12")
+        self.assertEqual(image.tag, "ptdbench:verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12")
+        self.assertEqual(image.dockerfile, IMAGES_DIR / "verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12.Dockerfile")
         self.assertEqual(image.context, IMAGES_DIR.parent)
 
     def test_every_dockerfile_declares_a_unique_tag(self):
         # tag 是按栈命名的，一个环境一个；两个环境撞 tag，后构建的会覆盖先构建的。
         tags = {name: EnvironmentImage(name).tag for name in sorted(known_images())}
         for name, tag in tags.items():
-            self.assertRegex(tag, r"^ptdbench/[a-z0-9.-]+:[A-Za-z0-9._-]+$", name)
+            self.assertRegex(tag, r"^ptdbench(:[a-z0-9.-]+|/[a-z0-9.-]+:[A-Za-z0-9._-]+)$", name)
             self.assertNotIn(":latest", tag, name)
         self.assertEqual(len(set(tags.values())), len(tags), tags)
 
@@ -286,11 +286,11 @@ class EnsureEnvironmentTests(unittest.TestCase):
         from ptdbench.runtimes.providers.docker import DockerRuntime
 
         runtime = DockerRuntime()
-        image = EnvironmentImage("verl")
+        image = EnvironmentImage("verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12")
         with mock.patch.object(DockerRuntime, "_image_exists", return_value=exists), \
                 mock.patch("ptdbench.runtimes.providers.docker.subprocess.run") as run:
             artifact = runtime.ensure_environment(image, rebuild=rebuild)
-        self.assertEqual(artifact.reference, "ptdbench/verl:vllm0.17-torch2.10-cu129")
+        self.assertEqual(artifact.reference, "ptdbench:verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12")
         return run
 
     def test_existing_image_is_reused_without_building(self):
@@ -300,8 +300,8 @@ class EnsureEnvironmentTests(unittest.TestCase):
         run = self._run(exists=False)
         argv = run.call_args.args[0]
         self.assertEqual(argv[:2], ["docker", "build"])
-        self.assertEqual(argv[argv.index("-f") + 1], str(IMAGES_DIR / "verl.Dockerfile"))
-        self.assertEqual(argv[argv.index("-t") + 1], "ptdbench/verl:vllm0.17-torch2.10-cu129")
+        self.assertEqual(argv[argv.index("-f") + 1], str(IMAGES_DIR / "verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12.Dockerfile"))
+        self.assertEqual(argv[argv.index("-t") + 1], "ptdbench:verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12")
         self.assertEqual(argv[-1], str(IMAGES_DIR.parent))
         self.assertTrue(run.call_args.kwargs["check"])
 
@@ -317,7 +317,7 @@ class EnsureEnvironmentTests(unittest.TestCase):
                     side_effect=subprocess.CalledProcessError(1, ["docker", "build"]),
                 ):
             with self.assertRaises(subprocess.CalledProcessError):
-                DockerRuntime().ensure_environment(EnvironmentImage("verl"))
+                DockerRuntime().ensure_environment(EnvironmentImage("verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12"))
 
 
 class BuildImagesCommandTests(unittest.TestCase):
@@ -336,11 +336,11 @@ class BuildImagesCommandTests(unittest.TestCase):
         self.assertEqual(calls, [(name, False) for name in sorted(known_images())])
 
     def test_names_and_rebuild_are_passed_through(self):
-        self.assertEqual(self._main("verl", "--rebuild"), (0, [("verl", True)]))
+        self.assertEqual(self._main("verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12", "--rebuild"), (0, [("verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12", True)]))
 
     def test_unknown_name_is_rejected_before_building(self):
         with self.assertRaises(SystemExit) as ctx:
-            self._main("verl", "pytorch")
+            self._main("verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12", "pytorch")
         self.assertIn("pytorch", str(ctx.exception))
 
 

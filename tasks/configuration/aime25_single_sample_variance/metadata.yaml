@@ -14,7 +14,7 @@ training:
   algo: PPO-Critic evaluation
   script: run_eval.py
 environment:
-  image: ppo-critic-vimpo
+  image: vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12
 
 outcome:
   failure_type: evaluation_under_sampling
