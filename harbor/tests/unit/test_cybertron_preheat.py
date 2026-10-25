@@ -5,11 +5,17 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 _SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "cybertron_preheat.py"
 _spec = importlib.util.spec_from_file_location("cybertron_preheat", _SCRIPT)
 assert _spec and _spec.loader
 preheat = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(preheat)
+
+# A known image name (task metadata `image`) and its mapped canonicalName.
+_IMAGE = "vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12"
+_CANONICAL = "infra-platform/ptdbench-vllm0.11-torch2.8-cu128:latest"
 
 
 class TestBuildEntry:
@@ -145,7 +151,7 @@ class TestBuildCctlCommand:
                 "--project",
                 "xinfer-chenyinghao",
                 "--image",
-                "25607122",
+                _IMAGE,
                 "--git-path",
                 "git@github.com:org/ptdbench.git",
                 "--git-ref",
@@ -162,7 +168,8 @@ class TestBuildCctlCommand:
         assert cmd[cmd.index("--git-path") + 1] == "git@github.com:org/ptdbench.git"
         assert cmd[cmd.index("--git-ref") + 1] == "main"
         assert cmd[cmd.index("--entry") + 1] == entry
-        assert cmd[cmd.index("--image") + 1] == "25607122"
+        # The image name is resolved to its Cybertron canonicalName for cctl.
+        assert cmd[cmd.index("--image") + 1] == _CANONICAL
 
     def test_profile_prefixed(self):
         args = preheat.parse_args(
@@ -170,7 +177,7 @@ class TestBuildCctlCommand:
                 "--project",
                 "p",
                 "--image",
-                "1",
+                _IMAGE,
                 "--git-path",
                 "g",
                 "--profile",
@@ -180,8 +187,17 @@ class TestBuildCctlCommand:
         cmd = preheat.build_cctl_command(args, "entry")
         assert cmd[:3] == ["cctl", "--profile", "thunlp"]
 
+    def test_unknown_image_name_rejected(self):
+        args = preheat.parse_args(
+            ["--project", "p", "--image", "25607122", "--git-path", "g"]
+        )
+        with pytest.raises(SystemExit, match="unknown image name"):
+            preheat.build_cctl_command(args, "entry")
+
     def test_dry_run_is_default(self):
-        args = preheat.parse_args(["--project", "p", "--image", "1", "--git-path", "g"])
+        args = preheat.parse_args(
+            ["--project", "p", "--image", _IMAGE, "--git-path", "g"]
+        )
         assert args.run is False
 
 
@@ -191,7 +207,7 @@ class TestMainDryRun:
             raise AssertionError("subprocess.run should not run in dry-run")
 
         monkeypatch.setattr(preheat.subprocess, "run", _boom)
-        rc = preheat.main(["--project", "p", "--image", "25607122", "--git-path", "g"])
+        rc = preheat.main(["--project", "p", "--image", _IMAGE, "--git-path", "g"])
         assert rc == 0
         out = capsys.readouterr().out
         assert "dry-run" in out

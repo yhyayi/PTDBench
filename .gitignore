@@ -11,6 +11,7 @@ datasets/
 
 raw_tasks/
 task_construct/
+docker-build/
 
 # 评测用的模型网关凭据（judge 走 OpenAI 兼容路径、agent 走 Anthropic 原生路径）。
 # 是真实 key，绝不能进 git。

@@ -104,46 +104,62 @@ _DEFAULT_HEARTBEAT_INTERVAL_SEC = 120
 _RUNNING_STATUSES = {"Running", "Started", "Ready"}
 _TERMINAL_STATUSES = {"Failed", "Killed", "Stopped", "Error", "Cancelled"}
 
-# Built-in ptdbench image tag (``ptdbench/<name>:<tag>``) -> Cybertron platform
-# image id map. Extend it per job/task via ``[environment].kwargs.image_map``
-# (inline dict) or ``image_map_path`` (a JSON file of the same shape) rather
-# than editing this default; precedence is documented on ``_resolve_image_id``.
+# Built-in PTDBench image name -> Cybertron ``canonicalName`` map. The key is the
+# task ``metadata.yaml`` ``image`` field (also the ``docker/images/<name>.Dockerfile``
+# stem); the value is the registry reference ``cctl ... --image`` resolves to a
+# platform image. ``cctl image get <id> -F canonical_name`` prints these, so refresh
+# a value whenever an image is rebuilt (the canonicalName carries the content tag).
+# Extend it per job/task via ``[environment].kwargs.image_map`` (inline dict) or
+# ``image_map_path`` (a JSON file of the same shape) rather than editing this default.
 #
-# NOTE: these keys are Cybertron-registered platform image names, a scheme
-# SEPARATE from the ptdbench env names in docker/images/*.Dockerfile (harbor
-# migration is still pending; see docker/README.zh.md §5). The env names each
-# corresponds to, for cross-reference:
-#   ptdbench-verl-vllm017      <- verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12
-#   ptdbench-slime-rc0         <- slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12
-#   ptdbench-slime-v0.3.2-cu129 <- slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12
-#
-# The slime v0.3.2 env was rebuilt on CUDA 12.9 (platform image_name
-# ptdbench-slime-v0.3.2-cu129, id 25607131) to clear the cu130 driver mismatch on
-# wuxi_train/speech-wx (see cybertron-cuda13-driver-mismatch). The slime v0.5.0rc0
-# env (cu126, 25607122) and the verl env (cu129, 25607123) run on speech-wx as-is.
+# harbor-evaluate hands the backend the built Dockerfile tag ``ptdbench:<name>``
+# rather than the bare name; ``_image_name_key`` strips that prefix so both the tag
+# and the raw metadata name resolve to the same entry here.
 _DEFAULT_IMAGE_MAP: dict[str, str] = {
-    "ptdbench/ptdbench-slime-rc0:latest": "25607122",
-    "ptdbench/ptdbench-slime-v0.3.2-cu129:latest": "25607131",
-    "ptdbench/ptdbench-slime-v0.3.2:latest": "25607131",
-    "ptdbench/ptdbench-slime:latest": "25607131",
-    "ptdbench/ptdbench-verl-vllm017:latest": "25607123",
-    "ptdbench/ptdbench-verl:latest": "25607123",
+    "slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12": (
+        "share-dev/ngc-docker/ptdbench-slime-rc0:dev-f110ee9-cb-8452036a"
+    ),
+    "slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12": (
+        "share-dev/ngc-docker/ptdbench-slime:dev-96bfe26-cb-55f572c7"
+    ),
+    "verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12": (
+        "share-dev/ngc-docker/ptdbench-verl-vllm017:dev-957fee7-cb-bf632efb"
+    ),
+    "vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12": (
+        "infra-platform/ptdbench-vllm0.11-torch2.8-cu128:latest"
+    ),
 }
+
+# The registry-less tag prefix harbor-evaluate builds for a PTDBench image
+# (``EnvironmentImage.tag`` -> ``ptdbench:<metadata image name>``).
+_PTDBENCH_TAG_PREFIX = "ptdbench:"
+
+
+def _image_name_key(image: str) -> str:
+    """The task metadata image name, whether given raw or as its built tag.
+
+    The CLI passes the bare metadata name (e.g.
+    ``slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12``);
+    harbor-evaluate passes the built Dockerfile tag ``ptdbench:<name>``. Both
+    normalize to the metadata name used as the image_map key.
+    """
+    if image.startswith(_PTDBENCH_TAG_PREFIX):
+        return image[len(_PTDBENCH_TAG_PREFIX) :]
+    return image
 
 
 def _load_image_map_file(path: str | Path) -> dict[str, str]:
-    """Load an image-name -> platform-id map from a JSON file.
+    """Load an image-name -> canonicalName map from a JSON file.
 
-    The file must be a JSON object of ``{"<image tag>": "<platform id>"}``;
-    values are coerced to ``str`` (ids are numeric on the platform but are
-    always passed to ``cctl`` as strings).
+    The file must be a JSON object of ``{"<image name>": "<canonicalName>"}``;
+    values are coerced to ``str``.
     """
     resolved = Path(path).expanduser()
     raw = json.loads(resolved.read_text())
     if not isinstance(raw, dict):
         raise ValueError(
             f"Cybertron image_map_path {resolved} must contain a JSON object "
-            f"of {{image: id}}, got {type(raw).__name__}."
+            f"of {{image: canonicalName}}, got {type(raw).__name__}."
         )
     return {str(key): str(value) for key, value in raw.items()}
 
@@ -453,7 +469,7 @@ class CybertronEnvironment(BaseEnvironment):
         requeue: bool = False,
         cpu: int | None = None,
         memory_gb: int | None = None,
-        image_id: str | None = None,
+        image_name: str | None = None,
         image_map: dict[str, str] | None = None,
         image_map_path: str | Path | None = None,
         cluster_user: str | None = None,
@@ -516,8 +532,9 @@ class CybertronEnvironment(BaseEnvironment):
         self._memory_gb = (
             memory_gb if memory_gb is not None else _MEMORY_GB_PER_GPU * gpu_units
         )
-        self._image_id_override = image_id
+        self._image_name_override = image_name
         # Precedence (low -> high): built-in < image_map_path file < image_map.
+        # image name (task metadata `image`) -> Cybertron canonicalName.
         self._image_map = {
             **_DEFAULT_IMAGE_MAP,
             **(_load_image_map_file(image_map_path) if image_map_path else {}),
@@ -604,35 +621,46 @@ class CybertronEnvironment(BaseEnvironment):
 
     @override
     def _validate_definition(self) -> None:
-        if not self.task_env_config.docker_image and self._image_id_override is None:
+        if not self.task_env_config.docker_image and self._image_name_override is None:
             raise ValueError(
                 "Cybertron environment requires either [environment].docker_image "
-                "(mapped to a platform image id) or an explicit image_id kwarg."
+                "(the task metadata image name) or an explicit image_name kwarg."
             )
-        # Fail fast if the image cannot be mapped to a platform id.
-        self._resolve_image_id()
+        # Fail fast if the image name cannot be mapped to a canonicalName.
+        self._resolve_image()
 
-    def _resolve_image_id(self) -> str:
-        """Resolve the platform image id to pass to ``cctl devspace create``.
+    def _resolve_image(self) -> str:
+        """Resolve the Cybertron ``canonicalName`` to pass to ``cctl ... --image``.
 
-        Precedence: explicit ``image_id`` kwarg > the image_map lookup
-        (built-in < ``image_map_path`` file < ``image_map`` kwarg, merged in
-        ``__init__``) > a raw platform id / canonicalName passed through.
+        The image is given by name — the explicit ``image_name`` kwarg or the
+        task's ``docker_image`` (the metadata image name, or its built
+        ``ptdbench:<name>`` tag) — and mapped through ``image_map``. Precedence:
+        explicit ``image_name`` kwarg > the task's ``docker_image``.
         """
-        if self._image_id_override is not None:
-            return self._image_id_override
+        if self._image_name_override is not None:
+            return self._lookup_canonical(self._image_name_override, "image_name")
         image = self.task_env_config.docker_image
         if image is None:
             raise ValueError("Cybertron environment has no image configured.")
-        mapped = self._image_map.get(image)
-        if mapped is not None:
-            return mapped
-        # Allow passing a raw platform id / canonicalName straight through.
-        if image.isdigit() or "/" in image or ":" in image:
-            return image
+        return self._lookup_canonical(image, "docker_image")
+
+    def _lookup_canonical(self, image: str, source: str) -> str:
+        """Map a PTDBench image name to its Cybertron ``canonicalName``.
+
+        The lookup key is the task metadata image name; ``_image_name_key``
+        strips the ``ptdbench:`` tag prefix harbor-evaluate adds so the tag and
+        the bare name both resolve. The map is built-in < ``image_map_path`` file
+        < ``image_map`` kwarg (merged in ``__init__``).
+        """
+        canonical = self._image_map.get(_image_name_key(image))
+        if canonical is not None:
+            return canonical
+        known = ", ".join(sorted(self._image_map)) or "<none>"
         raise ValueError(
-            f"Cannot map image {image!r} to a Cybertron platform image id. "
-            "Add it to the cybertron image_map kwarg or pass image_id."
+            f"Unknown {source} image {image!r}: no Cybertron canonicalName mapped. "
+            f"Known image names: {known}. Register the image and add it to "
+            "_DEFAULT_IMAGE_MAP, or pass it via the cybertron image_map kwarg "
+            "(name -> canonicalName)."
         )
 
     # -- paths --------------------------------------------------------------
@@ -724,7 +752,7 @@ class CybertronEnvironment(BaseEnvironment):
             "--billing-account-id",
             self._billing_account_id,
             "--image",
-            self._resolve_image_id(),
+            self._resolve_image(),
             "--gpu",
             str(self._effective_gpus),
             "--gpu-model",

@@ -18,6 +18,12 @@ from harbor.models.environment_type import EnvironmentType
 from harbor.models.task.config import EnvironmentConfig
 from harbor.models.trial.paths import TrialPaths
 
+# A known image name (task metadata `image`) and its mapped canonicalName, used
+# both to exercise resolution and to satisfy _validate_definition in tests that
+# do not care about the image.
+_IMAGE = "vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12"
+_CANONICAL = "infra-platform/ptdbench-vllm0.11-torch2.8-cu128:latest"
+
 
 def _trial_paths(root: Path) -> TrialPaths:
     root.mkdir(parents=True, exist_ok=True)
@@ -49,7 +55,7 @@ class TestRegistration:
         assert entry.class_name == "CybertronEnvironment"
 
     def test_type_and_capabilities(self, tmp_path):
-        env = _make_env(tmp_path, image_id="25607122")
+        env = _make_env(tmp_path, image_name=_IMAGE)
         assert env.type() is EnvironmentType.CYBERTRON
         caps = env.capabilities
         assert caps.gpus is True
@@ -72,7 +78,7 @@ class TestResourceScaling:
                 docker_image=None, workdir="/workspace", gpus=gpus
             ),
             project="xinfer-chenyinghao",
-            image_id="1",
+            image_name=_IMAGE,
             **kwargs,
         )
 
@@ -107,80 +113,83 @@ class TestPriority:
         return captured["args"]
 
     async def test_defaults_to_normal(self, tmp_path, monkeypatch):
-        env = _make_env(tmp_path, image_id="1")
+        env = _make_env(tmp_path, image_name=_IMAGE)
         args = await self._captured_create_args(env, monkeypatch)
         assert "--priority" in args
         assert args[args.index("--priority") + 1] == "NORMAL"
         assert "--requeue" not in args
 
     async def test_preemptable_is_passed(self, tmp_path, monkeypatch):
-        env = _make_env(tmp_path, image_id="1", priority="PREEMPTABLE")
+        env = _make_env(tmp_path, image_name=_IMAGE, priority="PREEMPTABLE")
         args = await self._captured_create_args(env, monkeypatch)
         assert args[args.index("--priority") + 1] == "PREEMPTABLE"
 
     async def test_lowercase_is_normalized(self, tmp_path):
-        env = _make_env(tmp_path, image_id="1", priority="preemptable")
+        env = _make_env(tmp_path, image_name=_IMAGE, priority="preemptable")
         assert env._priority == "PREEMPTABLE"
 
     async def test_requeue_appends_flag(self, tmp_path, monkeypatch):
-        env = _make_env(tmp_path, image_id="1", priority="PREEMPTABLE", requeue=True)
+        env = _make_env(
+            tmp_path, image_name=_IMAGE, priority="PREEMPTABLE", requeue=True
+        )
         args = await self._captured_create_args(env, monkeypatch)
         assert "--requeue" in args
 
     def test_invalid_priority_rejected(self, tmp_path):
         with pytest.raises(ValueError, match="priority must be one of"):
-            _make_env(tmp_path, image_id="1", priority="URGENT")
+            _make_env(tmp_path, image_name=_IMAGE, priority="URGENT")
 
 
 class TestImageResolution:
-    def test_builtin_map(self, tmp_path):
-        env = _make_env(tmp_path, docker_image="ptdbench/ptdbench-slime-rc0:latest")
-        assert env._resolve_image_id() == "25607122"
+    def test_builtin_map_by_name(self, tmp_path):
+        env = _make_env(tmp_path, docker_image=_IMAGE)
+        assert env._resolve_image() == _CANONICAL
 
-    def test_explicit_image_id_wins(self, tmp_path):
+    def test_builtin_map_by_built_tag(self, tmp_path):
+        # harbor-evaluate passes the built `ptdbench:<name>` tag, not the name.
+        env = _make_env(tmp_path, docker_image=f"ptdbench:{_IMAGE}")
+        assert env._resolve_image() == _CANONICAL
+
+    def test_explicit_image_name_wins(self, tmp_path):
         env = _make_env(
             tmp_path,
-            docker_image="ptdbench/ptdbench-slime-rc0:latest",
-            image_id="99999",
+            docker_image="slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12",
+            image_name=_IMAGE,
         )
-        assert env._resolve_image_id() == "99999"
+        assert env._resolve_image() == _CANONICAL
 
     def test_inline_image_map_overrides_builtin(self, tmp_path):
         env = _make_env(
             tmp_path,
-            docker_image="ptdbench/ptdbench-slime-rc0:latest",
-            image_map={"ptdbench/ptdbench-slime-rc0:latest": "77777"},
+            docker_image=_IMAGE,
+            image_map={_IMAGE: "my-registry/custom:tag"},
         )
-        assert env._resolve_image_id() == "77777"
+        assert env._resolve_image() == "my-registry/custom:tag"
 
     def test_image_map_path_merges_and_kwarg_wins(self, tmp_path):
         map_file = tmp_path / "images.json"
-        map_file.write_text(json.dumps({"ptdbench/custom:latest": "12345"}))
+        map_file.write_text(json.dumps({"custom-env": "reg/from-file:1"}))
         env = _make_env(
             tmp_path,
-            docker_image="ptdbench/custom:latest",
+            docker_image="custom-env",
             image_map_path=map_file,
         )
-        assert env._resolve_image_id() == "12345"
+        assert env._resolve_image() == "reg/from-file:1"
         # kwarg dict beats file entry for the same key
         env2 = _make_env(
             tmp_path,
-            docker_image="ptdbench/custom:latest",
+            docker_image="custom-env",
             image_map_path=map_file,
-            image_map={"ptdbench/custom:latest": "54321"},
+            image_map={"custom-env": "reg/from-kwarg:2"},
         )
-        assert env2._resolve_image_id() == "54321"
+        assert env2._resolve_image() == "reg/from-kwarg:2"
 
-    def test_raw_platform_id_passthrough(self, tmp_path):
-        env = _make_env(tmp_path, docker_image="25601234")
-        assert env._resolve_image_id() == "25601234"
-
-    def test_unmappable_name_raises(self, tmp_path):
-        env = _make_env(tmp_path, image_id="1")  # pass validation
-        env._image_id_override = None
-        env.task_env_config.docker_image = "mystery-image-no-colon"
-        with pytest.raises(ValueError, match="Cannot map image"):
-            env._resolve_image_id()
+    def test_unmapped_name_raises(self, tmp_path):
+        env = _make_env(tmp_path, image_name=_IMAGE)  # pass validation
+        env._image_name_override = None
+        env.task_env_config.docker_image = "mystery-image"
+        with pytest.raises(ValueError, match="Unknown docker_image image"):
+            env._resolve_image()
 
     def test_missing_image_fails_validation(self, tmp_path):
         with pytest.raises(ValueError, match="requires either"):
@@ -202,7 +211,7 @@ class TestImageMapFile:
 
 class TestTransportCommand:
     def test_tsh_transport(self, tmp_path):
-        env = _make_env(tmp_path, image_id="1", tsh_path="/opt/tsh")
+        env = _make_env(tmp_path, image_name=_IMAGE, tsh_path="/opt/tsh")
         env._host = "devspace-user-proj-1098539"
         cmd = env._transport_cmd()
         assert cmd == [
@@ -213,7 +222,7 @@ class TestTransportCommand:
         ]
 
     def test_ssh_fallback_transport(self, tmp_path):
-        env = _make_env(tmp_path, image_id="1", use_tsh=False)
+        env = _make_env(tmp_path, image_name=_IMAGE, use_tsh=False)
         env._host = "devspace-user-proj-1098539"
         cmd = env._transport_cmd()
         assert cmd[0] == "ssh"
@@ -221,7 +230,7 @@ class TestTransportCommand:
         assert "BatchMode=yes" in cmd
 
     def test_transport_requires_resolved_host(self, tmp_path):
-        env = _make_env(tmp_path, image_id="1", tsh_path="/opt/tsh")
+        env = _make_env(tmp_path, image_name=_IMAGE, tsh_path="/opt/tsh")
         with pytest.raises(RuntimeError, match="host is not resolved"):
             env._transport_cmd()
 
@@ -229,7 +238,10 @@ class TestTransportCommand:
 class TestNodeResolutionViaTsh:
     async def test_matches_node_by_id_suffix(self, tmp_path, monkeypatch):
         env = _make_env(
-            tmp_path, image_id="1", tsh_path="/opt/tsh", devspace_id="tasks/1098539"
+            tmp_path,
+            image_name=_IMAGE,
+            tsh_path="/opt/tsh",
+            devspace_id="tasks/1098539",
         )
         nodes = [
             {"spec": {"hostname": "devspace-u-p-711108"}},
@@ -250,7 +262,10 @@ class TestNodeResolutionViaTsh:
         # not-yet-present node is transient: resolution returns None and
         # _wait_for_status polls again rather than failing the start.
         env = _make_env(
-            tmp_path, image_id="1", tsh_path="/opt/tsh", devspace_id="tasks/1098539"
+            tmp_path,
+            image_name=_IMAGE,
+            tsh_path="/opt/tsh",
+            devspace_id="tasks/1098539",
         )
         monkeypatch.setattr(
             cybertron_mod.asyncio, "create_subprocess_exec", AsyncMock()
@@ -264,7 +279,10 @@ class TestNodeResolutionViaTsh:
 
     async def test_ssh_host_override_short_circuits(self, tmp_path):
         env = _make_env(
-            tmp_path, image_id="1", ssh_host="devspace-explicit-9", tsh_path="/opt/tsh"
+            tmp_path,
+            image_name=_IMAGE,
+            ssh_host="devspace-explicit-9",
+            tsh_path="/opt/tsh",
         )
         assert await env._resolve_devspace_host() == "devspace-explicit-9"
 
@@ -273,7 +291,9 @@ class TestWaitForStatus:
     """_wait_for_status gates on Running AND the ssh host registering."""
 
     def _env(self, tmp_path, monkeypatch, **kwargs):
-        env = _make_env(tmp_path, image_id="1", devspace_id="tasks/1098539", **kwargs)
+        env = _make_env(
+            tmp_path, image_name=_IMAGE, devspace_id="tasks/1098539", **kwargs
+        )
         # Never actually sleep between polls.
         monkeypatch.setattr(cybertron_mod.asyncio, "sleep", AsyncMock())
         return env
@@ -327,7 +347,7 @@ class TestWaitForStatus:
 
 class TestWrapSandbox:
     def _env(self, tmp_path, **kwargs):
-        env = _make_env(tmp_path, image_id="1", **kwargs)
+        env = _make_env(tmp_path, image_name=_IMAGE, **kwargs)
         env._cluster_user = "u"
         return env
 
@@ -389,7 +409,7 @@ class TestWrapSandbox:
 
 class TestResolveNodeIp:
     async def test_valid_ip_accepted(self, tmp_path, monkeypatch):
-        env = _make_env(tmp_path, image_id="1")
+        env = _make_env(tmp_path, image_name=_IMAGE)
         monkeypatch.setattr(
             CybertronEnvironment,
             "_ssh_exec",
@@ -402,7 +422,7 @@ class TestResolveNodeIp:
         assert await env._resolve_node_ip() == "200.20.26.185"
 
     async def test_garbage_output_rejected(self, tmp_path, monkeypatch):
-        env = _make_env(tmp_path, image_id="1")
+        env = _make_env(tmp_path, image_name=_IMAGE)
         monkeypatch.setattr(
             CybertronEnvironment,
             "_ssh_exec",
@@ -421,7 +441,7 @@ class TestRunDirName:
     spell out the defect."""
 
     def test_run_dir_does_not_leak_the_task_name(self, tmp_path):
-        env = _make_env(tmp_path, image_id="1")
+        env = _make_env(tmp_path, image_name=_IMAGE)
         env._cluster_user = "u"
         assert "test-task" not in env._run_dir
         assert env._run_dir.startswith("/user/u/harbor-runs/")
@@ -429,8 +449,8 @@ class TestRunDirName:
         assert env._logs_dir.startswith(env._run_dir)
 
     def test_run_dir_is_stable_per_instance_and_fresh_per_trial(self, tmp_path):
-        a = _make_env(tmp_path / "a", image_id="1")
-        b = _make_env(tmp_path / "b", image_id="1")
+        a = _make_env(tmp_path / "a", image_name=_IMAGE)
+        b = _make_env(tmp_path / "b", image_name=_IMAGE)
         a._cluster_user = b._cluster_user = "u"
         assert a._run_dir == a._run_dir
         assert a._run_dir != b._run_dir
@@ -438,7 +458,7 @@ class TestRunDirName:
 
 class TestSshConnectRetry:
     def _env(self, tmp_path, monkeypatch, results):
-        env = _make_env(tmp_path, image_id="1", use_tsh=False)
+        env = _make_env(tmp_path, image_name=_IMAGE, use_tsh=False)
         env._host = "h"
         calls: list[int] = []
 
@@ -485,7 +505,7 @@ class TestPathKind:
     """A slow Teleport round trip must not turn /workspace into a "file"."""
 
     def _env(self, tmp_path, monkeypatch, return_code):
-        env = _make_env(tmp_path, image_id="1")
+        env = _make_env(tmp_path, image_name=_IMAGE)
         seen: dict[str, object] = {}
 
         async def fake_exec(self, command, *args, timeout_sec=None, **kwargs):
@@ -515,7 +535,7 @@ class TestSetupDevspaceScript:
     async def test_clears_previous_trial_leftovers_first(self, tmp_path, monkeypatch):
         # /tests survives on an attached devspace's rootfs and is --rw in the
         # agent sandbox: the previous verifier's oracle.md would be readable.
-        env = _make_env(tmp_path, image_id="1")
+        env = _make_env(tmp_path, image_name=_IMAGE)
         env._cluster_user = "u"
         captured: dict[str, str] = {}
 
@@ -531,7 +551,7 @@ class TestSetupDevspaceScript:
         assert setup.index(cleanup) < setup.index("ln -sfnT ")
 
     async def test_installs_rename_shim_via_ld_so_preload(self, tmp_path, monkeypatch):
-        env = _make_env(tmp_path, image_id="1")
+        env = _make_env(tmp_path, image_name=_IMAGE)
         env._cluster_user = "u"
         captured: dict[str, str] = {}
 
@@ -555,7 +575,7 @@ class TestSetupDevspaceScript:
         # dirs; `ln -sfn` would silently nest inside them. Setup must drop any
         # pre-existing real (non-symlink) dir first, then link with -T so a
         # lingering real dir fails loudly instead of nesting again.
-        env = _make_env(tmp_path, image_id="1")
+        env = _make_env(tmp_path, image_name=_IMAGE)
         env._cluster_user = "u"
         captured: dict[str, str] = {}
 

@@ -1,7 +1,7 @@
 """Unit tests for scripts/cybertron_stage.py (pre-agent staging helper).
 
 Covers the pure, cluster-free surface: CLI parsing, the constructor-kwarg
-resolution (attach vs create, image_id / cache_dir folding), the on-devspace
+resolution (attach vs create, image_name / cache_dir folding), the on-devspace
 prepare recipe, and the dry-run output. The cluster-touching run_stage() path
 is exercised only through its argument plumbing, never by reaching cctl/ssh.
 """
@@ -65,20 +65,20 @@ class TestConstructorKwargs:
                 argv += [flag, str(over.pop(key))]
         return stage.parse_args(argv)
 
-    def test_image_flag_becomes_image_id(self):
-        kwargs = stage.constructor_kwargs(self._args(image="25607131"))
-        assert kwargs["image_id"] == "25607131"
+    def test_image_flag_becomes_image_name(self):
+        kwargs = stage.constructor_kwargs(self._args(image="slime-v0.3.2"))
+        assert kwargs["image_name"] == "slime-v0.3.2"
 
     def test_cache_dir_flag_folds_in(self):
         kwargs = stage.constructor_kwargs(self._args(cache_dir="/user/me/cache"))
         assert kwargs["cache_dir"] == "/user/me/cache"
 
     def test_explicit_pair_wins_over_flag(self):
-        # An image_id passed as a pair is not clobbered by --image.
+        # An image_name passed as a pair is not clobbered by --image.
         kwargs = stage.constructor_kwargs(
-            self._args(image="111", environment_kwarg=["image_id=999"])
+            self._args(image="aaa", environment_kwarg=["image_name=bbb"])
         )
-        assert kwargs["image_id"] == "999"
+        assert kwargs["image_name"] == "bbb"
 
     def test_devspace_id_signals_attach_mode(self):
         kwargs = stage.constructor_kwargs(
@@ -128,7 +128,7 @@ class TestEnvConfig:
 
 class TestDryRun:
     def test_dry_run_prints_plan_and_touches_nothing(self, capsys):
-        rc = stage.main(["tasks/slime_retool", "--gpu", "8", "--image", "25607131"])
+        rc = stage.main(["tasks/x", "--gpu", "8", "--image", "slime-v0.3.2-cu129"])
         out = capsys.readouterr().out
         assert rc == 0
         assert "dry-run" in out

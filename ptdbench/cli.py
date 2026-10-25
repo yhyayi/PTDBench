@@ -36,6 +36,25 @@ def _is_task_root(path: Path) -> bool:
     return any((path / name).is_file() for name in ("metadata.yaml", "metadata.yml"))
 
 
+def _metadata_image_and_gpus(task_root: Path) -> tuple[str | None, int | None]:
+    """Read the environment image name and GPU count from a task's metadata.yaml.
+
+    The GPU count is the number of entries in
+    ``environment.env.CUDA_VISIBLE_DEVICES`` — the same signal harbor-evaluate
+    uses to size the devspace. Either value is ``None`` when the task does not
+    declare it, leaving the caller's own default in place.
+    """
+    from .tasks import load_task_package
+
+    package = load_task_package(task_root, strict=False)
+    image = package.environment.image
+    visible = (package.environment.env or {}).get("CUDA_VISIBLE_DEVICES")
+    gpus = None
+    if visible:
+        gpus = len([part for part in str(visible).split(",") if part.strip()])
+    return image, gpus
+
+
 def expand_task_roots(paths: list[str]) -> list[Path]:
     """Expand each argument into task roots, keeping the caller's order.
 
@@ -419,7 +438,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--gpus",
         default=None,
         help="docker backend: docker run --gpus value; cybertron backend: "
-        "devspace GPU count (default: 8 on cybertron)",
+        "devspace GPU count (default: the task metadata CUDA_VISIBLE_DEVICES "
+        "count, else 8)",
     )
     g.add_argument(
         "--shm-size",
@@ -443,8 +463,10 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument(
         "--image",
         default=None,
-        help="cybertron backend: platform image id (e.g. 25607131), highest "
-        "precedence over the image_map",
+        help="cybertron backend: image name = the task metadata.yaml `image` "
+        "field (e.g. slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-"
+        "py3.12); mapped to a Cybertron canonicalName. Defaults to the task's own "
+        "metadata image, so you rarely need to pass it",
     )
     g.add_argument(
         "--keep",
@@ -690,11 +712,17 @@ def main(argv=None) -> int:
 
         # cybertron: shell out to the harbor-side stager (ptdbench never imports
         # harbor as a library — same boundary harbor-evaluate uses for harbor run).
+        # --image / --gpus default to the task's metadata.yaml (image name and the
+        # CUDA_VISIBLE_DEVICES count) so neither has to be passed by hand; an
+        # explicit flag still wins.
+        meta_image, meta_gpus = _metadata_image_and_gpus(task_root)
+        gpus = args.gpus if args.gpus is not None else meta_gpus
+        image = args.image if args.image is not None else meta_image
         cmd = [*shlex.split(args.stage_command), str(task_root)]
         cmd += ["--evaluation-level", args.evaluation_level]
-        cmd += ["--gpu", str(args.gpus) if args.gpus is not None else "8"]
-        if args.image is not None:
-            cmd += ["--image", args.image]
+        cmd += ["--gpu", str(gpus) if gpus is not None else "8"]
+        if image is not None:
+            cmd += ["--image", image]
         if args.huggingface_mirror is not None:
             cmd += ["--hf-endpoint", args.huggingface_mirror]
         if args.devspace_id is not None:

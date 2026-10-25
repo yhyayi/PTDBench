@@ -22,8 +22,8 @@ cluster. Pass ``--run`` to actually create/attach + stage.
 ptdbench→harbor boundary ``harbor-evaluate`` uses for ``harbor run``).
 
 Example:
-    python scripts/cybertron_stage.py tasks/slime_retool \\
-        --gpu 8 --image 25607131 \\
+    python scripts/cybertron_stage.py tasks/reward/retool_length_hack \\
+        --gpu 8 --image slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12 \\
         --environment-kwarg project=xinfer-chenyinghao \\
         --environment-kwarg cluster=wuxi_train \\
         --environment-kwarg resource_pool=speech-wx \\
@@ -184,13 +184,13 @@ def constructor_kwargs(args: argparse.Namespace) -> dict[str, Any]:
     """Resolve the CybertronEnvironment keyword args from parsed CLI args.
 
     --environment-kwarg pairs are the base; --image / --cache-dir are
-    conveniences folded in as image_id / cache_dir (without clobbering an
+    conveniences folded in as image_name / cache_dir (without clobbering an
     explicit pair). Passing devspace_id (via a pair) flips the backend into
     attach mode (_owns_devspace=False); omitting it creates a fresh devspace.
     """
     kwargs = parse_kwargs(args.environment_kwarg)
     if args.image is not None:
-        kwargs.setdefault("image_id", args.image)
+        kwargs.setdefault("image_name", args.image)
     if args.cache_dir is not None:
         kwargs.setdefault("cache_dir", args.cache_dir)
     return kwargs
@@ -199,8 +199,9 @@ def constructor_kwargs(args: argparse.Namespace) -> dict[str, Any]:
 def build_env_config(docker_image: str | None, gpu: int):
     """Build the EnvironmentConfig the backend validates + reads gpus from.
 
-    docker_image (an env name the image_map resolves) OR an explicit image_id
-    kwarg is required by _validate_definition; gpu becomes _effective_gpus.
+    docker_image (the task metadata image name the image_map resolves) OR an
+    explicit image_name kwarg is required by _validate_definition; gpu becomes
+    _effective_gpus.
     """
     from harbor.models.task.config import EnvironmentConfig
 
@@ -220,14 +221,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--image",
         default=None,
-        help="platform image id (e.g. 25607131); passed as image_id (highest "
-        "precedence). Omit to map the task's docker_image via the image_map.",
+        help="image name = the task metadata.yaml `image` field (e.g. "
+        "slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12); "
+        "mapped to a Cybertron canonicalName (highest precedence). Omit to use "
+        "the task's own image.",
     )
     p.add_argument(
         "--docker-image",
         default=None,
-        help="environment name the image_map resolves to a platform id "
-        "(alternative to --image)",
+        help="task image name used as the EnvironmentConfig.docker_image when "
+        "staging a task that has none (alternative to --image)",
     )
     p.add_argument(
         "--cache-dir",
@@ -386,7 +389,9 @@ def main(argv: list[str] | None = None) -> int:
         print("dry-run: would stage to the pre-agent state on Cybertron")
         print(f"  task:    {args.task_root}")
         print(f"  gpu:     {args.gpu}")
-        print(f"  image:   {args.image or args.docker_image or '(from image_map)'}")
+        print(
+            f"  image:   {args.image or args.docker_image or '(required: --image <name>)'}"
+        )
         print(f"  mode:    {'attach' if attach else 'create'}")
         print(f"  kwargs:  {kwargs}")
         print(f"  keep:    {args.keep}")

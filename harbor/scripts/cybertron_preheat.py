@@ -18,7 +18,8 @@ Example:
     python scripts/cybertron_preheat.py \\
         --project xinfer-chenyinghao --cluster wuxi_train \\
         --resource-pool speech-wx --billing-account-id N00069 \\
-        --image 25607122 --gpu 1 --gpu-model h100 \\
+        --image slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12 \\
+        --gpu 1 --gpu-model h100 \\
         --git-path git@github.com:your-org/ptdbench.git --git-ref main \\
         --cluster-user chenyinghao
     # review the printed command, then re-run with --run to submit.
@@ -30,6 +31,22 @@ import argparse
 import shlex
 import subprocess
 import sys
+
+
+def resolve_canonical(image: str) -> str:
+    """Map a task metadata image name to the Cybertron canonicalName for cctl.
+
+    Shares the built-in name -> canonicalName map with the Harbor backend so the
+    preheat ``cctl job`` and the trial devspaces resolve an image name the same
+    way. The CLI only accepts image names; there is no id form.
+    """
+    from harbor.environments.cybertron import _DEFAULT_IMAGE_MAP, _image_name_key
+
+    canonical = _DEFAULT_IMAGE_MAP.get(_image_name_key(image))
+    if canonical is None:
+        known = ", ".join(sorted(_DEFAULT_IMAGE_MAP)) or "<none>"
+        raise SystemExit(f"unknown image name {image!r}; known image names: {known}")
+    return canonical
 
 
 def proxy_export(http_proxy: str | None) -> str:
@@ -177,7 +194,7 @@ def build_cctl_command(args: argparse.Namespace, entry: str) -> list[str]:
         "--billing-account-id",
         args.billing_account_id,
         "--image",
-        args.image,
+        resolve_canonical(args.image),
         "--gpu",
         str(args.gpu),
         "--gpu-model",
@@ -204,7 +221,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--resource-pool", default="speech-wx")
     parser.add_argument("--billing-account-id", default="N00069")
     parser.add_argument(
-        "--image", required=True, help="Cybertron platform image id / canonicalName"
+        "--image",
+        required=True,
+        help="image name = the task metadata.yaml `image` field (mapped to a "
+        "Cybertron canonicalName; run `cctl image get <id> -F canonical_name` to "
+        "refresh the map after a rebuild)",
     )
     parser.add_argument("--gpu", type=int, default=1)
     parser.add_argument("--gpu-model", default="h100")
