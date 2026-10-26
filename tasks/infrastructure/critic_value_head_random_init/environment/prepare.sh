@@ -24,12 +24,15 @@
 #
 # ============================== 待补 / TODO ==================================
 # 原始任务用的是本地挂载，没有记录任何 HF 坐标，而多 GB 的 sha256 无法在打包机上
-# 现算。下面每一处 TODO 都要在任务端到端跑起来之前补上真实值：
-#   * Qwen3-1.7B：确认发布仓（公开仓是 Qwen/Qwen3-1.7B）、40 位 commit sha、
-#     以及至少一个主权重文件的 sha256 / 字节数。
-#   * Endless Terminals：补上承载 2492 个 task_* 目录的 HF dataset 仓、40 位 revision、
-#     以及一个代表性文件（或归档）的 sha256 / 字节数。
-# 在补全之前，`python3 -m ptdbench validate` 仍然通过（environment/ 与 prepare.sh
+# 现算。
+#   * Qwen3-1.7B：已补全。公开仓 Qwen/Qwen3-1.7B、commit 70d244cc、分片权重的
+#     sha256 / 字节数都取自实际快照并用 sha256sum 复核过（见下方基座模型段）。
+#   * Endless Terminals：**仍未补全**。承载 2492 个 task_* 目录的数据集还没有发布到
+#     HF（PTDBench 其它任务的惯例是发到 `LIF1014/ptdbench-*-dataset`，通常打成一个
+#     artifacts/workspace-assets.tar.gz 归档），devspace 1107990 上也找不到原始
+#     `/datasets/endless-terminals` 挂载，所以这里的 repo / revision / sha256 / 字节数
+#     暂时无法填真值——必须先把该数据集发布/找到后再回填下面那段。
+# 在 ET 段补全之前，`python3 -m ptdbench validate` 仍然通过（environment/ 与 prepare.sh
 # 对校验器是可选的），但 prepare 阶段会因为占位 revision 而失败。
 # ============================================================================
 set -euo pipefail
@@ -38,18 +41,29 @@ set -euo pipefail
 # dest 必须正好是 $PTDBENCH_WORKSPACE/Qwen3-1.7B：run.sh 的
 #   MODEL_DIR="${MODEL_DIR:-${WS}/Qwen3-1.7B}"
 # 以及 Stage A / Stage B 两份 megatron role YAML 的 load 字段都读这条路径。
+# Qwen3-1.7B 的权重是**分片**的（model-00001/00002-of-00002.safetensors + 索引），
+# 不是单个 model.safetensors——slime 的 HF->megatron 加载按 index.json 读两片，所以
+# 三个文件都要 allow，并逐个钉死 sha256 / 字节数。
+# 值取自实际快照（commit 70d244cc）：两片 safetensors 的 sha256 既等于 HF 下载缓存里
+# 记的 etag，也与 ModelScope 独立给出的 sha256 一致，并在设备上用 sha256sum 复核过。
 ptdbench_fetch_hf \
     --repo Qwen/Qwen3-1.7B \
-    --revision TODO_QWEN3_1_7B_40CHAR_COMMIT_SHA \
+    --revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e \
     --allow config.json \
     --allow generation_config.json \
     --allow tokenizer_config.json \
     --allow tokenizer.json \
     --allow vocab.json \
     --allow merges.txt \
-    --allow model.safetensors \
-    --expect model.safetensors=TODO_QWEN3_1_7B_MODEL_SAFETENSORS_SHA256 \
-    --expect-size model.safetensors=TODO_QWEN3_1_7B_MODEL_SAFETENSORS_BYTES \
+    --allow model.safetensors.index.json \
+    --allow model-00001-of-00002.safetensors \
+    --allow model-00002-of-00002.safetensors \
+    --expect model-00001-of-00002.safetensors=169ad53ec313c3a34b06c0809216e4fc072cce444a5d4ff2b59690d064130ed5 \
+    --expect model-00002-of-00002.safetensors=912becff8d60672aa8628ef08c05898d9adf17c2ad4ae3caf99b065622fdeff9 \
+    --expect model.safetensors.index.json=0d660e94b165eb912669a5249dff44b83188c4777a07ddb9611fb78d91b0578d \
+    --expect-size model-00001-of-00002.safetensors=3441185608 \
+    --expect-size model-00002-of-00002.safetensors=622329984 \
+    --expect-size model.safetensors.index.json=25605 \
     --dest "$PTDBENCH_WORKSPACE/Qwen3-1.7B"
 
 # --- Endless Terminals 原始任务集（run.sh 的 ET_SRC） ------------------------
