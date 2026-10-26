@@ -120,7 +120,7 @@ Documentation reconciliation:
 
 `issue` grades `$PTDBENCH_RESULTS/agent_answer.md` against hidden
 `oracle.md`. The judge scores verdict, root-cause, and evidence agreement
-(weights 0.2 / 0.6 / 0.2). Pass is a weighted score of at least `0.8`.
+(weights 0.2 / 0.6 / 0.2). Pass requires `verdict_score` == 1.0, and `root_cause_score` and `evidence_score` each > 0.8; the weighted total alone is not a pass condition.
 Ignoring `fn_name` and deleting the call-based execution path is the essential
 root cause.
 

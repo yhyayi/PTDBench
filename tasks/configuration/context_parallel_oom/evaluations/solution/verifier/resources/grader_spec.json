@@ -1,8 +1,0 @@
-{
-  "schema_version": 2,
-  "task_id": "context_parallel_oom",
-  "required_response_length": 30720,
-  "log_roots": [
-    "experiment_logs"
-  ]
-}

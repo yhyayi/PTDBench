@@ -33,7 +33,7 @@ Defective W&B history ends at step 148, but console history and final validation
 
 ## Verification
 
-**issue**: an LLM judge compares `agent_answer.md` with the hidden oracle on verdict / root cause / evidence, weighted 0.2 / 0.6 / 0.2; passing requires at least 0.8.
+**issue**: an LLM judge compares `agent_answer.md` with the hidden oracle on verdict / root cause / evidence, weighted 0.2 / 0.6 / 0.2; passing requires verdict_score 1.0 with root_cause_score and evidence_score each above 0.8.
 
 **solution**: require `val-core/openai/gsm8k/acc/mean@1 >= 0.4` at step 150, accuracy <= 1.0, using only fresh `experiment_logs`. This draft threshold is calibrated on 1 run per arm. Final margins are 0.4 above defective and 0.146875 below repaired; the lowest observed repaired point clears it by 0.053125. Neither run records step-0 validation, so the threshold cannot be certified above the initial checkpoint. The grader requires the step-150 evaluation and rejects step-0-only or earlier-best logs. No variance claim is made.
 

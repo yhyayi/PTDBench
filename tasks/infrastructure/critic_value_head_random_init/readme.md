@@ -512,7 +512,7 @@ long before. Nothing about either run was conditioned on `et_test`.
 
 | | what it asks | decider |
 |---|---|---|
-| `issue` | diagnose the snapshot | the shared issue protocol: an LLM judge scores `agent_answer.md` against the hidden `oracle.md` on verdict / root cause / evidence (0.2 / 0.6 / 0.2), pass ≥ 0.8. A passing diagnosis names the value head, its non-zero initialisation at construction, and *does not* blame the checkpoint |
+| `issue` | diagnose the snapshot | the shared issue protocol: an LLM judge scores `agent_answer.md` against the hidden `oracle.md` on verdict / root cause / evidence (0.2 / 0.6 / 0.2), pass requires verdict_score 1.0 and root_cause/evidence each above 0.8. A passing diagnosis names the value head, its non-zero initialisation at construction, and *does not* blame the checkpoint |
 | `solution` | apply the fix | `tools/check_value_head.py` passes, and Stage B reports `first_value_loss < 1.0` and `warmup_value_loss_mean < 1.0` over ≥1 critic step, with ≥1 rollout actually generated |
 
 The `issue` level uses the standard shared protocol (`instruction.md` +

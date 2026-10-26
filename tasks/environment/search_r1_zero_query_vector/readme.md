@@ -170,7 +170,7 @@ Documentation reconciliation:
 
 `issue` grades `$PTDBENCH_RESULTS/agent_answer.md` against hidden `oracle.md`.
 The judge scores verdict, root-cause and evidence agreement (weights
-0.2 / 0.6 / 0.2); pass is a weighted score of at least `0.8`. `judge.py`,
+0.2 / 0.6 / 0.2); pass requires `verdict_score` == 1.0, and `root_cause_score` and `evidence_score` each > 0.8; the weighted total alone is not a pass condition. `judge.py`,
 `judge_prompt.md` and `test.sh` are byte-identical to
 `tasks/slime_search_r1_nomask`'s.
 
@@ -287,7 +287,7 @@ GRPO / Qwen2.5-1.5B-Instruct / HotpotQA distractor（1024 训练 + 128 验证，
 **评测（两级）**
 
 - `issue` 级（复现 + 诊断）：decider = LLM judge 对 `oracle.md`，verdict/root_cause/
-  evidence 权重 0.2/0.6/0.2，加权 ≥ 0.8 通过。`agent_answer.md` 需指出
+  evidence 权重 0.2/0.6/0.2；通过要求 verdict_score == 1.0 且 root_cause_score、evidence_score 均 > 0.8，不是加权总分 ≥ 0.8。`agent_answer.md` 需指出
   `Encoder.encode` 里那块没被写入的 buffer 导致查询向量为零，且**不得**说成
   "训练没有提升"（故障组实际涨了 12.5 个点），也不得只说 "索引在 CPU、编码器在 GPU"。
 - `solution` 级（应用修复）：decider = 修好后按 `config.json` 原预算重跑 32 步，

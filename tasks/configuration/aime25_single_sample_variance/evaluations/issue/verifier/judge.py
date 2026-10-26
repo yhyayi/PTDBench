@@ -179,10 +179,16 @@ def main() -> int:
             api_key=api_key,
             timeout_s=timeout_s,
         )
+        # New scoring logic: verdict must be 1.0, root_cause and evidence must be > 0.8
+        passed = (
+            judgment["verdict_score"] == 1.0
+            and judgment["root_cause_score"] > 0.8
+            and judgment["evidence_score"] > 0.8
+        )
         score = sum(judgment[key] * weight for key, weight in WEIGHTS.items())
         score = round(score, 6)
         result = {
-            "passed": score >= PASS_SCORE,
+            "passed": passed,
             "score": score,
             "metrics": {
                 "status": "judged",

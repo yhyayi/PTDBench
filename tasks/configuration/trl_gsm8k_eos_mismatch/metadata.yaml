@@ -1,0 +1,24 @@
+title: 'TRL GSM8K GRPO with mismatched EOS configuration'
+submitter:
+  name: PostTrainBench contributor
+license: Apache-2.0
+created_date: '2026-10-24'
+type: configuration
+domain: configuration
+model:
+  name: Qwen3-1.7B-Base + GSM8K SFT
+dataset:
+  name: openai/gsm8k
+training:
+  framework: trl
+  algo: GRPO
+  script: scripts/run_training.sh
+environment:
+  image: verl
+outcome:
+  failure_type: implementation_bug
+  failure_reason: >-
+    GRPO inherits an EOS configuration that does not recognize the chat template
+    end-of-turn token (<|im_end|> = 151645, while generation_config eos_token_id
+    only lists endoftext 151643); rollouts continue past completed answers and
+    held-out performance regresses despite training reward.

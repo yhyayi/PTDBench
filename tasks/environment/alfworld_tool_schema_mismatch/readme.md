@@ -60,7 +60,7 @@ other families improve, and the rollouts show `*_object` calls answered by
 ## Verification
 
 - **issue**: an LLM judge compares `agent_answer.md` with the hidden oracle on
-  verdict / root cause / evidence, weighted 0.2 / 0.6 / 0.2. Passing requires ≥ 0.8.
+  verdict / root cause / evidence, weighted 0.2 / 0.6 / 0.2. Passing requires verdict_score 1.0 with root_cause_score and evidence_score each above 0.8.
 - **solution**: metric-only on `val-aux/alfworld_valid_unseen/success/mean@1`
   (held-out unseen success rate), `score_mode: best` over the fixed 63-step
   rerun. Pass is a best value in `[0.6, 1.0]`. The defective run's best is 0.333

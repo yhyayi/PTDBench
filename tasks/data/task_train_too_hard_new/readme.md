@@ -82,7 +82,7 @@ It has been removed from the workspace; only the run above is shipped.
 ## Evaluation design
 
 The judge scores verdict, root cause, and evidence (weights 0.2 / 0.6 / 0.2);
-pass is a weighted score of at least `0.8`. Full root-cause credit requires
+pass requires `verdict_score` == 1.0, and `root_cause_score` and `evidence_score` each > 0.8. Full root-cause credit requires
 "training data too hard" connected to the missing learning signal. Stating only
 "too hard" or only a train/validation difficulty mismatch, without the causal
 chain, gets partial root-cause credit (0.3) and cannot reach the pass line.

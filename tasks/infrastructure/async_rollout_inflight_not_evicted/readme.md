@@ -82,7 +82,7 @@ didn't learn" is wrong: both arms learn per step; the defect costs throughput.
 ## Verification
 
 - **issue**: an LLM judge compares `agent_answer.md` with the hidden oracle on
-  verdict / root cause / evidence, weighted 0.2 / 0.6 / 0.2. Passing requires ≥ 0.8.
+  verdict / root cause / evidence, weighted 0.2 / 0.6 / 0.2. Passing requires verdict_score 1.0 with root_cause_score and evidence_score each above 0.8.
 - **solution**: two signals from the fresh `experiment_logs`, both required.
   Primary — train-step throughput (largest `rollout N:` index + 1): threshold
   **120** (defective 92, control 148; ±28 either side). Secondary —

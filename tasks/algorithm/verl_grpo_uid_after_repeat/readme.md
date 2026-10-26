@@ -88,7 +88,7 @@ verl/trainer/ppo/ray_trainer.py
 ## Verification
 
 共享 LLM judge 比对 `$PTDBENCH_RESULTS/agent_answer.md` 与隐藏 `oracle.md`，
-verdict / root cause / evidence 权重 0.2 / 0.6 / 0.2，通过线 0.8。单一根因，
+verdict / root cause / evidence 权重 0.2 / 0.6 / 0.2；通过要求 verdict_score == 1.0 且 root_cause_score、evidence_score 均 > 0.8，不是加权总分过 0.8。单一根因，
 `oracle.md` 不含部分分条款。
 
 **为什么这是 issue-only：** 两臂都跑完了，缺的不是数据，而是**这个配方在 60 步预算

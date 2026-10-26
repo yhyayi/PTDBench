@@ -106,7 +106,7 @@ actor-LR collapse, or a startup failure is wrong.
 
 `issue` grades `$PTDBENCH_RESULTS/agent_answer.md` against hidden `oracle.md`.
 The judge scores verdict, root-cause, and evidence agreement (weights
-0.2 / 0.6 / 0.2). Pass is a weighted score of at least `0.8`.
+0.2 / 0.6 / 0.2). Pass requires `verdict_score` == 1.0, and `root_cause_score` and `evidence_score` each > 0.8; the weighted total alone is not a pass condition.
 
 `solution` is deterministic and metric-only, in the same shape as
 `verl_implementation/torch_functional`: fix the reward, rerun the launch script

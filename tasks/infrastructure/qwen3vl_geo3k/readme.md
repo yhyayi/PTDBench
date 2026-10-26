@@ -126,7 +126,7 @@ or an absence of learning is incorrect.
 ## Evaluation design
 
 `issue` uses the standard LLM judge: verdict / root cause / evidence weights
-are 0.2 / 0.6 / 0.2; passing requires a weighted score of at least 0.8.
+are 0.2 / 0.6 / 0.2; passing requires `verdict_score` == 1.0 with `root_cause_score` and `evidence_score` each > 0.8, not just a weighted total of at least 0.8.
 
 `solution` requires a fresh foreground 20-step training run, finite nonzero
 gradients, repeated validation, offline W&B evidence, and newly captured and
