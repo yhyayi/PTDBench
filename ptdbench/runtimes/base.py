@@ -8,6 +8,48 @@ from typing import Dict, List, Mapping, Optional, Sequence
 from ..core.types import CommandResult, EnvironmentImage
 
 
+# 以前这段逻辑装在镜像的 /etc/profile.d/ptdbench-activate.sh，靠登录 shell（`sh -lc`）
+# 自动 source。现在不再烤进镜像：harness 在运行时把它拼到每条 shell 命令前面（见
+# CommandSpec.to_argv），改一次 push 一次就生效，不用重建十几个镜像。因为不再用登录
+# shell，/etc/profile 不会重置 PATH，原来的 PATH 恢复（section 0）也就不需要了。
+#
+# 做两件事：
+#   1. 把 prepare 阶段写进 $PTDBENCH_PREPARED/env 的 KEY=VALUE 行 export 出来
+#      （PYTHONPATH 之类），给 agent / verifier / rerun 阶段用。只认 bare NAME=...，
+#      挡掉命令替换——任务不该能往每个阶段塞任意 shell。
+#   2. 把 pip 的 --user 落点指到 agent 自己的 workspace（agent / rerun 阶段）。
+#
+# POSIX sh：拼进 `sh -c` 执行，不能用 `return`（那只在被 source 时有效）。用 if 包住，
+# 让控制流自然落到后面拼接的真实命令。Harbor 后端不走这里，它把同样的内容
+# materialize 成文件、靠 BASH_ENV 加载（见 harbor_evaluator.ACTIVATE_HOOK）。
+PTDBENCH_ACTIVATE_BODY = r"""if [ -n "${PTDBENCH_STAGE:-}" ]; then
+    PTDBENCH_PREPARED="${PTDBENCH_PREPARED:-/ptdbench/prepared}"
+    export PTDBENCH_PREPARED
+    if [ -f "$PTDBENCH_PREPARED/env" ]; then
+        while IFS= read -r _ptdbench_line || [ -n "$_ptdbench_line" ]; do
+            case "$_ptdbench_line" in
+                ''|'#'*) continue ;;
+            esac
+            _ptdbench_key="${_ptdbench_line%%=*}"
+            case "$_ptdbench_key" in
+                ''|*[!A-Za-z0-9_]*)
+                    echo "ptdbench: ignoring malformed line in prepared/env: $_ptdbench_line" >&2
+                    continue ;;
+            esac
+            export "$_ptdbench_line"
+        done < "$PTDBENCH_PREPARED/env"
+        unset _ptdbench_line _ptdbench_key
+    fi
+    if [ "$PTDBENCH_STAGE" = "agent" ] || [ "$PTDBENCH_STAGE" = "rerun" ]; then
+        PYTHONUSERBASE="${PYTHONUSERBASE:-/workspace/.ptdbench-user}"
+        PIP_USER=1
+        PIP_BREAK_SYSTEM_PACKAGES=1
+        export PYTHONUSERBASE PIP_USER PIP_BREAK_SYSTEM_PACKAGES
+    fi
+fi
+"""
+
+
 @dataclass(frozen=True)
 class CommandSpec:
     """一次命令调用的描述，不包含任何平台专属参数。"""
@@ -25,7 +67,9 @@ class CommandSpec:
         if self.argv is not None:
             return list(self.argv)
         if self.shell is not None:
-            return ["sh", "-lc", self.shell]
+            # 非登录 shell（`sh -c`）：不跑 /etc/profile，PATH 保持镜像 ENV 的值。
+            # 先跑 activate body（导出 prepared/env 等），再跑真实命令。
+            return ["sh", "-c", PTDBENCH_ACTIVATE_BODY + "\n" + self.shell]
         raise ValueError("command spec needs argv or shell")
 
 

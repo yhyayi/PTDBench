@@ -163,7 +163,7 @@ class DockerRuntime(SandboxRuntime):
                 "--entrypoint",
                 "sh",
                 artifact.reference,
-                "-lc",
+                "-c",
                 "while :; do sleep 3600; done",
             ]
         )

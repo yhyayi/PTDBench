@@ -53,8 +53,7 @@ from typing import Dict, List, Optional, Sequence
 _CHUNK = 1024 * 1024
 
 # 两个缓存根，宿主机上就是仓库根的 models/ 和 datasets/。默认值必须和
-# ptdbench/core/types.py 的 MODELS_DIR / DATASETS_DIR、以及
-# docker/ptdbench-activate.sh 里的一致。
+# ptdbench/core/types.py 的 MODELS_DIR / DATASETS_DIR 一致。
 MODELS_ROOT = Path(os.environ.get("PTDBENCH_MODELS", "/ptdbench/models"))
 DATASETS_ROOT = Path(os.environ.get("PTDBENCH_DATASETS", "/ptdbench/datasets"))
 

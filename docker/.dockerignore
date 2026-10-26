@@ -2,12 +2,12 @@
 # images COPY exactly the in-container tooling; everything else here runs on the
 # host, so the context is an allowlist rather than a denylist.
 #
-# Only the activate hook is baked now. The fetch/dataset tooling
-# (ptdbench_fetch.py, ptdbench_dataset.py, ptdbench_datasets/) and
-# install-ptdbench-tooling.sh are provisioned at prepare time from the repo (see
+# Nothing general-purpose is baked anymore. The activate hook, the fetch/dataset
+# tooling (ptdbench_fetch.py, ptdbench_dataset.py, ptdbench_datasets/) and
+# install-ptdbench-tooling.sh are all provisioned at prepare time from the repo
+# (the hook via prepared/ptdbench-activate.sh; the tooling via
 # install-ptdbench-tooling.sh), not COPY'd, so they stay out of the build context.
 *
-!ptdbench-activate.sh
 # agent-r1-alfworld.Dockerfile installs its pinned stack from this runtime dir.
 !agent-r1-runtime
 !agent-r1-runtime/**

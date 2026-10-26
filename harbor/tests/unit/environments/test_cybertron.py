@@ -362,36 +362,32 @@ class TestWrapSandbox:
         assert "--ro /opt/custom" in wrapped
         assert "/sgl-workspace" not in wrapped
 
-    def test_no_proxy_preamble_absent_without_node_ip(self, tmp_path):
+    def test_proxy_and_results_exported_without_node_ip(self, tmp_path):
         wrapped = self._env(tmp_path)._wrap_sandbox("echo hi")
-        assert "no_proxy" not in wrapped
+        # Non-login shells inherit nothing from the devspace profile, so the
+        # proxy and PTDBENCH_RESULTS are exported explicitly. The node-IP
+        # no_proxy augmentation is skipped until the node IP is known.
+        assert "export http_proxy=" in wrapped
+        assert "export PTDBENCH_RESULTS=/logs/artifacts" in wrapped
+        assert "/16" not in wrapped
 
     def test_no_proxy_preamble_includes_node_ip_and_cidr(self, tmp_path):
         env = self._env(tmp_path)
         env._node_ip = "200.20.26.185"
         wrapped = env._wrap_sandbox("echo hi")
-        # node IP, derived /16, and localhost forms all present; profile
-        # $no_proxy preserved so external hosts still use the proxy.
+        # node IP, derived /16, and localhost forms all present; the base
+        # no_proxy (from proxy_export) is folded in so external hosts still
+        # use the proxy.
         assert "200.20.26.185" in wrapped
         assert "200.20.0.0/16" in wrapped
         assert "127.0.0.1" in wrapped
         assert "${no_proxy:+,$no_proxy}" in wrapped
         assert "export no_proxy=" in wrapped
-        assert "export NO_PROXY=" in wrapped
+        assert "NO_PROXY=" in wrapped
 
-    @pytest.mark.parametrize(
-        ("env", "expected"),
-        [
-            # Profile sets only lowercase: uppercase is mirrored, so dotenv
-            # loaders cannot fill it with a .env's literal "$https_proxy".
-            ({"https_proxy": "http://p:1", "http_proxy": "http://p:1"}, "http://p:1"),
-            # An explicit uppercase value is kept.
-            ({"https_proxy": "http://p:1", "HTTPS_PROXY": "http://q:2"}, "http://q:2"),
-            # No proxy configured: nothing is invented.
-            ({}, "<unset>"),
-        ],
-    )
-    def test_preamble_mirrors_uppercase_proxy(self, tmp_path, env, expected):
+    def test_preamble_exports_configured_proxy(self, tmp_path):
+        # The proxy is now exported from the harness-known value, not inherited
+        # from the login profile, so it wins regardless of the ambient env.
         import subprocess
 
         e = self._env(tmp_path)
@@ -399,12 +395,12 @@ class TestWrapSandbox:
         script = e._proxy_preamble() + 'echo "${HTTPS_PROXY-<unset>}"'
         out = subprocess.run(
             ["bash", "-c", script],
-            env={"PATH": "/usr/bin:/bin", **env},
+            env={"PATH": "/usr/bin:/bin", "HTTPS_PROXY": "http://stale:9"},
             capture_output=True,
             text=True,
             check=True,
         ).stdout.strip()
-        assert out == expected
+        assert out == e._http_proxy
 
 
 class TestResolveNodeIp:
@@ -590,6 +586,12 @@ class TestSetupDevspaceScript:
         assert '[ -e "$_link" ] && [ ! -L "$_link" ]' in setup
         assert "rm -rf" in setup
         # every mount point is linked with -T (no plain `ln -sfn` that would nest)
-        for link in ("/workspace", "/logs", "/ptdbench/models", "/ptdbench/datasets"):
+        for link in (
+            "/workspace",
+            "/logs",
+            "/ptdbench/models",
+            "/ptdbench/datasets",
+            "/ptdbench/prepared",
+        ):
             assert f" {link}\n" in setup
-        assert setup.count("ln -sfnT ") == 4
+        assert setup.count("ln -sfnT ") == 5

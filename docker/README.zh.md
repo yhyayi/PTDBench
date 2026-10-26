@@ -169,9 +169,11 @@ python3 -m ptdbench build-images --rebuild \
 
 ### 构建上下文是白名单
 
-`docker/.dockerignore` 先排除一切，再只放行镜像需要 COPY 的几个文件：
-`ptdbench-activate.sh`、`ptdbench_fetch.py`、`ptdbench_dataset.py`、`ptdbench_datasets/`。
-`docker/` 下其余东西（`warm-cache.sh`、本文档、残留的下载缓存）都跑在宿主机上，不进上下文。
+`docker/.dockerignore` 先排除一切，再只放行个别镜像确实要 COPY 的文件
+（如 `agent-r1-runtime/`、`verl-moe-token/mcore5047-minimal.patch`）。activate hook 和
+`ptdbench_fetch.py` / `ptdbench_dataset.py` / `ptdbench_datasets/` 现在都不再 COPY 进镜像，
+而是在 prepare 阶段从仓库取（见下）。`docker/` 下其余东西（`warm-cache.sh`、本文档、
+残留的下载缓存）都跑在宿主机上，不进上下文。
 
 ### 加一个新环境
 
@@ -191,23 +193,30 @@ python3 -m ptdbench build-images --rebuild \
 每个镜像末尾都有同一段：
 
 - `mkdir -p /ptdbench/{prepared,models,datasets}`，让它们是挂载点而不是 docker 临时造的目录；
-- 把镜像自己的 `PATH` 记到 `/etc/ptdbench-image-path`；
-- 装 activate hook 到 `/etc/profile.d/ptdbench-activate.sh`；
-- 装 `ptdbench_fetch_hf` / `ptdbench_fetch_url` / `ptdbench_dataset` 三个命令。
+- 设 `ENV CUDA_DEVICE_ORDER` 等镜像级变量。
 
-### `ptdbench-activate.sh`
+抓取工具（`ptdbench_fetch_hf` 等）和 activate 逻辑都**不再烤进镜像**：前者由
+`install-ptdbench-tooling.sh` 在 prepare 阶段从仓库装进 `/usr/local`，后者见下。
 
-harness 跑的每条命令都走 `sh -lc`，所以这个文件是塑造"每阶段环境"的唯一入口。用 POSIX sh。
-上游镜像原样使用，没有环境需要"激活"，所以它只做三件事：
+### activate 逻辑（运行时注入，不再是镜像里的文件）
 
-0. **补回镜像的 PATH** —— login shell 会先跑 `/etc/profile`，在 Debian 系上它会把 PATH 重置成
-   默认列表，丢掉镜像 `ENV PATH` 加的 `/usr/local/cuda/bin` 之类。hook 对照
-   `/etc/ptdbench-image-path` 把缺的补回前面。
+以前这段装在镜像的 `/etc/profile.d/ptdbench-activate.sh`，靠 `sh -lc` 登录 shell 自动 source。
+现在改为 harness 在运行时提供，单一来源是 `ptdbench/runtimes/base.py:PTDBENCH_ACTIVATE_BODY`：
+
+- **docker / local 后端**：`CommandSpec.to_argv()` 用非登录 `sh -c`，把这段 body 拼在每条 shell
+  命令前面执行；
+- **Harbor 后端**：prepare 把 body 写进 `prepared/ptdbench-activate.sh`，agent / verifier 的
+  非登录 `bash -c` 靠 `BASH_ENV` 指到它自动 source（cybertron 远端同理，另外显式导出代理与
+  `PTDBENCH_RESULTS`）。
+
+因为都是非登录 shell，`/etc/profile` 不会重置 PATH，镜像 `ENV PATH` 原样生效，所以**不再需要**
+以前那节"补回 PATH"的逻辑，`/etc/ptdbench-image-path` 也随之去掉。body 只做两件事：
+
 1. **接上 prepare 的产物** —— 读 `$PTDBENCH_PREPARED/env` 的 `KEY=VALUE` 行。
    这个文件被当作**数据**逐行解析，不是 `.` 进 shell：它在 agent 和 verifier 的每条命令里都会被读，
    任务包不该能借此在所有命令里执行任意 shell。它放在 `$PTDBENCH_PREPARED` 而不是 workspace，
    因为 agent 能写 workspace，而 verifier 也读这个文件 —— 评分不能参考 agent 改得动的东西。
-2. **给乱装的包找个落点（仅 agent 阶段）** —— 设 `PYTHONUSERBASE=/workspace/.ptdbench-user`、
+2. **给乱装的包找个落点（仅 agent / rerun 阶段）** —— 设 `PYTHONUSERBASE=/workspace/.ptdbench-user`、
    `PIP_USER=1`，以及 `PIP_BREAK_SYSTEM_PACKAGES=1`（Ubuntu 24.04 的系统解释器标了
    externally managed，不设的话连 `--user` 安装都会被拒）。agent 真去 `pip install` 的话
    落在自己的 workspace 里，不改镜像的 site-packages，verifier 也看不见。

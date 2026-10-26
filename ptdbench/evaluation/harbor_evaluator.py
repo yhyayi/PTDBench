@@ -37,6 +37,7 @@ from ..core.types import (
     EvaluationResult,
     TaskPackage,
 )
+from ..runtimes.base import PTDBENCH_ACTIVATE_BODY
 from ..tasks import SchemaError, load_task_package
 from .evaluator import TaskEvaluator
 from .run_spec import (
@@ -48,8 +49,11 @@ from .run_spec import (
 from ..utils.filesystem import copy_tree, ensure_dir, tree_digest, write_text
 
 
-# 镜像里 activate hook 的位置；见 docker/images/*.Dockerfile 的工具层。
-ACTIVATE_HOOK = "/etc/profile.d/ptdbench-activate.sh"
+# activate hook 的位置。以前烤在镜像的 /etc/profile.d 里，现在不再烤进镜像：
+# 内容由 runtimes.base.PTDBENCH_ACTIVATE_BODY 这一处定义，prepare 阶段把它写进
+# prepared 目录（见 HarborPreparer.prepare），容器里按 PREPARED_DIR 挂进来。
+# Harbor 用非登录 `bash -c`，靠 BASH_ENV 指到这里自动 source。
+ACTIVATE_HOOK = f"{PREPARED_DIR}/ptdbench-activate.sh"
 
 # 不在本机跑容器的 Harbor 后端。prepare 阶段要的是任务镜像（x86-64 CUDA）里的
 # slime / verl / Megatron 环境，而这些后端的算力在远端：prepare 由后端在远端执行
@@ -276,10 +280,11 @@ echo "ptdbench: rerun exit=$_rerun_status" >&2
         return f'''#!/usr/bin/env bash
 set +e
 
-# Harbor 用 `bash -c` 而不是登录 shell 执行命令，/etc/profile.d 不会自动生效；
-# prepare.sh 写进 $PTDBENCH_PREPARED/env 的变量要靠这一行导出。
-if [ -f /etc/profile.d/ptdbench-activate.sh ]; then
-  . /etc/profile.d/ptdbench-activate.sh
+# Harbor 用 `bash -c` 而不是登录 shell 执行命令，BASH_ENV 之外再显式 source 一次，
+# 保证本 wrapper 自身（rerun / verifier）也拿到 prepare.sh 写进 $PTDBENCH_PREPARED/env
+# 的变量。hook 内容见 runtimes.base.PTDBENCH_ACTIVATE_BODY，由 prepare 写进 prepared。
+if [ -f {ACTIVATE_HOOK} ]; then
+  . {ACTIVATE_HOOK}
 fi
 
 # --- PTDBench report gate: no report.md, no rerun, no grading -------------
@@ -1185,6 +1190,14 @@ class HarborPreparer:
             raise HarborAdapterError(
                 f"task {package.task_id!r}: prepare failed with exit {result.returncode}"
                 + (f"\n{tail}" if tail else "")
+            )
+        # activate hook 不再烤进镜像：把它和 prepare.sh 写的 env 放在一起，容器里按
+        # PREPARED_DIR 挂进来，agent / verifier 的 `bash -c` 靠 BASH_ENV=ACTIVATE_HOOK
+        # 自动 source（内容是 runtimes.base 的单一来源）。
+        if run.prepared is not None:
+            write_text(
+                Path(run.prepared) / "ptdbench-activate.sh",
+                "#!/usr/bin/env sh\n" + PTDBENCH_ACTIVATE_BODY,
             )
         return dataclasses.replace(unit, workspace=run.workspace, prepared=run.prepared)
 

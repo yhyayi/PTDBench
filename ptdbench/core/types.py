@@ -151,7 +151,8 @@ class StageArtifact:
 
 
 # 容器里三个阶段共享的目录。prepare 阶段可写 prepared，agent / verifier 阶段只读。
-# 与 docker/ptdbench-activate.sh 和 docker/ptdbench_fetch.py 的默认值必须一致。
+# 与 runtimes.base.PTDBENCH_ACTIVATE_BODY（读 $PTDBENCH_PREPARED/env）和
+# docker/ptdbench_fetch.py 的默认值必须一致。
 PREPARED_DIR = "/ptdbench/prepared"
 # 下载缓存，按资产种类分两个根：宿主机上就是仓库根的 models/ 和 datasets/。
 # 分开不是为了好看——一个显式的、跟仓库并排的目录漏挂时一眼看得出来，而藏在
@@ -214,9 +215,9 @@ def known_images() -> frozenset:
 class EnvironmentImage:
     """一个环境对应的镜像：docker/images/<name>.Dockerfile，tag 由其头部声明。
 
-    构建上下文是整个 docker/ 目录，因为每个镜像都要 COPY 同一组工具脚本
-    （ptdbench-activate.sh、ptdbench_fetch.py 等），见 docker/.dockerignore。
-    docker 评测、build-images 和 Harbor 的 `docker_image` 都用同一个 tag。
+    构建上下文是整个 docker/ 目录（见 docker/.dockerignore 的 allowlist），但现在
+    几乎不往镜像里烤通用工具：activate hook 和 fetch/dataset 工具都在 prepare 阶段
+    从仓库取，不再 COPY。docker 评测、build-images 和 Harbor 的 `docker_image` 都用同一个 tag。
     """
 
     name: str

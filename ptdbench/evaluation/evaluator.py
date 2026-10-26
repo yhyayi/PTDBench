@@ -330,8 +330,9 @@ class TaskEvaluator:
         校验哪些 sha256——而其中任何一个名字都可能直接点出要诊断的缺陷
         （数据集仓库名有时就是照着它承载的那个缺陷起的）。
 
-        agent 阶段没有任何东西读它：activate hook 在镜像的 /etc/profile.d 下，
-        不在这里；仓库现有任务的 agent 阶段也没有引用 $PTDBENCH_ENVIRONMENT。
+        agent 阶段没有任何东西读它：activate 逻辑由 harness 在运行时注入
+        （见 runtimes.base.PTDBENCH_ACTIVATE_BODY），不在这个目录里；仓库现有
+        任务的 agent 阶段也没有引用 $PTDBENCH_ENVIRONMENT。
         以前挂着只是因为三个阶段共用一张挂载表。
 
         在此之前，"别把答案写进 prepare.sh" 是一条写在 prepare.sh 文件头里的

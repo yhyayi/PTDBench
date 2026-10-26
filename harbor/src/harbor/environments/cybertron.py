@@ -46,6 +46,7 @@ from harbor.environments.ptdbench_prepare import (
     REMOTE_ENVIRONMENT,
     REMOTE_TOOLING,
     build_prepare_recipe,
+    proxy_export,
 )
 from harbor.environments.tar_transfer import extract_dir_from_bytes, pack_dir_to_bytes
 from harbor.models.environment_type import EnvironmentType
@@ -1089,11 +1090,11 @@ class CybertronEnvironment(BaseEnvironment):
             script = f"cd {shlex.quote(cwd)} && {script}"
         if user is not None and str(user) not in ("root", "0"):
             script = (
-                f"runuser -u {shlex.quote(str(user))} -- bash -lc {shlex.quote(script)}"
+                f"runuser -u {shlex.quote(str(user))} -- bash -c {shlex.quote(script)}"
             )
             remote_command = script
         else:
-            remote_command = f"bash -lc {shlex.quote(script)}"
+            remote_command = f"bash -c {shlex.quote(script)}"
 
         stdout, stderr, return_code = await self._ssh_raw(
             remote_command, timeout_sec=timeout_sec
@@ -1128,43 +1129,41 @@ class CybertronEnvironment(BaseEnvironment):
     # -- proxy bypass -------------------------------------------------------
 
     def _proxy_preamble(self) -> str:
-        """Shell preamble that adds the devspace's own cluster IP to no_proxy.
+        """Shell preamble run first inside every sandboxed (agent/verifier) ``bash -c``.
 
-        Cybertron devspaces export ``http(s)_proxy=whitelist-proxy…:7891``. Any
-        request to an *internal* cluster IP (the node's own IP, the ray
-        dashboard on localhost, sibling pods) goes through that proxy, which
-        502s on internal addresses — e.g. slime's ``_wait_server_healthy``
-        polls the sglang engine at the node IP and hangs forever (GPUs at 0%).
+        Harbor executes commands with **non-login** shells, so nothing is
+        inherited from the devspace's login profile. We therefore export the
+        whitelist egress proxy explicitly from ``self._http_proxy`` (the same URL
+        the prepare recipe uses), rather than relying on the profile to have set
+        it. ``proxy_export`` sets http(s)_proxy + their uppercase forms and a base
+        ``no_proxy``.
 
-        We prepend ``127.0.0.1,localhost,0.0.0.0,<node IP>,<A.B.0.0/16>`` (the
-        /16 derived from the node IP so it adapts per cluster) to no_proxy, and
-        keep any profile-provided ``$no_proxy`` so *external* hosts still use
-        the proxy. Emitted as an ``export`` inside the sandbox's inner
-        ``bash -lc`` so it runs *after* the login shell sources the profile and
-        therefore wins; children inherit it. Empty until the node IP is known.
+        Internal cluster IPs (the node's own IP, localhost, sibling pods) must
+        bypass the proxy or they 502 — e.g. slime's ``_wait_server_healthy`` polls
+        the sglang engine at the node IP and would hang forever (GPUs at 0%). So we
+        prepend ``127.0.0.1,localhost,0.0.0.0,<node IP>,<A.B.0.0/16>`` (the /16
+        derived from the node IP adapts per cluster) to the base ``no_proxy``.
 
-        The profile exports only the lowercase proxy pair, so the uppercase
-        ones are mirrored from them. Agents built on gemini-cli (gemini, qwen)
-        load the workspace's ``.env`` with plain dotenv parsing, filling in any
-        variable that is unset; the slime tasks ship a shell-style ``.env``
-        with ``HTTPS_PROXY="$https_proxy"``, which arrived as that literal
-        string and broke every request (``ENOTFOUND $https_proxy``).
+        ``PTDBENCH_RESULTS`` is exported here too: the issue-level instruction
+        templates tell the agent to write its answer to
+        ``$PTDBENCH_RESULTS/agent_answer.md``; without it the variable expands to
+        nothing and the answer lands in the cwd. (Used to be sourced from a
+        login-profile script, which a non-login shell never reads.)
         """
-        if not self._node_ip:
-            return ""
-        additions = ["127.0.0.1", "localhost", "0.0.0.0", self._node_ip]
-        octets = self._node_ip.split(".")
-        if len(octets) == 4:
-            additions.append(f"{octets[0]}.{octets[1]}.0.0/16")
-        joined = ",".join(additions)
-        value = f"{joined}${{no_proxy:+,$no_proxy}}"
-        return (
-            f'export no_proxy="{value}"; export NO_PROXY="{value}"; '
-            'if [ -n "${http_proxy:-}" ]; then '
-            'export HTTP_PROXY="${HTTP_PROXY:-$http_proxy}"; fi; '
-            'if [ -n "${https_proxy:-}" ]; then '
-            'export HTTPS_PROXY="${HTTPS_PROXY:-$https_proxy}"; fi; '
-        )
+        parts = [
+            proxy_export(self._http_proxy),
+            "export PTDBENCH_RESULTS=/logs/artifacts; ",
+        ]
+        if self._node_ip:
+            additions = ["127.0.0.1", "localhost", "0.0.0.0", self._node_ip]
+            octets = self._node_ip.split(".")
+            if len(octets) == 4:
+                additions.append(f"{octets[0]}.{octets[1]}.0.0/16")
+            joined = ",".join(additions)
+            # ${no_proxy:+,$no_proxy} folds in the base no_proxy proxy_export set.
+            value = f"{joined}${{no_proxy:+,$no_proxy}}"
+            parts.append(f'export no_proxy="{value}" NO_PROXY="{value}"; ')
+        return "".join(parts)
 
     async def _resolve_node_ip(self) -> str | None:
         """Best-effort primary cluster IP of the devspace node (for no_proxy).
@@ -1236,7 +1235,7 @@ class CybertronEnvironment(BaseEnvironment):
         llrun += [
             "--",
             "bash",
-            "-lc",
+            "-c",
             shlex.quote(self._proxy_preamble() + command),
         ]
         return " ".join(llrun)
@@ -1347,15 +1346,10 @@ ln -sfnT {shlex.quote(self._cache_dir + "/datasets")} /ptdbench/datasets
 # activate hook's default, and what the generated task.toml pins). Without this
 # link the two halves disagree and everything prepare handed forward is lost.
 ln -sfnT {shlex.quote(self._prepared_dir)} /ptdbench/prepared
-# PTDBENCH_RESULTS must be set before the agent runs: every issue-level
-# instruction template says "write your answer to $PTDBENCH_RESULTS/agent_answer.md"
-# but without this export the variable is unset and the shell expands it to
-# nothing, so the agent writes to ./agent_answer.md in its cwd (/workspace)
-# instead of /logs/artifacts/. The mounted (docker) backend gets this for free
-# from the compose environment block; here we write it into the per-session
-# login profile so both the sandboxed agent shell and the verifier shell see it.
-printf 'export PTDBENCH_RESULTS=/logs/artifacts\n' \
-  > /etc/profile.d/ptdbench-results.sh
+# PTDBENCH_RESULTS and the activate hook used to be sourced from the login
+# profile; commands now run under non-login `bash -c`, so PTDBENCH_RESULTS is
+# exported in _proxy_preamble and the activate hook (prepared/ptdbench-activate.sh,
+# written by the prepare recipe) is auto-sourced via BASH_ENV from the task.toml.
 # Always (re)compile so the binary tracks the embedded source (cheap, ~1s).
 if command -v gcc >/dev/null 2>&1; then
   cat > {shlex.quote(_LLRUN_SRC)} <<'LLRUN_EOF'
@@ -1427,7 +1421,7 @@ fi
         transport but lets the child inherit our stdio, so progress appears live.
         Returns the remote exit code.
         """
-        argv = [*self._transport_cmd(), f"bash -lc {shlex.quote(script)}"]
+        argv = [*self._transport_cmd(), f"bash -c {shlex.quote(script)}"]
         proc = await asyncio.create_subprocess_exec(*argv)
         return await proc.wait()
 
@@ -1596,7 +1590,7 @@ fi
             f"tar xf - -C {shlex.quote(target_dir)}"
         )
         _, stderr, return_code = await self._ssh_raw(
-            f"bash -lc {shlex.quote(remote_command)}",
+            f"bash -c {shlex.quote(remote_command)}",
             stdin=tar_buffer.getvalue(),
             timeout_sec=300,
         )
@@ -1618,7 +1612,7 @@ fi
             f"tar xf - -C {shlex.quote(target_dir)}"
         )
         _, stderr, return_code = await self._ssh_raw(
-            f"bash -lc {shlex.quote(remote_command)}",
+            f"bash -c {shlex.quote(remote_command)}",
             stdin=tar_buffer.getvalue(),
             timeout_sec=1800,
         )
@@ -1640,7 +1634,7 @@ fi
             f"tar cf - -C {shlex.quote(str(host.parent))} {shlex.quote(host.name)}"
         )
         stdout, stderr, return_code = await self._ssh_raw(
-            f"bash -lc {shlex.quote(remote_command)}", timeout_sec=300
+            f"bash -c {shlex.quote(remote_command)}", timeout_sec=300
         )
         if return_code != 0:
             raise RuntimeError(
@@ -1695,7 +1689,7 @@ fi
         target.mkdir(parents=True, exist_ok=True)
         remote_command = f"cd {shlex.quote(source_dir)} && tar cf - ."
         stdout, stderr, return_code = await self._ssh_raw(
-            f"bash -lc {shlex.quote(remote_command)}", timeout_sec=1800
+            f"bash -c {shlex.quote(remote_command)}", timeout_sec=1800
         )
         if return_code != 0:
             raise RuntimeError(

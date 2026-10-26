@@ -246,8 +246,8 @@ else
 fi
 
 # 后两个阶段要看见这个缓存，指的是 workspace 那一份（只有它可写）。和上面 faiss
-# 的 PYTHONPATH 同一个机制：prepared/env 是 KEY=VALUE，由
-# docker/ptdbench-activate.sh:104-118 在每个阶段 export。
+# 的 PYTHONPATH 同一个机制：prepared/env 是 KEY=VALUE，由 harness 在每个阶段 export
+# （ptdbench/runtimes/base.py:PTDBENCH_ACTIVATE_BODY）。
 if ! grep -qs "^HF_DATASETS_CACHE=" "$PTDBENCH_PREPARED/env"; then
     echo "HF_DATASETS_CACHE=$HF_CACHE_RUN" >> "$PTDBENCH_PREPARED/env"
 fi

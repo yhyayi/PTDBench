@@ -51,6 +51,42 @@ DEFAULT_HF_ENDPOINT = "https://hf-mirror.com"
 
 _NO_PROXY = "localhost,127.0.0.1,.modelbest.co,.svc.cluster.local"
 
+# The activate hook body, written into the prepared dir by the prepare recipe and
+# auto-sourced by every non-login `bash -c` via BASH_ENV (the task.toml points
+# BASH_ENV at $PTDBENCH_PREPARED/ptdbench-activate.sh). It exports what prepare.sh
+# left in $PTDBENCH_PREPARED/env (only bare NAME=…, to block command substitution)
+# and sets the pip --user base for the agent/rerun stages. No PATH restore: Harbor
+# runs non-login shells, so /etc/profile never wipes the image's ENV PATH.
+#
+# KEEP IN SYNC with ptdbench/runtimes/base.py:PTDBENCH_ACTIVATE_BODY (the Docker
+# backend injects that copy inline; this copy serves the Harbor/cybertron backend).
+PTDBENCH_ACTIVATE_BODY = r"""if [ -n "${PTDBENCH_STAGE:-}" ]; then
+    PTDBENCH_PREPARED="${PTDBENCH_PREPARED:-/ptdbench/prepared}"
+    export PTDBENCH_PREPARED
+    if [ -f "$PTDBENCH_PREPARED/env" ]; then
+        while IFS= read -r _ptdbench_line || [ -n "$_ptdbench_line" ]; do
+            case "$_ptdbench_line" in
+                ''|'#'*) continue ;;
+            esac
+            _ptdbench_key="${_ptdbench_line%%=*}"
+            case "$_ptdbench_key" in
+                ''|*[!A-Za-z0-9_]*)
+                    echo "ptdbench: ignoring malformed line in prepared/env: $_ptdbench_line" >&2
+                    continue ;;
+            esac
+            export "$_ptdbench_line"
+        done < "$PTDBENCH_PREPARED/env"
+        unset _ptdbench_line _ptdbench_key
+    fi
+    if [ "$PTDBENCH_STAGE" = "agent" ] || [ "$PTDBENCH_STAGE" = "rerun" ]; then
+        PYTHONUSERBASE="${PYTHONUSERBASE:-/workspace/.ptdbench-user}"
+        PIP_USER=1
+        PIP_BREAK_SYSTEM_PACKAGES=1
+        export PYTHONUSERBASE PIP_USER PIP_BREAK_SYSTEM_PACKAGES
+    fi
+fi
+"""
+
 
 def proxy_export(http_proxy: str | None) -> str:
     """Shell ``export http(s)_proxy=… no_proxy=…;`` for the whitelist egress proxy.
@@ -135,6 +171,10 @@ def build_prepare_recipe(
         f"PTDBENCH_MODELS={shlex.quote(models)} "
         f"PTDBENCH_DATASETS={shlex.quote(datasets)}; "
         f"mkdir -p {shlex.quote(prepared)}; "
+        # Write the activate hook next to prepare's env output. The Dockerfiles no
+        # longer bake it; agent/verifier auto-source it via BASH_ENV (non-login).
+        f"cat > {shlex.quote(prepared + '/ptdbench-activate.sh')} "
+        f"<<'PTDBENCH_ACTIVATE_EOF'\n{PTDBENCH_ACTIVATE_BODY}PTDBENCH_ACTIVATE_EOF\n"
         # Install the repo's CURRENT fetch/dataset tooling (the Dockerfiles no
         # longer bake it); no-op if the installer wasn't uploaded.
         f"if [ -f {shlex.quote(installer)} ]; then "
