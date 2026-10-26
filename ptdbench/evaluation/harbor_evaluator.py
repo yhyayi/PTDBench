@@ -219,7 +219,7 @@ class HarborTaskMaterializer:
         自己把 PTDBENCH_STAGE 顶成 rerun 再跑实验，跑完恢复成 verifier。
 
         report 门槛对**所有** solution 任务生效（含没有 run_spec 的
-        critic_value_head / aime25）：没交 report 就不重跑也不判分，直接 0 分。
+        aime25）：没交 report 就不重跑也不判分，直接 0 分。
         issue 层没有这段（level 由运行时的 PTDBENCH_EVALUATION_LEVEL 判断，
         wrapper 对两个层级是同一份）。
         """

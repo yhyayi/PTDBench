@@ -1,8 +1,23 @@
 {
   "task_id": "trl_gsm8k_eos_mismatch",
-  "evaluation_mode": "configuration_repair_only",
+  "evaluation_mode": "configuration_repair_and_eval",
   "candidate": "model/generation_config.json",
   "expected_eos_token_ids": [151643, 151645],
-  "requires_training_rerun": false,
-  "measures_model_inference": false
+  "requires_eval_rerun": true,
+  "measures_model_inference": false,
+  "eval_metrics_relpath": "experiment_logs/eval_metrics.json",
+  "eval_n_examples": 3,
+  "required_eval_accuracy": 0.5,
+  "reference_calibration": {
+    "source": "outputs/rollout_samples.jsonl — 3 retained rollout records from the historical run, decoded with skip_special_tokens=False",
+    "date": "2026-10-26",
+    "protocol": "scripts/replay_stopping.py, deterministic: each retained completion is cut at the first stopping token from the config under test, then scored with the training's last-match answer extraction",
+    "repaired_arm_accuracy": 0.667,
+    "unrepaired_arm_accuracy": 0.667,
+    "repaired_arm_frac_finished_eos": 1.0,
+    "unrepaired_arm_frac_finished_eos": 0.333,
+    "note": "The replay re-executes the stopping rule itself; last-match extraction is robust to post-im_end continuations, so the unrepaired config does not lose scored answers and accuracy alone does not separate the arms. The repair is visible in frac_finished_eos (1.0 vs 0.333: with 151645 included, every retained completion stops at the end of its turn). Gate 2 is therefore a floor guarding against truncation-degrading repairs, not the discriminator; discrimination is structural (gate 1). A gate-1-passing config reproduces the repaired arm (0.667 accuracy, clearing 0.5 with margin); a truncating or garbage stop set cuts the scored answers away and lands far below it."
+  },
+  "historical_defective_reference_accuracy": 0.48597422289613346,
+  "historical_repaired_reference_accuracy": 0.7869598180439727
 }

@@ -807,7 +807,7 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'TOKENIZERS_PAR
 [36m(TaskRunner pid=6902)[0m                                    'top_p': 1,
 [36m(TaskRunner pid=6902)[0m                                    'trace': {'_target_': 'verl.workers.config.TraceConfig',
 [36m(TaskRunner pid=6902)[0m                                              'backend': None,
-[36m(TaskRunner pid=6902)[0m                                              'experiment_name': 'taco_qwen2_5_1.5b_torch_functional',
+[36m(TaskRunner pid=6902)[0m                                              'experiment_name': '__BENCH_TASK_ID__',
 [36m(TaskRunner pid=6902)[0m                                              'max_samples_per_step_per_worker': None,
 [36m(TaskRunner pid=6902)[0m                                              'project_name': 'verl_grpo_taco',
 [36m(TaskRunner pid=6902)[0m                                              'token2text': False},
@@ -1207,11 +1207,11 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'TOKENIZERS_PAR
 [36m(TaskRunner pid=6902)[0m  'trainer': {'balance_batch': True,
 [36m(TaskRunner pid=6902)[0m              'critic_warmup': 0,
 [36m(TaskRunner pid=6902)[0m              'default_hdfs_dir': None,
-[36m(TaskRunner pid=6902)[0m              'default_local_dir': 'checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_torch_functional',
+[36m(TaskRunner pid=6902)[0m              'default_local_dir': 'checkpoints/verl_grpo_taco/__BENCH_TASK_ID__',
 [36m(TaskRunner pid=6902)[0m              'del_local_ckpt_after_load': False,
 [36m(TaskRunner pid=6902)[0m              'device': 'cuda',
 [36m(TaskRunner pid=6902)[0m              'esi_redundant_time': 0,
-[36m(TaskRunner pid=6902)[0m              'experiment_name': 'taco_qwen2_5_1.5b_torch_functional',
+[36m(TaskRunner pid=6902)[0m              'experiment_name': '__BENCH_TASK_ID__',
 [36m(TaskRunner pid=6902)[0m              'log_val_generations': 0,
 [36m(TaskRunner pid=6902)[0m              'logger': ['console', 'wandb'],
 [36m(TaskRunner pid=6902)[0m              'max_actor_ckpt_to_keep': None,
@@ -14173,13 +14173,13 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'TOKENIZERS_PAR
 [36m(TaskRunner pid=6902)[0m Training Progress: 100%|█████████▉| 398/400 [6:13:10<01:26, 43.18s/it]
 [36m(WorkerDict pid=7751)[0m INFO:2026-09-10 10:18:53,539:update_weights done, time cost: 0.77s
 [36m(TaskRunner pid=6902)[0m Training Progress: 100%|█████████▉| 399/400 [6:13:55<00:43, 43.71s/it]
-[36m(WorkerDict pid=7754)[0m INFO:2026-09-10 10:19:36,130:[Rank 3] Saved model to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_torch_functional/global_step_400/actor/model_world_size_4_rank_3.pt
-[36m(WorkerDict pid=7754)[0m INFO:2026-09-10 10:19:40,742:[Rank 3] Saved optim to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_torch_functional/global_step_400/actor/optim_world_size_4_rank_3.pt
-[36m(WorkerDict pid=7754)[0m INFO:2026-09-10 10:19:40,744:[Rank 3] Saved extra_state to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_torch_functional/global_step_400/actor/extra_state_world_size_4_rank_3.pt
-[36m(WorkerDict pid=7751)[0m INFO:2026-09-10 10:19:40,914:[Rank 0] Saved model config and tokenizer class to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_torch_functional/global_step_400/actor/huggingface
+[36m(WorkerDict pid=7754)[0m INFO:2026-09-10 10:19:36,130:[Rank 3] Saved model to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/model_world_size_4_rank_3.pt
+[36m(WorkerDict pid=7754)[0m INFO:2026-09-10 10:19:40,742:[Rank 3] Saved optim to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/optim_world_size_4_rank_3.pt
+[36m(WorkerDict pid=7754)[0m INFO:2026-09-10 10:19:40,744:[Rank 3] Saved extra_state to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/extra_state_world_size_4_rank_3.pt
+[36m(WorkerDict pid=7751)[0m INFO:2026-09-10 10:19:40,914:[Rank 0] Saved model config and tokenizer class to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/huggingface
 [36m(WorkerDict pid=7753)[0m /workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.
 [36m(WorkerDict pid=7753)[0m   torch.cuda.memory._set_allocator_settings(settings)
-[36m(WorkerDict pid=7753)[0m INFO:2026-09-10 10:19:36,288:[Rank 2] Saved model to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_torch_functional/global_step_400/actor/model_world_size_4_rank_2.pt[32m [repeated 3x across cluster][0m
+[36m(WorkerDict pid=7753)[0m INFO:2026-09-10 10:19:36,288:[Rank 2] Saved model to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/model_world_size_4_rank_2.pt[32m [repeated 3x across cluster][0m
 [36m(WorkerDict pid=7751)[0m INFO:2026-09-10 10:19:42,237:update_weights done, time cost: 0.73s
 
 [36m(RewardLoopWorker pid=8374)[0m unable to get function error = (<class 'AttributeError'>, AttributeError("module 'tmp_sol' has no attribute 'digits'"), <traceback object at 0x7f4dbc46f740>)
@@ -36563,7 +36563,7 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'TOKENIZERS_PAR
 [36m(vLLMHttpServer pid=10246)[0m (EngineCore_DP0 pid=11051) WARNING 09-10 10:18:54 [scheduler.py:1834] reset_connector called but no KV connector is configured.[32m [repeated 10x across cluster][0m
 [36m(RewardLoopWorker pid=8364)[0m unable to get function error = (<class 'AttributeError'>, AttributeError("module 'tmp_sol' has no attribute 'generate'"), <traceback object at 0x7f952811d340>)
 [36m(RewardLoopWorker pid=8367)[0m unable to get function error = (<class 'AttributeError'>, AttributeError("module 'tmp_sol' has no attribute 'min_length_num'"), <traceback object at 0x7f69a3bdc2c0>)
-[36m(TaskRunner pid=6902)[0m local_global_step_folder: checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_torch_functional/global_step_400
+[36m(TaskRunner pid=6902)[0m local_global_step_folder: checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400
 [36m(vLLMHttpServer pid=10249)[0m (EngineCore_DP0 pid=11030) WARNING 09-10 10:19:41 [scheduler.py:1834] reset_connector called but no KV connector is configured.
 [36m(TaskRunner pid=6902)[0m test_gen_batch meta info: {'eos_token_id': 151645, 'pad_token_id': 151643, 'recompute_log_prob': False, 'do_sample': True, 'validate': True, 'global_steps': 400}
 [36m(RewardLoopWorker pid=8366)[0m unable to get function error = (<class 'AttributeError'>, AttributeError("module 'tmp_sol' has no attribute 'find_mult_3'"), <traceback object at 0x7ed5397aa1c0>)
@@ -36664,8 +36664,8 @@ ray init kwargs: {'num_cpus': None, 'runtime_env': {'env_vars': {'TOKENIZERS_PAR
 [36m(TaskRunner pid=6902)[0m wandb: You can sync this run to the cloud by running:
 [36m(TaskRunner pid=6902)[0m wandb: wandb sync /workspace/logs/wandb/offline-run-20260910_040240-xr5gf82b
 [36m(TaskRunner pid=6902)[0m wandb: Find logs at: ./logs/wandb/offline-run-20260910_040240-xr5gf82b/logs
-[36m(WorkerDict pid=7753)[0m INFO:2026-09-10 10:19:41,060:[Rank 2] Saved optim to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_torch_functional/global_step_400/actor/optim_world_size_4_rank_2.pt[32m [repeated 3x across cluster][0m
-[36m(WorkerDict pid=7753)[0m INFO:2026-09-10 10:19:41,062:[Rank 2] Saved extra_state to /workspace/checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_torch_functional/global_step_400/actor/extra_state_world_size_4_rank_2.pt[32m [repeated 3x across cluster][0m
+[36m(WorkerDict pid=7753)[0m INFO:2026-09-10 10:19:41,060:[Rank 2] Saved optim to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/optim_world_size_4_rank_2.pt[32m [repeated 3x across cluster][0m
+[36m(WorkerDict pid=7753)[0m INFO:2026-09-10 10:19:41,062:[Rank 2] Saved extra_state to /workspace/checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400/actor/extra_state_world_size_4_rank_2.pt[32m [repeated 3x across cluster][0m
 [36m(WorkerDict pid=7752)[0m /workspace/verl/plugin/platform/platform_cuda.py:99: FutureWarning: torch.cuda._set_allocator_settings is deprecated. Use torch._C._accelerator_setAllocatorSettings instead.[32m [repeated 3x across cluster][0m
 [36m(WorkerDict pid=7752)[0m   torch.cuda.memory._set_allocator_settings(settings)[32m [repeated 3x across cluster][0m
 [36m(TaskRunner pid=6902)[0m Exception ignored in atexit callback: <function _start_and_connect_service.<locals>.teardown_atexit at 0x7fb9f8475440>

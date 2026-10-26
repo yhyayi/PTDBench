@@ -527,8 +527,8 @@ class TaskEvaluator:
     ) -> Optional[CommandResult]:
         """按任务的 run_spec.json 用 agent 留下的 workspace 重跑实验。
 
-        没有 run_spec.json 就返回 None（verifier 自己驱动训练的
-        critic_value_head_random_init、纯协议修复的 aime25）：这些任务
+        没有 run_spec.json 就返回 None（纯协议修复的
+        aime25_single_sample_variance：没有要重跑的实验）。这些任务
         提交 report 后直接进 verifier，agent 侧的约束由 instruction 承担。
         run_spec.json 存在但不合法是任务定义的错，load_run_spec 会当场抛
         RunSpecError——不是在训练跑了一半的时候才冒出来。

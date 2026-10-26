@@ -434,7 +434,7 @@ actor_rollout_ref:
       trace:
         _target_: verl.workers.config.TraceConfig
         project_name: verl_grpo_taco
-        experiment_name: taco_qwen2_5_1.5b_torch_functional
+        experiment_name: __BENCH_TASK_ID__
         backend: null
         token2text: false
         max_samples_per_step_per_worker: null
@@ -998,7 +998,7 @@ trainer:
     total_epochs: 15
     total_training_steps: 400
     project_name: verl_grpo_taco
-    experiment_name: taco_qwen2_5_1.5b_torch_functional
+    experiment_name: __BENCH_TASK_ID__
     logger:
     - console
     - wandb
@@ -1017,7 +1017,7 @@ trainer:
     critic_warmup: 0
     default_hdfs_dir: null
     del_local_ckpt_after_load: false
-    default_local_dir: checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_torch_functional
+    default_local_dir: checkpoints/verl_grpo_taco/__BENCH_TASK_ID__
     max_actor_ckpt_to_keep: null
     max_critic_ckpt_to_keep: null
     ray_wait_register_center_timeout: 300

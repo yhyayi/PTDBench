@@ -7,25 +7,25 @@
 #
 #   1. Offline  -- construct the value head and assert it is all zero. Needs
 #      only torch. This is the fix itself, checked directly.
-#   2. End to end -- run the two-stage reproduction and assert Stage B's
-#      critic warmup loss is below the reward bound. This is what the fix was
-#      for, checked by measurement.
+#   2. End to end -- assert Stage B's critic warmup loss is below the reward
+#      bound in the harness rerun's summary. The harness (run_spec.json) runs
+#      the two-stage reproduction before this script; the verifier only reads
+#      ${PTDBENCH_RESULTS}/experiment_logs/stage_b_value_loss.json. This is
+#      what the fix was for, checked by measurement.
 #
-# Check 2 needs 2 GPUs and ~15 minutes. Set PTDBENCH_SKIP_TRAIN=1 to run
-# only check 1 (useful while iterating, and on a machine with no GPU) -- the
-# script says loudly that it did so, and a skipped run is not a pass.
+# Set PTDBENCH_SKIP_TRAIN=1 to run only check 1 (useful while iterating, and
+# on a machine with no GPU) -- the script says loudly that it did so, and a
+# skipped run is not a pass.
 #
 # Env:
 #   WORKSPACE            workspace under test      (default /workspace)
 #   PTDBENCH_RESULTS     where to write artifacts  (default ${WORKSPACE}/outputs)
-#   OUT_DIR              run.sh's artifact dir     (default ${PTDBENCH_RESULTS})
 #   VALUE_LOSS_THRESHOLD reward-scale bound        (default 1.0)
 #   PTDBENCH_SKIP_TRAIN  1 = offline checks only
 set -uo pipefail
 
 WORKSPACE="${WORKSPACE:-/workspace}"
 PTDBENCH_RESULTS="${PTDBENCH_RESULTS:-${WORKSPACE}/outputs}"
-OUT_DIR="${OUT_DIR:-${PTDBENCH_RESULTS}}"
 THRESHOLD="${VALUE_LOSS_THRESHOLD:-1.0}"
 
 mkdir -p "${PTDBENCH_RESULTS}"
@@ -61,20 +61,12 @@ fi
 echo
 echo "== check 2/2: Stage B critic warmup loss is inside the reward scale =="
 
-SUMMARY="${OUT_DIR}/stage_b_value_loss.json"
+# The harness's system rerun (run_spec.json) executed run.sh with
+# OUT_DIR=$PTDBENCH_RESULTS/experiment_logs before this script; the fresh
+# summary is the only one that counts.
+SUMMARY="${PTDBENCH_RESULTS}/experiment_logs/stage_b_value_loss.json"
 
-# Reuse an existing run if the harness already produced one; otherwise run.
-if [ -f "${SUMMARY}" ] && [ "${PTDBENCH_REUSE_RUN:-1}" = "1" ]; then
-    echo "   reusing ${SUMMARY}"
-else
-    echo "   running ${WORKSPACE}/run.sh (~15 min on 2 GPUs, longer if the"
-    echo "   Endless Terminals prompt set still has to be built and validated)"
-    ( cd "${WORKSPACE}" && OUT_DIR="${OUT_DIR}" bash run.sh ) \
-        > "${PTDBENCH_RESULTS}/verifier_run.log" 2>&1 \
-        || fail "run.sh exited non-zero; see ${PTDBENCH_RESULTS}/verifier_run.log"
-fi
-
-[ -f "${SUMMARY}" ] || fail "run.sh produced no ${SUMMARY}"
+[ -f "${SUMMARY}" ] || fail "no ${SUMMARY}; the system rerun produced no summary"
 
 python3 - "${SUMMARY}" "${THRESHOLD}" <<'PY'
 import json, sys
@@ -131,8 +123,6 @@ if errors:
     sys.exit(1)
 PY
 [ $? -eq 0 ] || fail "Stage B critic warmup loss is not inside the reward scale"
-
-cp -f "${SUMMARY}" "${PTDBENCH_RESULTS}/stage_b_value_loss.json" 2>/dev/null || true
 
 echo
 echo "SOLUTION_VERIFIED"

@@ -7,14 +7,16 @@
 这一份是协议的机器可读部分。launch 脚本的默认值和协议要求的预算经常不一致
 （search-r1 脚本默认 `--num-rollout 200`，协议要求 100；retool 默认 3000，
 要求 70），预算覆盖只写在 instruction.md 的散文里时，harness 没法替 agent
-把它跑对。所以每个 training 任务在
+把它跑对。所以每个 solution 任务在
 `evaluations/solution/verifier/resources/run_spec.json` 里固化一份：
 跑哪条命令、带哪些环境变量、多久超时、日志落在哪。
 
-没有 run_spec.json 的 solution 任务（verifier 自己驱动训练的
-critic_value_head_random_init、纯协议修复的 aime25_single_sample_variance）
-同样适用新协议的 agent 侧约束——修代码、交 report.md、不跑训练——只是
-harness 不额外跑一遍实验。
+所有 solution 任务都带 run_spec：训练类任务重跑训练，评测类任务只重跑
+一遍评测（trl_gsm8k_eos_mismatch 的评测是确定性重放脚本，不需要 GPU）。
+唯一例外是纯协议修复的
+aime25_single_sample_variance（verifier 只查 config + sha256，没有要跑的
+实验）——它没有 run_spec，同样适用 agent 侧约束——修代码、交 report.md、
+不跑训练。
 """
 
 from __future__ import annotations

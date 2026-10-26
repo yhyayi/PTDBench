@@ -12,32 +12,49 @@ training signals together. This is a fully-async run trained against a fixed
 wall-clock budget rather than a fixed step count, so how much useful work the
 engine completes per unit time is itself part of health.
 
-If you find a defect, fix it in the staged workspace at `/workspace`. Then run
-the experiment as a foreground process and wait until it returns. Do not use
-the network. Do not use `nohup`, `&`, `tmux`, `screen`, or any detach
-mechanism. The dataset, model, rollout configuration, and wall-clock training
-budget are fixed.
+If you find a defect, fix it in the staged workspace at `/workspace`. Do not
+use the network. The dataset, model, rollout configuration, and wall-clock
+training budget are fixed.
 
-The launch script is:
+**Do not launch the experiment — do not run `scripts/train_grpo.sh` yourself,
+in the foreground or background, and do not use `nohup`, `&`, `tmux`,
+`screen`, or any detach mechanism.** The system runs the full 8-hour
+experiment itself after you finish; a run you start is wasted and scores
+nothing.
+
+When you are done, submit a report at `/workspace/report.md`. It must
+summarize:
+
+1. **Diagnosis** — the defect you found and the evidence that connects it to
+   the observed behavior.
+2. **Changes** — every file you changed and what you changed in it.
+3. **Expected effect** — the metrics the fix should move and their expected
+   values.
+
+A missing or empty `/workspace/report.md` scores 0.
+
+## How you will be checked
+
+After you submit the report, the system runs the experiment end-to-end in
+your repaired workspace via the launch script
 
 ```text
 scripts/train_grpo.sh
 ```
 
-The effective run must use:
+with the effective run fixed to:
 
 - model `/workspace/Qwen3-1.7B`
 - Megatron torch_dist reference `/workspace/Qwen3-1.7B_torch_dist`
 - train data `/workspace/data/dapo_math_17k_dedup.jsonl`
-- `TRAIN_SECONDS=28800` (the fixed 8-hour wall-clock budget; do not shorten it)
-- `LOG_DIR=$PTDBENCH_RESULTS/experiment_logs`
+- `TRAIN_SECONDS=28800` (the fixed 8-hour wall-clock budget)
+- logs under `$PTDBENCH_RESULTS/experiment_logs`
 
-Create `$PTDBENCH_RESULTS/experiment_logs` first; the launch script writes the
-driver log and the per-step rollout dumps (`dump/rollout_data/*.pt`) under
-`LOG_DIR`. The run is scored only from files under
-`$PTDBENCH_RESULTS/experiment_logs`; logs written anywhere else are ignored. Do
-not copy, edit, or fabricate log metrics or dumps. Otherwise the run is scored 0.
+The run is scored only from files under `$PTDBENCH_RESULTS/experiment_logs`
+(the driver log and the per-step rollout dumps `dump/rollout_data/*.pt`); logs
+written anywhere else are ignored. Do not copy, edit, or fabricate log metrics
+or dumps. Otherwise the run is scored 0.
 
 Scoring reads two signals from those logs: the number of training steps
-completed in the fixed wall clock (primary), and the last-window mean solve rate
-over the dumped rollouts (secondary). Both must clear their thresholds.
+completed in the fixed wall clock (primary), and the last-window mean solve
+rate over the dumped rollouts (secondary). Both must clear their thresholds.

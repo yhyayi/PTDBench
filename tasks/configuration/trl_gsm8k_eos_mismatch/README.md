@@ -12,8 +12,8 @@ despite apparently encouraging training reward.
 | **Model** | Qwen3-1.7B-Base + GSM8K SFT |
 | **Dataset** | openai/gsm8k |
 | **Framework** | trl, `scripts/run_training.sh` |
-| **Environment** | `verl`, offline inspection and configuration repair; no GPU needed |
-| **Evaluations** | issue · solution (configuration-repair variant) |
+| **Environment** | `verl`; issue tier is offline inspection (no GPU), solution tier is offline too (deterministic CPU replay) |
+| **Evaluations** | issue · solution (configuration repair + one replay evaluation rerun) |
 | **Recorded runs** | A single historical training run (frozen evidence); repaired-training control run separately |
 
 ## Difficulty
@@ -48,12 +48,29 @@ configuration, so the repair is validated by measurement, not mechanism alone.
   it is not asserted to reproduce the historical TRL stack. Historical software
   versions and provenance are in `environment/source_manifest.json`.
 - **solution**: a custom deterministic verifier checks the workspace EOS list,
-  unchanged non-EOS fields and synthetic token-stream stopping boundaries.
-  The tier follows the report-gate protocol: grading is configuration-level by
-  design, no rerun is launched.
-- No weights or dataset downloads are needed. A repaired-training control
-  retraining with the corrected EOS list was measured to materially improve
-  held-out accuracy; passing the solution checks itself establishes the
-  configuration edit, since the grader does not run training or inference.
+  unchanged non-EOS fields and synthetic token-stream stopping boundaries, then
+  gates on a replay evaluation. The tier follows the report-gate
+  protocol: the agent repairs the config and submits `report.md`; the harness
+  (run_spec.json) then reruns exactly one evaluation —
+  `scripts/replay_stopping.py` deterministically replaying the retained
+  rollout records (`outputs/rollout_samples.jsonl`), each completion cut at
+  the first stopping token read from the repaired
+  `model/generation_config.json` and scored with the training's own answer
+  extraction — and the grader requires that run's accuracy to clear the
+  calibrated threshold.
+- No training is rerun and no model is loaded: the replay re-executes the
+  stopping rule itself on the frozen completions (special tokens are atomic in
+  the tokenizer, so the cut is a string-level analogue of decoding with the
+  config under test as the sole stopping authority). Thresholds are
+  calibrated on the retained records: the repaired config replays at 0.667
+  accuracy with every completion stopping at the end of its turn, the
+  unrepaired config at 0.667 with a third of them running past the answer to
+  the token cap (last-match extraction is robust to those continuations).
+  The evaluation gate is therefore a floor guarding against
+  truncation-degrading repairs — discrimination lives in the structural gate.
+  The grader records both the replay accuracy and the historical defective
+  baseline for the ledger; the historical accuracies (0.486 defective /
+  0.787 repaired) come from the private SFT checkpoint under training-time
+  stopping, not from this replay.
 - Structural validation and local checks are recorded by the submission guide;
   the repaired-training control was run outside this packaging.

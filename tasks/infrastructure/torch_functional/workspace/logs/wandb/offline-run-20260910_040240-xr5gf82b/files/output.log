@@ -21970,7 +21970,7 @@ Output:
 [expected] None
 [output] None
 ========================================================================
-local_global_step_folder: checkpoints/verl_grpo_taco/taco_qwen2_5_1.5b_torch_functional/global_step_400
+local_global_step_folder: checkpoints/verl_grpo_taco/__BENCH_TASK_ID__/global_step_400
 test_gen_batch meta info: {'eos_token_id': 151645, 'pad_token_id': 151643, 'recompute_log_prob': False, 'do_sample': True, 'validate': True, 'global_steps': 400}
 validation generation end
 ========================================================================
