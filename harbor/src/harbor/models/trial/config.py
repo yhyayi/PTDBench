@@ -3,7 +3,7 @@ import json
 import warnings
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, NotRequired, override, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict, override
 from uuid import UUID
 
 from pydantic import (
@@ -312,6 +312,17 @@ class EnvironmentConfig(BaseModel):
 class VerifierConfig(BaseModel):
     override_timeout_sec: float | None = None
     max_timeout_sec: float | None = None
+    exec_heartbeat_sec: float | None = Field(
+        default=None,
+        exclude_if=lambda v: v is None,
+        description=(
+            "When set, the verifier test script runs wrapped in a keepalive loop "
+            "that prints a heartbeat line every N seconds for the duration of the "
+            "run. Transport layers that reap idle connections (e.g. SSH proxies "
+            "with an idle timeout) otherwise kill the exec channel hours into a "
+            "silent long-running verifier, orphaning the remote process."
+        ),
+    )
     include_logs: list[str] = Field(
         default_factory=list,
         exclude_if=lambda v: not v,

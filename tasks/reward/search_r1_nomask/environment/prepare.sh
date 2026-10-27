@@ -46,8 +46,7 @@ set -euo pipefail
 # 为什么 libraft / librmm / rapids-logger 要逐个写出来：--no-deps 是故意的（见
 # 下一段），而 libcuvs.so 的 DT_NEEDED 链是 rapids-logger -> librmm -> libraft
 # -> libcuvs，faiss/__init__.py 也按这个顺序 preload。少一环就是一句
-# "cannot open shared object file"。CUDA 侧的依赖（cublas / curand / nvjitlink /
-# nccl）不写，是因为环境里已经有了，多装一份就回到上面那个撞车问题。
+# "cannot open shared object file"。
 #
 # 为什么装到 $PTDBENCH_PREPARED 而不是直接 pip 进 env：prepare 是**独立的一次性
 # 容器**（evaluator.py 的 _run_prepare 建了就关），装进镜像 site-packages 的东西出了这个容器就
@@ -66,6 +65,61 @@ PIP_INDEX_ARGS=()
 if [ -n "$PIP_INDEX_URL" ]; then
     PIP_INDEX_ARGS+=(--index-url "$PIP_INDEX_URL")
     [ -n "$PIP_TRUSTED_HOST" ] && PIP_INDEX_ARGS+=(--trusted-host "$PIP_TRUSTED_HOST")
+fi
+
+# nvidia cu13 五件（nvjitlink / cublas / curand / cusolver / nvrtc）装进系统
+# dist-packages，不进 $FAISS_SITE——faiss loader 在 import 时用 `nvidia.cu13`
+# 拿路径，而 dist-packages 里那个 0 字节的 nvidia/__init__.py stub 让 nvidia 成了
+# regular package，--target 装出来的 $FAISS_SITE/nvidia 永远参与不进
+# `import nvidia.cu13` 的解析，loader 只认 dist-packages 那份 __path__[0]。镜像里确
+# 实有 nvidia/ 目录，但那是 torch 2.11.0+cu129 带的 cu12 布局（nvidia/nvjitlink/lib/
+# libnvJitLink.so.12 一系）；faiss-gpu-cuvs 要的 nvidia/cu13/lib/ 下的一套 .so，镜像的
+# cu13 目录只装了 cudart/nvvm/nvblas。前三个（.13 soname 的 nvjitlink / cublas /
+# curand）缺了，import 死在 "failed to load libnvJitLink.so.13"——那是 faiss
+# loader 自己 RTLD_GLOBAL 预载的五件里的三件。
+#
+# 后两个缺得更深：libcuvs.so 的 DT_NEEDED 里有 libcusolver.so.12 和
+# libnvrtc.so.13（镜像只有 .so.11 / .so.12，torch 的 cu12 布局里没有这两个
+# soname），预载完五件之后 rapids 的 load.py 去 dlopen libcuvs.so，缺了就
+# **静默**返回 None，最后 _swigfaiss.abi3.so 报 "libcuvs.so: cannot open shared
+# object file"——离原因隔着三层。cusolver 轮子的版本号是 12.3.5.3 而不是
+# 13.x：CUDA 13 这条线里 cusolver 的**库版本**就是 12（soname .so.12），
+# unsuffixed 的 nvidia-cusolver 到 12.3.5.3 为止，装出来照样落在
+# nvidia/cu13/lib/（其余四件同款布局，已对着 RECORD 逐个核过）。nvrtc 的发行名
+# 带 cuda- 前缀（nvidia-cuda-nvrtc，13.4.92）。
+#
+# 这五个与镜像里已有的 *-cu12 同名物是不同的发行名（nvidia-nvjitlink vs
+# nvidia-nvjitlink-cu12 一系），pip 元数据不冲突，soname 也不撞（.13 vs .12），
+# retrieval server 进程里 torch（cu12 轮子）和 faiss（cu13 目录）两套各走各的，
+# 同进程 import 两者 + GPU cloner 冒烟已过。cuda-runtime 不装：镜像的
+# nvidia-cuda-runtime==13.3.29 已经把 libcudart.so.13 放在 cu13/lib/ 里了。这一步
+# 写在 PIP_INDEX_ARGS 定义之后才能吃到集群的镜像源——unsuffixed 的 cu13 轮子
+# 不在 pypi.org 上。它写的是 prepare 所在容器的系统目录，devspace 重建后由守卫
+# 重装（本任务只在 attach 模式的 devspace 上跑，prepare/agent/verifier 同容器）。
+# 版本取 nvjitlink 13.4.92 / cublas 13.8.2.12 / curand 10.4.4.72 / cusolver
+# 12.3.5.3 / cuda-nvrtc 13.4.92，libcuvs 26.6 要的 __nvJitLinkCreate_13_0 符号
+# 它们都有。
+NV13_SYS="/usr/local/lib/python3.12/dist-packages/nvidia/cu13/lib"
+cu13_ready() {
+    local soname
+    for soname in libnvJitLink.so.13 libcublas.so.13 libcurand.so.10 \
+                  libcusolver.so.12 libnvrtc.so.13; do
+        [ -e "$NV13_SYS/$soname" ] || return 1
+    done
+    return 0
+}
+if ! cu13_ready; then
+    echo "[prepare] installing CUDA-13 nvidia runtime components into system dist-packages"
+    python3 -m pip install --no-cache-dir --no-deps --no-user \
+        --retries 10 --timeout 120 \
+        ${PIP_INDEX_ARGS[@]+"${PIP_INDEX_ARGS[@]}"} \
+        nvidia-nvjitlink==13.4.92 \
+        nvidia-cublas==13.8.2.12 \
+        nvidia-curand==10.4.4.72 \
+        nvidia-cusolver==12.3.5.3 \
+        nvidia-cuda-nvrtc==13.4.92
+else
+    echo "[prepare] CUDA-13 nvidia runtime components already present"
 fi
 # 守卫认的是这一版的 dist-info，不是 `faiss/` 目录：认目录的话，一棵装了一半的、
 # 或者上一版 cu12 的树会被当成装好了，然后在 agent 阶段才炸。
@@ -91,6 +145,23 @@ if [ ! -d "$FAISS_MARKER" ]; then
 else
     echo "[prepare] faiss already present in $FAISS_SITE"
 fi
+
+# libcuvs.so 的 RPATH 写死的是**相对 pysite** 的路径：
+# $ORIGIN:$ORIGIN/../../nvidia/cu13/lib:$ORIGIN/../../nvidia/nccl/lib:$ORIGIN/../../libcuvs_cu13.libs。
+# 系统安装（上一段）够不着它的 cu13 / nccl 两个元素；rapids 的 load.py（libcuvs/
+# load.py 的 _load_wheel_installation）在 dlopen libcuvs.so 失败时**静默**返回
+# None，然后 _swigfaiss.abi3.so 死在 "libcuvs.so: cannot open shared object
+# file"。这里在 pysite 里铺一层 symlink 指回系统目录，让 RPATH 那两个元素命中：
+# $FAISS_SITE/nvidia/cu13/lib -> dist-packages/nvidia/cu13/lib（五件 + cudart 都
+# 在那），nccl 同理（镜像 torch cu12 布局带的，ldconfig 本来就解析得了，铺上这层
+# 让它不依赖 ldconfig）。$FAISS_SITE/nvidia 没有 __init__.py，PEP 420 下不参与
+# `import nvidia.cu13` 的解析（dist-packages 的 regular package 永远优先）——
+# 这层纯粹是给动态链接器看的。每次 run 的 $FAISS_SITE 都是全新目录，所以每遍
+# prepare 都要重建（ln -sfn 幂等）。
+NVROOT="$(python3 -c 'import nvidia.cu13, os; print(os.path.dirname(nvidia.cu13.__path__[0]))')"
+mkdir -p "$FAISS_SITE/nvidia/cu13" "$FAISS_SITE/nvidia/nccl"
+ln -sfn "$NVROOT/cu13/lib" "$FAISS_SITE/nvidia/cu13/lib"
+ln -sfn "$NVROOT/nccl/lib" "$FAISS_SITE/nvidia/nccl/lib"
 
 # 后两个阶段靠这一行看见它。注意 slime 的启动脚本对 PYTHONPATH 是**赋值**不是追加
 # （`export PYTHONPATH=/workspace:/root/Megatron-LM`，且在 ray runtime_env 里再写

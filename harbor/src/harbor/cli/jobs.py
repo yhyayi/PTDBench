@@ -843,6 +843,18 @@ def start(
             show_default=False,
         ),
     ] = None,
+    verifier_exec_heartbeat_sec: Annotated[
+        float | None,
+        Option(
+            "--verifier-exec-heartbeat-sec",
+            help="Print a heartbeat line on the exec channel every N seconds "
+            "while the verifier test script runs. Keeps idle-sensitive "
+            "transports (e.g. SSH proxies) from reaping the connection on "
+            "long-running verifiers.",
+            rich_help_panel="Verifier",
+            show_default=False,
+        ),
+    ] = None,
     verifier: Annotated[
         str | None,
         Option(
@@ -1357,6 +1369,8 @@ def start(
         config.verifier.include_logs.extend(verifier_include_logs)
     if verifier_exclude_logs is not None:
         config.verifier.exclude_logs.extend(verifier_exclude_logs)
+    if verifier_exec_heartbeat_sec is not None:
+        config.verifier.exec_heartbeat_sec = verifier_exec_heartbeat_sec
     if verifier_import_path is not None:
         warn_deprecated_flag("--verifier-import-path", "--verifier")
         config.verifier.import_path = verifier_import_path

@@ -1,19 +1,19 @@
-from typing import override
 import json
 import logging
 from pathlib import Path
+from typing import override
 
 from harbor.environments.base import BaseEnvironment
 from harbor.models.task.task import Task
 from harbor.models.trial.paths import EnvironmentPaths, TrialPaths
 from harbor.models.verifier.result import VerifierResult
-from harbor.verifier.base import BaseVerifier
 from harbor.utils.env import resolve_env_vars
 from harbor.utils.scripts import (
     build_execution_command,
     needs_chmod,
     quote_shell_arg,
 )
+from harbor.verifier.base import BaseVerifier
 
 
 class AddTestsDirError(Exception):
@@ -49,6 +49,7 @@ class Verifier(BaseVerifier):
         step_name: str | None = None,
         include_logs: list[str] | None = None,
         exclude_logs: list[str] | None = None,
+        exec_heartbeat_sec: float | None = None,
     ):
         super().__init__(
             task=task,
@@ -62,6 +63,7 @@ class Verifier(BaseVerifier):
             exclude_logs=exclude_logs,
         )
         self._skip_tests_upload = skip_tests_upload
+        self._exec_heartbeat_sec = exec_heartbeat_sec
 
     def _parse_reward_text(self) -> dict[str, float | int]:
         if self.trial_paths.reward_text_path.stat().st_size == 0:
@@ -186,6 +188,7 @@ class Verifier(BaseVerifier):
             test_script_path,
             stdout_path=test_stdout_path,
             task_os=self.environment.os,
+            heartbeat_sec=self._exec_heartbeat_sec,
         )
 
         if needs_chmod(test_script_path):
@@ -196,10 +199,23 @@ class Verifier(BaseVerifier):
 
         # Runs as ``environment.default_user``, which the caller must set to the
         # effective verifier user (step-level override or task-level fallback).
-        await self.environment.exec(
+        exec_result = await self.environment.exec(
             command=command,
             env=env,
         )
+        if exec_result.return_code != 0:
+            # The reward files are the contract; a nonzero exit code is only
+            # surfaced so a missing-reward failure downstream says why.
+            self.logger.warning(
+                "Verifier test script exited with code %s (reward files, if "
+                "written, are still parsed)",
+                exec_result.return_code,
+            )
+            exit_code_note = (
+                f" (test script exited with code {exec_result.return_code})"
+            )
+        else:
+            exit_code_note = ""
 
         if not self.environment.capabilities.mounted:
             try:
@@ -232,7 +248,7 @@ class Verifier(BaseVerifier):
             raise RewardFileNotFoundError(
                 f"No reward file found at {self.trial_paths.reward_text_path} or {
                     self.trial_paths.reward_json_path
-                }"
+                }{exit_code_note}"
             )
 
         return VerifierResult(rewards=rewards)

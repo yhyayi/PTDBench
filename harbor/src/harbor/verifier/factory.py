@@ -1,12 +1,11 @@
 import logging
 from typing import Any
 
-from harbor.utils.import_path import import_class
-
 from harbor.environments.base import BaseEnvironment
 from harbor.models.task.task import Task
 from harbor.models.trial.config import VerifierConfig
 from harbor.models.trial.paths import TrialPaths
+from harbor.utils.import_path import import_class
 from harbor.verifier.base import BaseVerifier
 from harbor.verifier.verifier import Verifier
 
@@ -96,4 +95,5 @@ class VerifierFactory:
             skip_tests_upload=skip_tests_upload,
             include_logs=config.include_logs or None,
             exclude_logs=config.exclude_logs or None,
+            exec_heartbeat_sec=config.exec_heartbeat_sec,
         )

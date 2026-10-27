@@ -16,7 +16,6 @@ from harbor.utils.scripts import (
     quote_windows_shell_arg,
 )
 
-
 # ---------------------------------------------------------------------------
 # discover_script
 # ---------------------------------------------------------------------------
@@ -189,6 +188,44 @@ class TestBuildExecutionCommand:
     def test_backslash_sh_path(self):
         cmd = build_execution_command("C:\\tests\\test.sh")
         assert cmd == "C:\\tests\\test.sh"
+
+    def test_heartbeat_wraps_stdout_redirect(self):
+        """Heartbeat composes with the stdout redirect: script still writes to
+        the file, keepalive lines go to the exec channel, exit status propagates."""
+        cmd = build_execution_command(
+            "/tests/test.sh", stdout_path="/logs/out.txt", heartbeat_sec=30
+        )
+        assert cmd == (
+            "(/tests/test.sh) > /logs/out.txt 2>&1 & __harbor_hb=$!; "
+            "while kill -0 $__harbor_hb 2>/dev/null; do "
+            'echo "[heartbeat] $(date -u +%Y-%m-%dT%H:%M:%SZ)"; '
+            "sleep 30; done; "
+            "wait $__harbor_hb"
+        )
+
+    def test_heartbeat_without_stdout_redirect(self):
+        cmd = build_execution_command("/tests/test.sh", heartbeat_sec=15)
+        assert cmd == (
+            "/tests/test.sh & __harbor_hb=$!; "
+            "while kill -0 $__harbor_hb 2>/dev/null; do "
+            'echo "[heartbeat] $(date -u +%Y-%m-%dT%H:%M:%SZ)"; '
+            "sleep 15; done; "
+            "wait $__harbor_hb"
+        )
+
+    def test_heartbeat_fractional_interval(self):
+        cmd = build_execution_command("/tests/test.sh", heartbeat_sec=2.5)
+        assert "sleep 2.5; done" in cmd
+
+    def test_heartbeat_rejected_for_bat(self):
+        with pytest.raises(ValueError, match="heartbeat_sec is not supported"):
+            build_execution_command("C:/tests/test.bat", heartbeat_sec=30)
+
+    def test_heartbeat_rejected_non_positive(self):
+        with pytest.raises(ValueError, match="must be positive"):
+            build_execution_command("/tests/test.sh", heartbeat_sec=0)
+        with pytest.raises(ValueError, match="must be positive"):
+            build_execution_command("/tests/test.sh", heartbeat_sec=-1)
 
 
 class TestNeedsChmodBackslash:

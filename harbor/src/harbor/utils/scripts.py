@@ -124,6 +124,7 @@ def build_execution_command(
     stdout_path: str | PurePath | None = None,
     *,
     task_os: "TaskOS | None" = None,
+    heartbeat_sec: float | None = None,
 ) -> str:
     """Build the shell command to run *script_path* inside the environment.
 
@@ -137,9 +138,25 @@ def build_execution_command(
     When *task_os* is provided, *script_path* and *stdout_path* are quoted
     for the target OS's shell. When omitted, they are interpolated raw —
     callers must pre-quote in that case.
+
+    If *heartbeat_sec* is given (POSIX targets only), the script runs in the
+    background while a companion loop prints a timestamped heartbeat line to
+    stdout every *heartbeat_sec* seconds, then ``wait`` reaps the script and
+    propagates its exit status. Long verifier runs over connection-reaping
+    transports (e.g. idle SSH proxies) otherwise sit silent on the channel
+    for hours and get the connection killed mid-run.
     """
     script_str = str(script_path)
     ext = _extension(script_str)
+
+    if heartbeat_sec is not None:
+        if ext == ".bat":
+            raise ValueError(
+                f"heartbeat_sec is not supported for .bat scripts ({script_str})"
+            )
+        if heartbeat_sec <= 0:
+            raise ValueError(f"heartbeat_sec must be positive, got {heartbeat_sec}")
+
     script_piece = (
         quote_shell_arg(script_str, task_os) if task_os is not None else script_str
     )
@@ -156,6 +173,22 @@ def build_execution_command(
             quote_shell_arg(stdout_str, task_os) if task_os is not None else stdout_str
         )
         cmd = f"({cmd}) > {stdout_piece} 2>&1"
+
+    if heartbeat_sec is not None:
+        # The script (already redirected) runs in the background while a
+        # companion loop emits a timestamped line on the exec channel every
+        # interval, then ``wait`` propagates the script's exit status as the
+        # command's own. Without those bytes, transports that reap idle
+        # connections (e.g. SSH proxies with an idle timeout) can kill the
+        # channel hours into a silent verifier run.
+        interval = f"{heartbeat_sec:g}"
+        cmd = (
+            f"{cmd} & __harbor_hb=$!; "
+            f"while kill -0 $__harbor_hb 2>/dev/null; do "
+            f'echo "[heartbeat] $(date -u +%Y-%m-%dT%H:%M:%SZ)"; '
+            f"sleep {interval}; done; "
+            f"wait $__harbor_hb"
+        )
 
     return cmd
 
