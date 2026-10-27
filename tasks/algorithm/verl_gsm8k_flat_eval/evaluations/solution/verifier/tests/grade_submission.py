@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract the target slime metric from fresh logs and assign a binary score."""
+"""Extract the final GSM8K held-out reward from fresh rerun logs and assign a binary score."""
 
 from __future__ import annotations
 

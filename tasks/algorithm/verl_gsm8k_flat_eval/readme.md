@@ -26,5 +26,7 @@ The observed run's actor gradient norm and policy-gradient loss are zero at all 
 
 ## Verification
 
-- **issue**: an LLM judge compares the diagnosis with the hidden oracle on verdict / root cause / evidence, weighted 0.2 / 0.6 / 0.2. Passing requires at least 0.8.
-- **solution**: final `val-core/openai/gsm8k/reward/mean@1` at step 50 must be at least `0.74609375`. It is `0.01171875` above the observed run's maximum, `0.0078125` below the baseline run's minimum, and `0.0078125` above baseline step 0. Threshold margins are calibrated on one run per arm; variance was not measured.
+- **issue**: an LLM judge compares the diagnosis with the hidden oracle on verdict / root cause / evidence. Passing requires `verdict_score == 1.0` plus `root_cause_score > 0.8` and `evidence_score > 0.8`.
+- **solution**: the agent repairs the code and submits `/workspace/report.md` without launching training (`run_spec.json`, debug-then-report). The system deletes `$PTDBENCH_RESULTS/experiment_logs`, re-runs `/workspace/run.sh` in the repaired workspace, and the final `val-core/openai/gsm8k/reward/mean@1` at step 50 of that fresh run must be at least `0.74609375`. It is `0.01171875` above the observed run's maximum, `0.0078125` below the baseline run's minimum, and `0.0078125` above baseline step 0. Threshold margins are calibrated on one run per arm; variance was not measured.
+
+The metric gate alone does not distinguish a root-cause repair from a masking fix (dropping the `rollout.seed` override from the launch script also clears it). The solution instruction forbids changing the recorded launch configuration, and the issue-level diagnosis is where the root cause is graded.
