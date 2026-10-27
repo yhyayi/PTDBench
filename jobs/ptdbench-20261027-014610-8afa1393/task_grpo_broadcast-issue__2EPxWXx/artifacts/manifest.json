@@ -1,0 +1,16 @@
+[
+  {
+    "source": "/logs/artifacts",
+    "destination": "artifacts/logs/artifacts",
+    "type": "directory",
+    "status": "ok",
+    "service": null
+  },
+  {
+    "source": "/workspace",
+    "destination": "artifacts/workspace",
+    "type": "directory",
+    "status": "failed",
+    "service": null
+  }
+]

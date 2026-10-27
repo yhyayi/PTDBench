@@ -1,0 +1,26 @@
+{
+    "job_name": "ptdbench-20261027-031044-8c153d46",
+    "environment": {
+        "type": "cybertron",
+        "mounts": [],
+        "kwargs": {
+            "prepare_dir": "/Users/chenyinghao/workspace/PTDBench/tasks/algorithm/task_grpo_broadcast/environment",
+            "project": "xinfer-chenyinghao",
+            "cluster": "sichuan_train",
+            "resource_pool": "speech-sc",
+            "billing_account_id": "N00069",
+            "devspace_id": 1377547
+        }
+    },
+    "agents": [
+        {
+            "name": "claude-code",
+            "model_name": "gpt-5.5"
+        }
+    ],
+    "datasets": [
+        {
+            "path": "/private/var/folders/jm/096lpmvd4blc0l4dnwfy952w0000gn/T/ptdbench-harbor-task_grpo_broadcast-issue-hhgtagkj/harbor/tasks"
+        }
+    ]
+}

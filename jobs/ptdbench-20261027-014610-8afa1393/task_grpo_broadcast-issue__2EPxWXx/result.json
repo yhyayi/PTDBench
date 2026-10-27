@@ -1,0 +1,109 @@
+{
+    "id": "e5215d25-54b7-4fb8-affe-da103f29c712",
+    "task_name": "ptdbench/task_grpo_broadcast-issue",
+    "trial_name": "task_grpo_broadcast-issue__2EPxWXx",
+    "trial_uri": "file:///Users/chenyinghao/workspace/PTDBench/jobs/ptdbench-20261027-014610-8afa1393/task_grpo_broadcast-issue__2EPxWXx",
+    "task_id": {
+        "path": "/private/var/folders/jm/096lpmvd4blc0l4dnwfy952w0000gn/T/ptdbench-harbor-task_grpo_broadcast-issue-w0jld1yj/harbor/tasks/task_grpo_broadcast-issue"
+    },
+    "source": "tasks",
+    "task_checksum": "53afbf3690ecfe7a2ecf276077a080ae43859e95b57d3c5beaf31510923b6561",
+    "config": {
+        "task": {
+            "path": "/private/var/folders/jm/096lpmvd4blc0l4dnwfy952w0000gn/T/ptdbench-harbor-task_grpo_broadcast-issue-w0jld1yj/harbor/tasks/task_grpo_broadcast-issue",
+            "git_url": null,
+            "git_commit_id": null,
+            "name": null,
+            "ref": null,
+            "overwrite": false,
+            "download_dir": null,
+            "source": "tasks"
+        },
+        "trial_name": "task_grpo_broadcast-issue__2EPxWXx",
+        "trials_dir": "jobs/ptdbench-20261027-014610-8afa1393",
+        "install_only": false,
+        "timeout_multiplier": 1.0,
+        "agent_timeout_multiplier": null,
+        "verifier_timeout_multiplier": null,
+        "agent_setup_timeout_multiplier": null,
+        "environment_build_timeout_multiplier": null,
+        "agent": {
+            "name": "codex",
+            "import_path": null,
+            "model_name": "gpt-5.5",
+            "n_concurrent": null,
+            "concurrency_group": null,
+            "skills": [],
+            "override_timeout_sec": null,
+            "override_setup_timeout_sec": null,
+            "max_timeout_sec": null,
+            "resume_trajectory": false,
+            "load_trajectory": null,
+            "extra_allowed_hosts": [],
+            "kwargs": {},
+            "mcp_servers": []
+        },
+        "environment": {
+            "type": "cybertron",
+            "import_path": null,
+            "force_build": false,
+            "delete": true,
+            "cpu_enforcement_policy": "auto",
+            "memory_enforcement_policy": "auto",
+            "override_cpus": null,
+            "override_memory_mb": null,
+            "override_storage_mb": null,
+            "override_gpus": null,
+            "override_tpu": null,
+            "mounts": [],
+            "extra_docker_compose": [],
+            "kwargs": {
+                "prepare_dir": "/Users/chenyinghao/workspace/PTDBench/tasks/algorithm/task_grpo_broadcast/environment",
+                "project": "xinfer-chenyinghao",
+                "cluster": "sichuan_train",
+                "resource_pool": "speech-sc",
+                "billing_account_id": "N00069"
+            },
+            "extra_allowed_hosts": []
+        },
+        "verifier": {
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "disable": false
+        },
+        "artifacts": [],
+        "extra_instruction_paths": [],
+        "job_id": "aca83c47-6c98-4f37-a78d-e98bb8483c7f",
+        "source_trial": null
+    },
+    "agent_info": {
+        "name": "codex",
+        "version": "unknown",
+        "model_info": {
+            "name": "gpt-5.5",
+            "provider": "openai"
+        }
+    },
+    "agent_result": null,
+    "verifier_result": null,
+    "verifier_environment_mode": "shared",
+    "exception_info": {
+        "exception_type": "AgentSetupTimeoutError",
+        "exception_message": "Agent setup timed out after 360.0 seconds",
+        "exception_traceback": "Traceback (most recent call last):\n  File \"/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py\", line 507, in wait_for\n    return await fut\n           ^^^^^^^^^\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/agents/installed/base.py\", line 940, in setup\n    await self.install(environment)\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/agents/installed/codex.py\", line 350, in install\n    await self.ensure_system_dependencies(\n        environment, (\"curl\", \"bash\", \"nodejs\", \"npm\", \"ripgrep\")\n    )\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/agents/installed/base.py\", line 677, in ensure_system_dependencies\n    await self.exec_as_root(environment, command=command, env=env)\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/agents/installed/base.py\", line 872, in exec_as_root\n    return await self._exec(\n           ^^^^^^^^^^^^^^^^^\n        environment, command, user=\"root\", env=env, cwd=cwd, timeout_sec=timeout_sec\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/agents/installed/base.py\", line 836, in _exec\n    result = await environment.exec(\n             ^^^^^^^^^^^^^^^^^^^^^^^\n    ...<5 lines>...\n    )\n    ^\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py\", line 1563, in exec\n    return await self._ssh_exec(\n           ^^^^^^^^^^^^^^^^^^^^^\n    ...<6 lines>...\n    )\n    ^\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py\", line 1096, in _ssh_exec\n    stdout, stderr, return_code = await self._ssh_raw(\n                                  ^^^^^^^^^^^^^^^^^^^^\n        remote_command, timeout_sec=timeout_sec\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py\", line 1050, in _ssh_raw\n    stdout, stderr, return_code = await self._collect_process(\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        process, timeout_sec=timeout_sec, stdin=stdin\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    )\n    ^\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py\", line 1010, in _collect_process\n    stdout, stderr = await process.communicate(stdin)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/subprocess.py\", line 201, in communicate\n    stdin, stdout, stderr = await tasks.gather(stdin, stdout, stderr)\n                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/subprocess.py\", line 181, in _read_stream\n    output = await stream.read()\n             ^^^^^^^^^^^^^^^^^^^\n  File \"/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/streams.py\", line 723, in read\n    block = await self.read(self._limit)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/streams.py\", line 730, in read\n    await self._wait_for_data('read')\n  File \"/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/streams.py\", line 539, in _wait_for_data\n    await self._waiter\nasyncio.exceptions.CancelledError\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py\", line 1252, in _setup_agent\n    await asyncio.wait_for(\n    ...<2 lines>...\n    )\n  File \"/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py\", line 506, in wait_for\n    async with timeouts.timeout(timeout):\n               ~~~~~~~~~~~~~~~~^^^^^^^^^\n  File \"/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/timeouts.py\", line 116, in __aexit__\n    raise TimeoutError from exc_val\nTimeoutError\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py\", line 379, in run\n    await self._prepare()\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py\", line 417, in _prepare\n    await self._setup_agent()\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py\", line 1257, in _setup_agent\n    raise AgentSetupTimeoutError(\n        f\"Agent setup timed out after {self._agent_setup_timeout_sec} seconds\"\n    ) from exc\nharbor.trial.errors.AgentSetupTimeoutError: Agent setup timed out after 360.0 seconds\n",
+        "occurred_at": "2026-10-27T00:57:36.889245Z"
+    },
+    "started_at": "2026-10-27T00:47:34.162073Z",
+    "finished_at": "2026-10-27T01:05:06.504102Z",
+    "environment_setup": {
+        "started_at": "2026-10-27T00:47:34.360909Z",
+        "finished_at": "2026-10-27T00:51:36.871146Z"
+    },
+    "agent_setup": {
+        "started_at": "2026-10-27T00:51:36.872083Z",
+        "finished_at": "2026-10-27T00:57:36.874535Z"
+    },
+    "agent_execution": null,
+    "verifier": null,
+    "step_results": null
+}

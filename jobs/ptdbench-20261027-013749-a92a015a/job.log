@@ -1,0 +1,133 @@
+Created Cybertron devspace tasks/1377522
+Trial task_grpo_broadcast-issue__vMX7MdH cancelled
+Failed to download logs to jobs/ptdbench-20261027-013749-a92a015a/task_grpo_broadcast-issue__vMX7MdH/agent
+Collecting main service artifacts
+Failed to download artifact '/logs/artifacts' from service 'main' (best-effort)
+Traceback (most recent call last):
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 379, in run
+    await self._prepare()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 413, in _prepare
+    await self._setup_agent_environment()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 1220, in _setup_agent_environment
+    await self._start_agent_environment()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 1226, in _start_agent_environment
+    await asyncio.wait_for(
+    ...<4 lines>...
+    )
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1392, in start
+    await self._wait_for_status()  # gates on Running + sets self._host
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 821, in _wait_for_status
+    await asyncio.sleep(10)
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py", line 718, in sleep
+    return await future
+           ^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/artifact_handler.py", line 343, in _download_artifact
+    await source_env.service_download_dir(
+    ...<3 lines>...
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 1274, in service_download_dir
+    await self.download_dir(source_dir, target_dir)
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1686, in download_dir
+    stdout, stderr, return_code = await self._ssh_raw(
+                                  ^^^^^^^^^^^^^^^^^^^^
+        f"bash -c {shlex.quote(remote_command)}", timeout_sec=1800
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1040, in _ssh_raw
+    *self._transport_cmd(),
+     ~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 972, in _transport_cmd
+    raise RuntimeError("Devspace SSH host is not resolved yet.")
+RuntimeError: Devspace SSH host is not resolved yet.
+Failed to download artifact '/workspace' from service 'main' (best-effort)
+Traceback (most recent call last):
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 379, in run
+    await self._prepare()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 413, in _prepare
+    await self._setup_agent_environment()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 1220, in _setup_agent_environment
+    await self._start_agent_environment()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 1226, in _start_agent_environment
+    await asyncio.wait_for(
+    ...<4 lines>...
+    )
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1392, in start
+    await self._wait_for_status()  # gates on Running + sets self._host
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 821, in _wait_for_status
+    await asyncio.sleep(10)
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py", line 718, in sleep
+    return await future
+           ^^^^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/artifact_handler.py", line 336, in _download_artifact
+    await source_env.service_download_dir_with_exclusions(
+    ...<4 lines>...
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 1295, in service_download_dir_with_exclusions
+    await self.download_dir_with_exclusions(
+    ...<3 lines>...
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 997, in download_dir_with_exclusions
+    await self._download_dir_with_exclusions_impl(
+    ...<4 lines>...
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 1023, in _download_dir_with_exclusions_impl
+    result = await self.service_exec(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 1243, in service_exec
+    return await self.exec(
+           ^^^^^^^^^^^^^^^^
+        command, cwd=cwd, env=env, timeout_sec=timeout_sec, user=user
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1563, in exec
+    return await self._ssh_exec(
+           ^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1096, in _ssh_exec
+    stdout, stderr, return_code = await self._ssh_raw(
+                                  ^^^^^^^^^^^^^^^^^^^^
+        remote_command, timeout_sec=timeout_sec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1040, in _ssh_raw
+    *self._transport_cmd(),
+     ~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 972, in _transport_cmd
+    raise RuntimeError("Devspace SSH host is not resolved yet.")
+RuntimeError: Devspace SSH host is not resolved yet.
+cctl devspace stop failed for tasks/1377522: {
+  "error": {
+    "code": "confirmation_required",
+    "message": "stop task requires confirmation for \"tasks/1377522\"",
+    "recoverable": true,
+    "suggestion": "Re-run with --yes or --confirm tasks/1377522"
+  },
+  "ok": false
+}
+

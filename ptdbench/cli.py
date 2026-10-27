@@ -194,11 +194,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     b = sub.add_parser(
         "build-images",
-        help="build the environment images under docker/images/ ahead of time",
+        help="pull the environment images under docker/images/ ahead of time",
         description=(
-            "Build each environment image from docker/images/<name>.Dockerfile, "
-            "tagged as declared by its `# ptdbench-image:` header. "
-            "`evaluate` builds a missing image on demand; this command lets a "
+            "Pull each environment image referenced by docker/images/<name>.Dockerfile's "
+            "FROM line. Nothing is baked anymore, so there is no build step -- "
+            "`evaluate` pulls a missing image on demand; this command lets a "
             "machine pay that cost up front. Images that already exist are "
             "skipped unless --rebuild is given."
         ),
@@ -531,7 +531,7 @@ def main(argv=None) -> int:
             try:
                 runtime.ensure_environment(image, rebuild=args.rebuild)
             except subprocess.CalledProcessError as exc:
-                raise SystemExit(f"building {image.tag} failed (exit {exc.returncode})")
+                raise SystemExit(f"pulling {image.tag} failed (exit {exc.returncode})")
             print(image.tag)
         return 0
 

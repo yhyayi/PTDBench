@@ -18,7 +18,6 @@ from ptdbench.core.types import (
     MODELS_DIR,
     PREPARED_DIR,
     PTDBENCH_ENVIRONMENT_DIR,
-    TOOLING_DIR,
     EnvironmentPlan,
 )
 from ptdbench.runtimes import SandboxRequest
@@ -141,32 +140,6 @@ class MountTableTests(unittest.TestCase):
             mounts = self._mounts(make_request(stage, host_models=None, host_datasets=None))
             self.assertNotIn(MODELS_DIR, mounts, stage)
             self.assertNotIn(DATASETS_DIR, mounts, stage)
-
-    # --- tooling：只有 prepare 只读挂仓库 docker/ ----------------------------
-
-    def test_prepare_mounts_the_tooling_dir_read_only(self) -> None:
-        # prepare 跑脚本前要用 docker/install-ptdbench-tooling.sh 装最新 fetch/dataset
-        # 工具，所以仓库 docker/ 要挂进来；只读，因为 prepare 没理由改仓库。
-        mount = self._mounts(make_request("prepare", host_tooling=ROOT / "docker"))[
-            TOOLING_DIR
-        ]
-        self.assertEqual(mount.host_path, ROOT / "docker")
-        self.assertTrue(mount.read_only)
-
-    def test_later_stages_never_mount_tooling(self) -> None:
-        # agent / rerun / verifier 不跑 prepare，工具装了也没用，而且它们是另起的容器。
-        for stage in ("agent", "rerun", "verifier"):
-            self.assertNotIn(
-                TOOLING_DIR,
-                self._mounts(make_request(stage, host_tooling=ROOT / "docker")),
-                stage,
-            )
-
-    def test_prepare_without_tooling_still_runs(self) -> None:
-        # 装成 wheel 后 docker/ 可能不跟着走；没有就不挂（安装脚本那步也兜底跳过）。
-        self.assertNotIn(
-            TOOLING_DIR, self._mounts(make_request("prepare", host_tooling=None))
-        )
 
     # --- environment：三个阶段都只读 ----------------------------------------
 

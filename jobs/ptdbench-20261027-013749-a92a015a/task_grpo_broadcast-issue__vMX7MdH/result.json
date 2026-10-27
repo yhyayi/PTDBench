@@ -1,0 +1,106 @@
+{
+    "id": "2bc60b25-a4fc-40a8-97bd-7523488f213a",
+    "task_name": "ptdbench/task_grpo_broadcast-issue",
+    "trial_name": "task_grpo_broadcast-issue__vMX7MdH",
+    "trial_uri": "file:///Users/chenyinghao/workspace/PTDBench/jobs/ptdbench-20261027-013749-a92a015a/task_grpo_broadcast-issue__vMX7MdH",
+    "task_id": {
+        "path": "/private/var/folders/jm/096lpmvd4blc0l4dnwfy952w0000gn/T/ptdbench-harbor-task_grpo_broadcast-issue-e5c7t0g9/harbor/tasks/task_grpo_broadcast-issue"
+    },
+    "source": "tasks",
+    "task_checksum": "53afbf3690ecfe7a2ecf276077a080ae43859e95b57d3c5beaf31510923b6561",
+    "config": {
+        "task": {
+            "path": "/private/var/folders/jm/096lpmvd4blc0l4dnwfy952w0000gn/T/ptdbench-harbor-task_grpo_broadcast-issue-e5c7t0g9/harbor/tasks/task_grpo_broadcast-issue",
+            "git_url": null,
+            "git_commit_id": null,
+            "name": null,
+            "ref": null,
+            "overwrite": false,
+            "download_dir": null,
+            "source": "tasks"
+        },
+        "trial_name": "task_grpo_broadcast-issue__vMX7MdH",
+        "trials_dir": "jobs/ptdbench-20261027-013749-a92a015a",
+        "install_only": false,
+        "timeout_multiplier": 1.0,
+        "agent_timeout_multiplier": null,
+        "verifier_timeout_multiplier": null,
+        "agent_setup_timeout_multiplier": null,
+        "environment_build_timeout_multiplier": null,
+        "agent": {
+            "name": "codex",
+            "import_path": null,
+            "model_name": "gpt-5.5",
+            "n_concurrent": null,
+            "concurrency_group": null,
+            "skills": [],
+            "override_timeout_sec": null,
+            "override_setup_timeout_sec": null,
+            "max_timeout_sec": null,
+            "resume_trajectory": false,
+            "load_trajectory": null,
+            "extra_allowed_hosts": [],
+            "kwargs": {},
+            "mcp_servers": []
+        },
+        "environment": {
+            "type": "cybertron",
+            "import_path": null,
+            "force_build": false,
+            "delete": true,
+            "cpu_enforcement_policy": "auto",
+            "memory_enforcement_policy": "auto",
+            "override_cpus": null,
+            "override_memory_mb": null,
+            "override_storage_mb": null,
+            "override_gpus": null,
+            "override_tpu": null,
+            "mounts": [],
+            "extra_docker_compose": [],
+            "kwargs": {
+                "prepare_dir": "/Users/chenyinghao/workspace/PTDBench/tasks/algorithm/task_grpo_broadcast/environment",
+                "project": "xinfer-chenyinghao",
+                "cluster": "wuxi_train",
+                "resource_pool": "speech-wx",
+                "billing_account_id": "N00069"
+            },
+            "extra_allowed_hosts": []
+        },
+        "verifier": {
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "disable": false
+        },
+        "artifacts": [],
+        "extra_instruction_paths": [],
+        "job_id": "b3d015bb-34b3-4f4d-8faf-c29d62c98883",
+        "source_trial": null
+    },
+    "agent_info": {
+        "name": "codex",
+        "version": "unknown",
+        "model_info": {
+            "name": "gpt-5.5",
+            "provider": "openai"
+        }
+    },
+    "agent_result": null,
+    "verifier_result": null,
+    "verifier_environment_mode": "shared",
+    "exception_info": {
+        "exception_type": "CancelledError",
+        "exception_message": "",
+        "exception_traceback": "Traceback (most recent call last):\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py\", line 379, in run\n    await self._prepare()\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py\", line 413, in _prepare\n    await self._setup_agent_environment()\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py\", line 1220, in _setup_agent_environment\n    await self._start_agent_environment()\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py\", line 1226, in _start_agent_environment\n    await asyncio.wait_for(\n    ...<4 lines>...\n    )\n  File \"/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py\", line 507, in wait_for\n    return await fut\n           ^^^^^^^^^\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py\", line 1392, in start\n    await self._wait_for_status()  # gates on Running + sets self._host\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py\", line 821, in _wait_for_status\n    await asyncio.sleep(10)\n  File \"/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py\", line 718, in sleep\n    return await future\n           ^^^^^^^^^^^^\nasyncio.exceptions.CancelledError\n",
+        "occurred_at": "2026-10-27T00:45:56.218271Z"
+    },
+    "started_at": "2026-10-27T00:39:01.455513Z",
+    "finished_at": "2026-10-27T00:45:56.263757Z",
+    "environment_setup": {
+        "started_at": "2026-10-27T00:39:01.656442Z",
+        "finished_at": "2026-10-27T00:45:56.206778Z"
+    },
+    "agent_setup": null,
+    "agent_execution": null,
+    "verifier": null,
+    "step_results": null
+}

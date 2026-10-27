@@ -44,7 +44,6 @@ REMOTE_MODELS = "/ptdbench/models"
 REMOTE_DATASETS = "/ptdbench/datasets"
 REMOTE_PREPARED = "/workspace/.ptdbench-prepared"
 REMOTE_ENVIRONMENT = "/workspace/.ptdbench-environment"
-REMOTE_TOOLING = "/ptdbench/tooling"
 
 DEFAULT_HTTP_PROXY = "http://whitelist-proxy.cybertron.svc.cluster.local:7891"
 DEFAULT_HF_ENDPOINT = "https://hf-mirror.com"
@@ -124,17 +123,17 @@ def build_prepare_recipe(
     datasets: str = REMOTE_DATASETS,
     prepared: str = REMOTE_PREPARED,
     environment: str = REMOTE_ENVIRONMENT,
-    tooling: str = REMOTE_TOOLING,
     script: str = "prepare.sh",
     http_proxy: str | None = None,
     hf_endpoint: str | None = None,
     task_env: dict[str, str] | None = None,
 ) -> str:
-    """Shell that installs the tooling then runs the uploaded task's prepare.sh.
+    """Shell that runs the uploaded task's prepare.sh.
 
     Runs on the devspace against the shared cache at ``/ptdbench/{models,datasets}``.
     Weights land in ``$PTDBENCH_WORKSPACE`` (=/workspace); the tiny ``prepared/env``
-    file lands under it.
+    file lands under it. The fetch/dataset tools ride along in the task's uploaded
+    ``environment/`` and prepare.sh runs them directly via ``$PTDBENCH_ENVIRONMENT``.
 
     ``task_env`` carries the task's own ``[environment].env`` (``CUDA_VISIBLE_DEVICES``,
     ``PTDBENCH_PIP_INDEX_URL``, …). It is exported *before* the PTDBENCH_* paths
@@ -144,7 +143,6 @@ def build_prepare_recipe(
     persistent workspace this backend guarantees. A task can still override the
     proxy and mirror, which are exported earlier still.
     """
-    installer = f"{tooling}/install-ptdbench-tooling.sh"
     task_exports = ""
     if task_env:
         pairs = " ".join(
@@ -175,10 +173,6 @@ def build_prepare_recipe(
         # longer bake it; agent/verifier auto-source it via BASH_ENV (non-login).
         f"cat > {shlex.quote(prepared + '/ptdbench-activate.sh')} "
         f"<<'PTDBENCH_ACTIVATE_EOF'\n{PTDBENCH_ACTIVATE_BODY}PTDBENCH_ACTIVATE_EOF\n"
-        # Install the repo's CURRENT fetch/dataset tooling (the Dockerfiles no
-        # longer bake it); no-op if the installer wasn't uploaded.
-        f"if [ -f {shlex.quote(installer)} ]; then "
-        f"bash {shlex.quote(installer)}; fi; "
         f"cd {shlex.quote(environment)}; "
         f"bash {shlex.quote(script)}"
     )

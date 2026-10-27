@@ -1,0 +1,139 @@
+Created Cybertron devspace tasks/1377547
+Devspace tasks/1377547 ready via SSH host devspace-chenyinghao-xinfer-chenyinghao-1377547 (user chenyinghao)
+Waiting for SSH on devspace tasks/1377547
+Devspace node IP 10.244.22.162 (no_proxy bypass)
+Session task_grpo_broadcast-issue__2EPxWXx__env runs in /user/chenyinghao/harbor-runs/3d945e9289cb
+Uploading environment/ to /workspace
+Running prepare.sh on devspace tasks/1377547 (downloads + any torch_dist conversion; output streams below)
+Running command: apt-get update && apt-get install -y curl bash nodejs npm ripgrep
+Trial task_grpo_broadcast-issue__2EPxWXx failed: Agent setup timed out after 360.0 seconds
+Collecting main service artifacts
+Cybertron heartbeat error: Command '['/Users/chenyinghao/Library/Application Support/Cursor/User/globalStorage/yangsuiyun.cybertron/bin/tsh', 'ssh', '--cluster=teleport.cybertron.modelbest.co', 'root@devspace-chenyinghao-xinfer-chenyinghao-1377547', 'true']' timed out after 30 seconds
+Failed to download artifact '/workspace' from service 'main' (best-effort)
+Traceback (most recent call last):
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/agents/installed/base.py", line 940, in setup
+    await self.install(environment)
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/agents/installed/codex.py", line 350, in install
+    await self.ensure_system_dependencies(
+        environment, ("curl", "bash", "nodejs", "npm", "ripgrep")
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/agents/installed/base.py", line 677, in ensure_system_dependencies
+    await self.exec_as_root(environment, command=command, env=env)
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/agents/installed/base.py", line 872, in exec_as_root
+    return await self._exec(
+           ^^^^^^^^^^^^^^^^^
+        environment, command, user="root", env=env, cwd=cwd, timeout_sec=timeout_sec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/agents/installed/base.py", line 836, in _exec
+    result = await environment.exec(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1563, in exec
+    return await self._ssh_exec(
+           ^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1096, in _ssh_exec
+    stdout, stderr, return_code = await self._ssh_raw(
+                                  ^^^^^^^^^^^^^^^^^^^^
+        remote_command, timeout_sec=timeout_sec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1050, in _ssh_raw
+    stdout, stderr, return_code = await self._collect_process(
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        process, timeout_sec=timeout_sec, stdin=stdin
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1010, in _collect_process
+    stdout, stderr = await process.communicate(stdin)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/subprocess.py", line 201, in communicate
+    stdin, stdout, stderr = await tasks.gather(stdin, stdout, stderr)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/subprocess.py", line 181, in _read_stream
+    output = await stream.read()
+             ^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/streams.py", line 723, in read
+    block = await self.read(self._limit)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/streams.py", line 730, in read
+    await self._wait_for_data('read')
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/streams.py", line 539, in _wait_for_data
+    await self._waiter
+asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 1252, in _setup_agent
+    await asyncio.wait_for(
+    ...<2 lines>...
+    )
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py", line 506, in wait_for
+    async with timeouts.timeout(timeout):
+               ~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/timeouts.py", line 116, in __aexit__
+    raise TimeoutError from exc_val
+TimeoutError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 379, in run
+    await self._prepare()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 417, in _prepare
+    await self._setup_agent()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 1257, in _setup_agent
+    raise AgentSetupTimeoutError(
+        f"Agent setup timed out after {self._agent_setup_timeout_sec} seconds"
+    ) from exc
+harbor.trial.errors.AgentSetupTimeoutError: Agent setup timed out after 360.0 seconds
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/artifact_handler.py", line 336, in _download_artifact
+    await source_env.service_download_dir_with_exclusions(
+    ...<4 lines>...
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 1295, in service_download_dir_with_exclusions
+    await self.download_dir_with_exclusions(
+    ...<3 lines>...
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 997, in download_dir_with_exclusions
+    await self._download_dir_with_exclusions_impl(
+    ...<4 lines>...
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 1038, in _download_dir_with_exclusions_impl
+    await self.service_download_file(
+    ...<3 lines>...
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 1259, in service_download_file
+    await self.download_file(source_path, target_path)
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1635, in download_file
+    raise RuntimeError(
+    ...<2 lines>...
+    )
+RuntimeError: Failed to download devspace file /tmp/.hb-transfer-c0245023-7de8-4077-9f2c-c51bdee9fc2d.tar.gz: Command timed out after 300 seconds
+cctl devspace stop failed for tasks/1377547: {
+  "error": {
+    "code": "confirmation_required",
+    "message": "stop task requires confirmation for \"tasks/1377547\"",
+    "recoverable": true,
+    "suggestion": "Re-run with --yes or --confirm tasks/1377547"
+  },
+  "ok": false
+}
+
+Not retrying trial because the maximum number of retries has been reached

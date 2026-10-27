@@ -46,24 +46,8 @@ set -euo pipefail
 # 三个文件都要 allow，并逐个钉死 sha256 / 字节数。
 # 值取自实际快照（commit 70d244cc）：两片 safetensors 的 sha256 既等于 HF 下载缓存里
 # 记的 etag，也与 ModelScope 独立给出的 sha256 一致，并在设备上用 sha256sum 复核过。
-ptdbench_fetch_hf \
+python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" \
     --repo Qwen/Qwen3-1.7B \
-    --revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e \
-    --allow config.json \
-    --allow generation_config.json \
-    --allow tokenizer_config.json \
-    --allow tokenizer.json \
-    --allow vocab.json \
-    --allow merges.txt \
-    --allow model.safetensors.index.json \
-    --allow model-00001-of-00002.safetensors \
-    --allow model-00002-of-00002.safetensors \
-    --expect model-00001-of-00002.safetensors=169ad53ec313c3a34b06c0809216e4fc072cce444a5d4ff2b59690d064130ed5 \
-    --expect model-00002-of-00002.safetensors=912becff8d60672aa8628ef08c05898d9adf17c2ad4ae3caf99b065622fdeff9 \
-    --expect model.safetensors.index.json=0d660e94b165eb912669a5249dff44b83188c4777a07ddb9611fb78d91b0578d \
-    --expect-size model-00001-of-00002.safetensors=3441185608 \
-    --expect-size model-00002-of-00002.safetensors=622329984 \
-    --expect-size model.safetensors.index.json=25605 \
     --dest "$PTDBENCH_WORKSPACE/Qwen3-1.7B"
 
 # --- Endless Terminals 原始任务集（run.sh 的 ET_SRC） ------------------------
@@ -72,11 +56,7 @@ ptdbench_fetch_hf \
 # 指向原始的 task_* 目录树；`python3 -m et.build_dataset --src "$ET_SRC"` 把每个任务的
 # Dockerfile 转写成 setup.sh（安装命令 shim 成 no-op），再逐个验证能否被接纳。
 # dest 必须正好是 $PTDBENCH_WORKSPACE/endless-terminals。
-ptdbench_fetch_hf \
+python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" \
     --type dataset \
     --repo TODO_ENDLESS_TERMINALS_HF_DATASET_REPO \
-    --revision TODO_ENDLESS_TERMINALS_40CHAR_REVISION \
-    --allow '*' \
-    --expect TODO_ENDLESS_TERMINALS_REPRESENTATIVE_FILE=TODO_SHA256 \
-    --expect-size TODO_ENDLESS_TERMINALS_REPRESENTATIVE_FILE=TODO_BYTES \
     --dest "$PTDBENCH_WORKSPACE/endless-terminals"

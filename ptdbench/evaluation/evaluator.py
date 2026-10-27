@@ -13,9 +13,7 @@ from typing import Any, Dict, Optional
 
 from ..agents import AgentExecutionContext, AgentRunner, create_agent_runner, resolve_agent_spec
 from ..core.types import (
-    DOCKER_DIR,
     PTDBENCH_ENVIRONMENT_DIR,
-    TOOLING_INSTALLER,
     AgentSpec,
     TaskPackage,
     CommandResult,
@@ -395,9 +393,6 @@ class TaskEvaluator:
             host_prepared=run.prepared,
             host_models=run.models,
             host_datasets=run.datasets,
-            # 仓库 docker/ 只读挂进 prepare 容器；跑脚本前用它装最新 fetch/dataset 工具。
-            # 目录不在（装成 wheel 时 docker/ 可能不跟着走）就不挂，下面的调用也兜底跳过。
-            host_tooling=DOCKER_DIR if DOCKER_DIR.is_dir() else None,
             env=self._prepare_mirror_env(config),
             # prepare 是唯一该联网的阶段；把它也断网，模型就没人下了。
             network="bridge",
@@ -414,16 +409,9 @@ class TaskEvaluator:
         )
         sandbox = self.runtime.create_sandbox(request, artifact=artifact)
         try:
-            # prepare.sh 调的 ptdbench_fetch_* / ptdbench_dataset 是 shim，exec 的是
-            # /usr/local/libexec 下的工具。装成镜像烤进去的那份可能是旧的，所以挂了
-            # 仓库 docker/（host_tooling）就先跑安装脚本，把当前版本装进去再跑脚本。
-            # 安装脚本不在（没挂）时跳过，行为与旧版一致。
+            # prepare.sh 直接 `python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py"` 调工具，
+            # 工具随任务的 environment/ 挂进来，不再需要装一步。
             shell = f"bash {shlex.quote(script)}"
-            if request.host_tooling is not None:
-                shell = (
-                    f"if [ -f {shlex.quote(TOOLING_INSTALLER)} ]; then "
-                    f"bash {shlex.quote(TOOLING_INSTALLER)}; fi; " + shell
-                )
             result = self.runtime.exec(
                 sandbox,
                 CommandSpec(

@@ -201,16 +201,18 @@ python3 -m ptdbench build-images verl-qwen3vl-cu130
 TASK="$PWD/tasks/infrastructure/qwen3vl_geo3k"
 IMAGE=ptdbench/verl-qwen3vl-cu130:vllm0.24-torch2.11-cu130
 
-# Prepare the pinned assets in a networked CPU container.
+# Prepare the pinned assets in a networked CPU container. The fetch/dataset
+# tools live in the task's environment/ and prepare.sh runs them via
+# $PTDBENCH_ENVIRONMENT, so that var must point at the mounted dir.
 docker run --rm \
   -v "$TASK/workspace:/workspace" \
   -v "$TASK/environment:/ptdbench/environment:ro" \
-  -v "$PWD/docker:/ptdbench/tooling:ro" \
   -e PTDBENCH_WORKSPACE=/workspace \
+  -e PTDBENCH_ENVIRONMENT=/ptdbench/environment \
   -e HF_ENDPOINT=https://hf-mirror.com \
   -e HF_HUB_OFFLINE=0 -e HF_DATASETS_OFFLINE=0 \
   --entrypoint bash "$IMAGE" -lc \
-  'bash /ptdbench/tooling/install-ptdbench-tooling.sh && bash /ptdbench/environment/prepare.sh'
+  'bash /ptdbench/environment/prepare.sh'
 
 # Run on eight GPUs and write new experiment logs.
 docker run --rm --gpus all --shm-size=16g \

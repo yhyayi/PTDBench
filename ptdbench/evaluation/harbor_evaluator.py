@@ -26,7 +26,6 @@ from ..core.harbor_types import (
 )
 from ..core.types import (
     DATASETS_DIR,
-    DOCKER_DIR,
     MODELS_DIR,
     PREPARED_DIR,
     PTDBENCH_ENVIRONMENT_DIR,
@@ -327,13 +326,28 @@ exit "$verifier_status"
 '''
 
     @staticmethod
-    def _docker_image(package: TaskPackage) -> str:
+    def _image_name(package: TaskPackage) -> str:
+        """任务声明的环境名（= metadata environment.image，也是
+        docker/images/<name>.Dockerfile 的名字）。
+
+        远端 cybertron 后端用它查 image_map 映射到集群自己的 canonicalName，所以那条
+        路径要的是这个名字，而不是 Dockerfile FROM 行指向的上游镜像。
+        """
         if package.environment.image is None:
             raise HarborAdapterError(
                 f"task {package.task_id!r} declares no environment.image; Harbor needs "
                 "a prebuilt image"
             )
-        return EnvironmentImage(package.environment.image).tag
+        return package.environment.image
+
+    @staticmethod
+    def _image_ref(package: TaskPackage) -> str:
+        """可以直接 `docker pull` / `docker run` 的镜像引用（Dockerfile 的 FROM 行）。
+
+        本地 docker 后端和 harbor-shell 都在本机起容器，要的是真实可拉取的引用，
+        不能用环境名。
+        """
+        return EnvironmentImage(HarborTaskMaterializer._image_name(package)).tag
 
     # 离线开关：与 SandboxRuntime._network_policy_env 对 agent / verifier 给的一致。
     # 联网的只有 prepare，而它在 `harbor run` 之前就跑完了。
@@ -380,7 +394,13 @@ exit "$verifier_status"
         oracle_path = "/tests/oracle.md" if evaluation.oracle.is_file() else "/tests/oracle"
         task_name = harbor_task_name(package.task_id, evaluation.level)
         title = str(package.metadata.get("title") or package.task_id)
-        docker_image = self._docker_image(package)
+        # 远端（cybertron）后端拿环境名去 image_map 映射到集群 canonicalName；本地
+        # docker 后端直接 `docker run` 这个值，所以要可拉取的 FROM 引用。
+        docker_image = (
+            self._image_name(package)
+            if _is_remote_backend(config.harbor_args)
+            else self._image_ref(package)
+        )
 
         # 两个 stage 共用的部分：挂载路径、离线开关，以及让 `bash -c` 也加载
         # activate hook 的 BASH_ENV（Harbor 不起登录 shell）。
@@ -522,7 +542,7 @@ build_timeout_sec = {self._environment_start_timeout(task_dir / "environment")}
             "task_id": package.task_id,
             "evaluation_level": evaluation.level,
             "verifier_mode": "shared",
-            "docker_image": HarborTaskMaterializer._docker_image(package),
+            "docker_image": HarborTaskMaterializer._image_name(package),
             "source_task": str(package.paths.root),
         }
         write_text(
@@ -723,12 +743,12 @@ class HarborRunner:
         prepared: PreparedHarborTask,
         harbor_args: Sequence[str],
     ) -> list[str]:
-        """远端后端跑 prepare 所需的两个路径，作为 environment kwarg 注入。
+        """远端后端跑 prepare 所需的路径，作为 environment kwarg 注入。
 
-        后端要自己把 prepare.sh 和 fetch/dataset 工具送上 devspace，但物化出来的
-        Harbor task 里并没有任务原本的 environment/（那个目录名在 Harbor 语义下装
-        的是要上传到 workdir 的 workspace 树），docker 路径是靠 bind mount 补的。
-        远端没有挂载，所以这里把宿主机上的两个源目录显式告诉后端。
+        后端要自己把 prepare.sh（以及随它放在 environment/ 里的 fetch/dataset 工具）
+        送上 devspace，但物化出来的 Harbor task 里并没有任务原本的 environment/（那个
+        目录名在 Harbor 语义下装的是要上传到 workdir 的 workspace 树），docker 路径是
+        靠 bind mount 补的。远端没有挂载，所以这里把宿主机上的源目录显式告诉后端。
 
         用户显式给过同名 kwarg 时不覆盖——调试时可以指到别处。
         """
@@ -749,8 +769,6 @@ class HarborRunner:
             args.extend(
                 ["--environment-kwarg", f"prepare_dir={package.paths.environment.resolve()}"]
             )
-        if "tooling_dir" not in existing and DOCKER_DIR.is_dir():
-            args.extend(["--environment-kwarg", f"tooling_dir={DOCKER_DIR.resolve()}"])
         return args
 
     @staticmethod
@@ -1274,7 +1292,7 @@ class HarborShell:
             }
             write_text(state_path, json.dumps(state_data, indent=2, ensure_ascii=False))
 
-        image = HarborTaskMaterializer._docker_image(package)
+        image = HarborTaskMaterializer._image_ref(package)
         argv = self._build_docker_argv(
             unit,
             package,

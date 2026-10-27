@@ -36,11 +36,12 @@ class TestProxyAndMirrorExports:
 
 @pytest.mark.unit
 class TestPrepareRecipe:
-    def test_installs_tooling_before_running_prepare(self):
+    def test_runs_prepare_from_the_environment_dir(self):
+        # The fetch/dataset tools ride along in the task's environment/, so the
+        # recipe just cd's there and runs prepare.sh -- no separate install step.
         recipe = build_prepare_recipe()
-        assert recipe.index("install-ptdbench-tooling.sh") < recipe.index(
-            "bash prepare.sh"
-        )
+        assert "install-ptdbench-tooling" not in recipe
+        assert recipe.index("PTDBENCH_ENVIRONMENT=") < recipe.index("bash prepare.sh")
 
     def test_exports_the_layout_prepare_scripts_read(self):
         recipe = build_prepare_recipe()
@@ -114,7 +115,7 @@ class TestPrepareRecipe:
         assert recipe.index("HF_HUB_OFFLINE=1") < unset_at
         assert unset_at < recipe.index("bash prepare.sh")
         for name in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE", "HF_DATASETS_OFFLINE"):
-            assert name in recipe[unset_at:unset_at + 80]
+            assert name in recipe[unset_at : unset_at + 80]
 
     def test_fails_fast(self):
         # Without -e a failing download would be followed by a "successful"

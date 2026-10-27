@@ -44,7 +44,6 @@ from harbor.environments.ptdbench_prepare import (
 )
 from harbor.environments.ptdbench_prepare import (
     REMOTE_ENVIRONMENT,
-    REMOTE_TOOLING,
     build_prepare_recipe,
     proxy_export,
 )
@@ -489,7 +488,6 @@ class CybertronEnvironment(BaseEnvironment):
         cctl_profile: str | None = None,
         sandbox_ro_tool_dirs: list[str] | tuple[str, ...] | None = None,
         prepare_dir: str | Path | None = None,
-        tooling_dir: str | Path | None = None,
         prepare_script: str = "prepare.sh",
         prepare_env: dict[str, str] | None = None,
         http_proxy: str | None = _DEFAULT_HTTP_PROXY,
@@ -497,13 +495,12 @@ class CybertronEnvironment(BaseEnvironment):
         **kwargs: Any,
     ) -> None:
         # PTDBench prepare stage. ``prepare_dir`` is the task's own
-        # ``environment/`` dir (the one holding ``prepare.sh``); when it is set,
-        # start() uploads it plus ``tooling_dir`` (the repo's ``docker/``) and
+        # ``environment/`` dir (the one holding ``prepare.sh`` plus the
+        # fetch/dataset tools it runs); when it is set, start() uploads it and
         # runs prepare ON the devspace. Left unset, the environment behaves as
         # before and no prepare runs -- the manual staging script drives it
         # itself, and non-PTDBench tasks have nothing to prepare.
         self._prepare_dir = None if prepare_dir is None else Path(prepare_dir)
-        self._tooling_dir = None if tooling_dir is None else Path(tooling_dir)
         self._prepare_script = prepare_script
         # Extra env for the prepare shell only. Tasks that install from a
         # package index cannot hardcode one (search_r1 defaults to the beijing
@@ -579,8 +576,14 @@ class CybertronEnvironment(BaseEnvironment):
         # title"). Fresh per instance; the session -> dir mapping is logged.
         self._run_uid = uuid.uuid4().hex[:12]
 
-        # attach mode: reuse an existing devspace instead of creating one
-        self._devspace_id: str | None = devspace_id
+        # attach mode: reuse an existing devspace instead of creating one.
+        # Coerce to str: a numeric devspace_id (e.g. from `--environment-kwarg
+        # devspace_id=1377547`, which the CLI parses as an int) otherwise reaches
+        # cctl's subprocess argv and `_numeric_id`'s .rsplit as an int and raises
+        # `TypeError: expected str ... not int`.
+        self._devspace_id: str | None = (
+            None if devspace_id is None else str(devspace_id)
+        )
         self._owns_devspace = devspace_id is None
 
         # Resolved Teleport node / ssh alias (same string in both transports).
@@ -1445,8 +1448,6 @@ fi
             raise RuntimeError(
                 f"Cybertron prepare_dir {self._prepare_dir} is not a directory"
             )
-        if self._tooling_dir is not None:
-            await self.upload_dir(self._tooling_dir, REMOTE_TOOLING)
         await self.upload_dir(self._prepare_dir, REMOTE_ENVIRONMENT)
         if not (self._prepare_dir / self._prepare_script).is_file():
             self.logger.debug(

@@ -1,0 +1,24 @@
+{
+    "task": {
+        "path": "/private/var/folders/jm/096lpmvd4blc0l4dnwfy952w0000gn/T/ptdbench-harbor-task_grpo_broadcast-issue-w0jld1yj/harbor/tasks/task_grpo_broadcast-issue",
+        "source": "tasks"
+    },
+    "trial_name": "task_grpo_broadcast-issue__2EPxWXx",
+    "trials_dir": "jobs/ptdbench-20261027-014610-8afa1393",
+    "agent": {
+        "name": "codex",
+        "model_name": "gpt-5.5"
+    },
+    "environment": {
+        "type": "cybertron",
+        "mounts": [],
+        "kwargs": {
+            "prepare_dir": "/Users/chenyinghao/workspace/PTDBench/tasks/algorithm/task_grpo_broadcast/environment",
+            "project": "xinfer-chenyinghao",
+            "cluster": "sichuan_train",
+            "resource_pool": "speech-sc",
+            "billing_account_id": "N00069"
+        }
+    },
+    "job_id": "aca83c47-6c98-4f37-a78d-e98bb8483c7f"
+}

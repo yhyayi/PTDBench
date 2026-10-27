@@ -98,22 +98,40 @@ the weighted float when only one component passes.
 
 ## External dataset asset
 
-- Repository: `LIF1014/ptdbench-reward-design-task-grpo-broadcast-dataset`
-- Publication status: `published`
-- Pinned revision: `bf47407d7372856d5d09b6d16dae3c1570393692`
+- Repository: `cyh2004/ptdbench-taco-verl-easy` (neutral name — does not encode the task)
 - Dataset license: `Apache-2.0`
-- Provenance: Same TACO EASY snapshot as `task_function_call` (8368 train / 184 test).
+- Provenance: TACO EASY snapshot (8368 train / 184 test), same bytes as `task_function_call`.
+- Contents: `train.parquet` and `test.parquet` flat at the repo root (no `tar.gz`).
 
+| File            | Size              | SHA-256                                                            |
+| --------------- | ----------------- | ------------------------------------------------------------------ |
+| `test.parquet`  | 61,082,676 bytes  | `e364fa69d973f8e8644b2fa4d7dc6ec405d5b4adff64002c6ad52e7c787c6eaa` |
+| `train.parquet` | 606,016,648 bytes | `7f25abdfa9e0f5baa173d153a32973fbe2cc8736503a35408b8ebb8ae2bc5706` |
 
-| Runtime path                            | Size              | SHA-256                                                            |
-| --------------------------------------- | ----------------- | ------------------------------------------------------------------ |
-| `workspace/taco_verl/test.parquet`      | 61,082,676 bytes  | `e364fa69d973f8e8644b2fa4d7dc6ec405d5b4adff64002c6ad52e7c787c6eaa` |
-| `workspace/taco_verl/train.parquet`     | 606,016,648 bytes | `7f25abdfa9e0f5baa173d153a32973fbe2cc8736503a35408b8ebb8ae2bc5706` |
+`environment/prepare.sh` fetches the whole repo straight into
+`workspace/taco_verl`; the two parquet files are what training reads. No unpack
+or checksum step — the dataset is delivered already extracted.
 
+### How the flat dataset was published
 
-`environment/prepare.sh` downloads the immutable revision in the prepare
-stage, verifies the archive and the unpacked parquet bytes, and stages
-`workspace/taco_verl` before the agent runs.
+One-time, with an HF token, to the **neutral-named** repo above (so the repo /
+cache dir name never reveals the task to the agent). Recorded here so it can be
+reproduced if the repo is ever lost:
+
+```bash
+# extract the two parquets from the legacy tarball (or reuse an existing taco_verl)
+hf download LIF1014/ptdbench-reward-design-task-grpo-broadcast-dataset \
+    artifacts/workspace-assets.tar.gz --repo-type dataset --local-dir /tmp/taco-dl
+mkdir -p /tmp/taco-flat
+tar -xzf /tmp/taco-dl/artifacts/workspace-assets.tar.gz -C /tmp/taco-flat workspace/taco_verl
+
+# publish the two parquets at the repo root
+hf repo create cyh2004/ptdbench-taco-verl-easy --repo-type dataset
+hf upload cyh2004/ptdbench-taco-verl-easy /tmp/taco-flat/workspace/taco_verl . --repo-type dataset
+```
+
+The SHA-256 / size rows above are kept for reference only; `prepare.sh` no
+longer checks them.
 
 ## External model asset
 

@@ -19,22 +19,9 @@ set -euo pipefail
 # 里 VERL_ROOT 是启动脚本上溯两级，容器里就是 /workspace，所以 dest 必须正好是
 # $PTDBENCH_WORKSPACE/Qwen2.5-1.5B-Instruct。
 #
-# 官方仓的固定 revision。allow 列表里的每个文件（含 model.safetensors）与历史 run
-# 用的快照逐字节相同，校验值不变。
-ptdbench_fetch_hf \
+# 官方仓，整仓下载（fetch 不再按 --allow 取子集，也不再校验 sha256）。
+python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" \
     --repo Qwen/Qwen2.5-1.5B-Instruct \
-    --revision 989aa7980e4cf806f80c7fef2b1adb7bc71aa306 \
-    --allow config.json \
-    --allow generation_config.json \
-    --allow LICENSE \
-    --allow merges.txt \
-    --allow README.md \
-    --allow tokenizer_config.json \
-    --allow tokenizer.json \
-    --allow vocab.json \
-    --allow model.safetensors \
-    --expect model.safetensors=dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee \
-    --expect-size model.safetensors=3087467144 \
     --dest "$PTDBENCH_WORKSPACE/Qwen2.5-1.5B-Instruct"
 
 # --- 数据集 -----------------------------------------------------------------
@@ -50,17 +37,13 @@ ptdbench_fetch_hf \
 # hydrate-assets.sh 就是把这层 workspace/ 铺到 /workspace 上）。ptdbench_fetch_hf
 # 不会解包，所以下到一个临时目录再自己展开；展开完两份 parquet 逐个校验。
 #
-# 归档校验值取自 legacy Dockerfile 的 DATASET_ARCHIVE_SHA256 / DATASET_ARCHIVE_SIZE。
 TACO_STAGING="$PTDBENCH_WORKSPACE/.ptdbench-taco-archive"
 rm -rf "$TACO_STAGING"
 
-ptdbench_fetch_hf \
+python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" \
     --type dataset \
     --repo LIF1014/ptdbench-verl-implementation-torch-functional-dataset \
-    --revision 83da7ccf4a74543f5aa3e46191c4916d7029564b \
-    --allow artifacts/workspace-assets.tar.gz \
-    --expect artifacts/workspace-assets.tar.gz=ffbcda004787c3ccc6460ac63d738110cc1bbfb6e143f23701753cabdef684e6 \
-    --expect-size artifacts/workspace-assets.tar.gz=471687179 \
+    --cache-as ptdbench/verl-asset-1 \
     --dest "$TACO_STAGING"
 
 echo "[prepare] unpacking taco_verl -> $PTDBENCH_WORKSPACE/taco_verl"
@@ -72,8 +55,8 @@ rm -rf "$PTDBENCH_WORKSPACE/taco_verl"
 mv "$TACO_STAGING/workspace/taco_verl" "$PTDBENCH_WORKSPACE/taco_verl"
 rm -rf "$TACO_STAGING"
 
-# 展开后的字节自己再校一遍。ptdbench_fetch_hf 校的是归档，这里校的是训练真正读的
-# 那两个文件——中间隔着一次 tar，值得各校各的。对不上就硬失败，不重下。
+# 展开后的两份 parquet 自己校一遍（fetch 本身已不再校验），训练真正读它们。
+# 对不上就硬失败。
 # 校验值取自 readme.md "External dataset asset" 表的两行。
 (
     cd "$PTDBENCH_WORKSPACE/taco_verl"
@@ -84,19 +67,3 @@ TACO_DIGESTS
     [ "$(stat -c %s test.parquet)" = 61082676 ]
     [ "$(stat -c %s train.parquet)" = 606016648 ]
 )
-
-# --- 关于 pyext：这里**故意**不装 ---------------------------------------------
-# verl/utils/reward_score/taco.py 先试 `from pyext import RuntimeModule`，ImportError
-# 就退到自带的 _FallbackRuntimeModule（完整可用，不是半截），stdin 路径每条样例都会
-# 走到，所以装不装 pyext 会落到奖励上。
-#
-# 选择不装，依据是本任务 wandb 冻结清单：
-#   workspace/logs/wandb/*/files/requirements.txt 里没有 pyext。
-# 本 benchmark 的门槛按历史曲线校（readme.md：val 峰值 ≥ 0.125、
-# critic/rewards/mean > 0.14），以 wandb 清单为准，不以 legacy Dockerfile 为准。
-# （reward_design/task_function_call 出于同一依据也不装；task_evaluator 装，因为
-# 它那份 requirements.txt 里有 pyext==0.7。）
-#
-# 要改回去的话：把 reward_design/task_evaluator/environment/prepare.sh 末尾那一节整段
-# 搬过来即可（装进 $PTDBENCH_PREPARED/pysite 并往 $PTDBENCH_PREPARED/env 写 PYTHONPATH）。
-# 不要改 docker/images/verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12.Dockerfile——那个镜像是所有 verl 任务共用的。

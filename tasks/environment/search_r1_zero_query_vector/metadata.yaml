@@ -14,7 +14,7 @@ training:
   algo: grpo
   script: run.py
 environment:
-  image: search-r1-verl-vllm0.6.3-torch2.4.0-flashattn2.6.3-cu121-py3.10
+  image: vllm0.6.3-torch2.4.0-flashattn2.6.3-cu121-py3.10
   env:
     # 单卡任务：run.py 自己会把 CUDA_VISIBLE_DEVICES 设成 config.json 里的 gpu
     # （默认 0），train_grpo.sh 在 SEARCH_R1_SHORT_GRPO=1 下也只要一张卡

@@ -1,0 +1,23 @@
+Traceback (most recent call last):
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 379, in run
+    await self._prepare()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 413, in _prepare
+    await self._setup_agent_environment()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 1220, in _setup_agent_environment
+    await self._start_agent_environment()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 1226, in _start_agent_environment
+    await asyncio.wait_for(
+    ...<4 lines>...
+    )
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1392, in start
+    await self._wait_for_status()  # gates on Running + sets self._host
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 821, in _wait_for_status
+    await asyncio.sleep(10)
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py", line 718, in sleep
+    return await future
+           ^^^^^^^^^^^^
+asyncio.exceptions.CancelledError

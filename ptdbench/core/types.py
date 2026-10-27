@@ -161,14 +161,9 @@ PREPARED_DIR = "/ptdbench/prepared"
 MODELS_DIR = "/ptdbench/models"
 DATASETS_DIR = "/ptdbench/datasets"
 # 任务的 environment/ 目录挂进来的位置。三个阶段都只读——prepare.sh 是环境说明，
-# 不是答案，但也没有哪个阶段有理由改仓库里的任务定义。
+# 不是答案，但也没有哪个阶段有理由改仓库里的任务定义。prepare 阶段的 fetch/dataset
+# 工具（ptdbench_fetch.py 等）也随任务放在这个目录里，prepare.sh 直接 `python3` 调。
 PTDBENCH_ENVIRONMENT_DIR = "/ptdbench/environment"
-# 仓库 docker/ 目录（见 DOCKER_DIR）在 prepare 容器里挂进来的位置。只读、仅 prepare 阶段。
-# prepare 跑 prepare.sh 前先 `bash $TOOLING_DIR/install-ptdbench-tooling.sh`，把 fetch/
-# dataset 工具按仓库当前版本装进 /usr/local，避免用到烤进镜像的旧副本。
-TOOLING_DIR = "/ptdbench/tooling"
-# 这个安装脚本在仓库 docker/ 里，挂进来后的容器路径。
-TOOLING_INSTALLER = f"{TOOLING_DIR}/install-ptdbench-tooling.sh"
 
 # task package 里的约定文件名。写成常量是因为 loader 和 evaluator 都要用，而
 # "默认值散落多处"正是 schema 漂移的起点。
@@ -224,24 +219,38 @@ class EnvironmentImage:
 
     @property
     def tag(self) -> str:
-        """Dockerfile 头部 `# ptdbench-image: <tag>` 声明的 tag。
+        """这个环境要跑的镜像引用。
 
-        找不到就报错而不是回退到某个默认值：回退会让两个环境悄悄共用一个 tag，
-        后构建的那个覆盖先构建的。
+        现在每个 docker/images/*.Dockerfile 只有一行 `FROM <ref>@sha256:...`，没有再
+        往镜像里烤任何东西（activate hook、fetch 工具都挪到 prepare 阶段了），所以任务
+        直接跑这行 FROM 指向的、钉死 digest 的上游镜像——不再构建自定义镜像。
+
+        取值顺序：可选的 `# ptdbench-image: <tag>` 头（如果某个 Dockerfile 还留着，
+        用它覆盖，向后兼容），否则取 FROM 行的镜像引用。两者都没有才报错。
         """
         try:
             text = self.dockerfile.read_text(encoding="utf-8")
         except OSError as exc:
             raise RuntimeError(
-                f"cannot read {self.dockerfile} to resolve the image tag of {self.name!r}"
+                f"cannot read {self.dockerfile} to resolve the image of {self.name!r}"
             ) from exc
+        from_ref: Optional[str] = None
         for line in text.splitlines():
-            if line.startswith(IMAGE_TAG_HEADER):
-                tag = line[len(IMAGE_TAG_HEADER):].strip()
+            stripped = line.strip()
+            if stripped.startswith(IMAGE_TAG_HEADER):
+                tag = stripped[len(IMAGE_TAG_HEADER):].strip()
                 if tag:
                     return tag
+            if from_ref is None and stripped[:5].upper() == "FROM ":
+                # FROM <ref> [AS <stage>]
+                parts = stripped.split()
+                if len(parts) >= 2:
+                    from_ref = parts[1]
+        if from_ref:
+            return from_ref
         raise RuntimeError(
-            f"{self.dockerfile} has no '{IMAGE_TAG_HEADER} <tag>' header line"
+            f"{self.dockerfile} has neither a '{IMAGE_TAG_HEADER} <tag>' header "
+            "nor a FROM line to take the image reference from"
         )
 
     @property

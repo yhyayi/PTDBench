@@ -1,0 +1,238 @@
+Trial task_grpo_broadcast-issue__RvYbH5g failed: expected str, bytes or os.PathLike object, not int
+Failed to download logs to jobs/ptdbench-20261027-031044-8c153d46/task_grpo_broadcast-issue__RvYbH5g/agent
+Collecting main service artifacts
+Failed to download artifact '/logs/artifacts' from service 'main' (best-effort)
+Traceback (most recent call last):
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 379, in run
+    await self._prepare()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 413, in _prepare
+    await self._setup_agent_environment()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 1220, in _setup_agent_environment
+    await self._start_agent_environment()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 1226, in _start_agent_environment
+    await asyncio.wait_for(
+    ...<4 lines>...
+    )
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1392, in start
+    await self._wait_for_status()  # gates on Running + sets self._host
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 807, in _wait_for_status
+    parsed, code, stderr = await self._cctl(
+                           ^^^^^^^^^^^^^^^^^
+        ["devspace", "get", self._devspace_id, "-F", "status"]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 710, in _cctl
+    process = await asyncio.create_subprocess_exec(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/subprocess.py", line 224, in create_subprocess_exec
+    transport, protocol = await loop.subprocess_exec(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        stderr=stderr, **kwds)
+        ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/base_events.py", line 1813, in subprocess_exec
+    transport = await self._make_subprocess_transport(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        protocol, popen_args, False, stdin, stdout, stderr,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        bufsize, **kwargs)
+        ^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/unix_events.py", line 213, in _make_subprocess_transport
+    transp = _UnixSubprocessTransport(self, protocol, args, shell,
+                                    stdin, stdout, stderr, bufsize,
+                                    waiter=waiter, extra=extra,
+                                    **kwargs)
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/base_subprocess.py", line 40, in __init__
+    self._start(args=args, shell=shell, stdin=stdin, stdout=stdout,
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                stderr=stderr, bufsize=bufsize, **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/unix_events.py", line 855, in _start
+    self._proc = subprocess.Popen(
+                 ~~~~~~~~~~~~~~~~^
+        args, shell=shell, stdin=stdin, stdout=stdout, stderr=stderr,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        universal_newlines=False, bufsize=bufsize, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/subprocess.py", line 1921, in _execute_child
+    self.pid = _fork_exec(
+               ~~~~~~~~~~^
+            args, executable_list,
+            ^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+            process_group, gid, gids, uid, umask,
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            preexec_fn, _USE_VFORK)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: expected str, bytes or os.PathLike object, not int
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/artifact_handler.py", line 343, in _download_artifact
+    await source_env.service_download_dir(
+    ...<3 lines>...
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 1274, in service_download_dir
+    await self.download_dir(source_dir, target_dir)
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1686, in download_dir
+    stdout, stderr, return_code = await self._ssh_raw(
+                                  ^^^^^^^^^^^^^^^^^^^^
+        f"bash -c {shlex.quote(remote_command)}", timeout_sec=1800
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1040, in _ssh_raw
+    *self._transport_cmd(),
+     ~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 972, in _transport_cmd
+    raise RuntimeError("Devspace SSH host is not resolved yet.")
+RuntimeError: Devspace SSH host is not resolved yet.
+Failed to download artifact '/workspace' from service 'main' (best-effort)
+Traceback (most recent call last):
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 379, in run
+    await self._prepare()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 413, in _prepare
+    await self._setup_agent_environment()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 1220, in _setup_agent_environment
+    await self._start_agent_environment()
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/trial.py", line 1226, in _start_agent_environment
+    await asyncio.wait_for(
+    ...<4 lines>...
+    )
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1392, in start
+    await self._wait_for_status()  # gates on Running + sets self._host
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 807, in _wait_for_status
+    parsed, code, stderr = await self._cctl(
+                           ^^^^^^^^^^^^^^^^^
+        ["devspace", "get", self._devspace_id, "-F", "status"]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 710, in _cctl
+    process = await asyncio.create_subprocess_exec(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/subprocess.py", line 224, in create_subprocess_exec
+    transport, protocol = await loop.subprocess_exec(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        stderr=stderr, **kwds)
+        ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/base_events.py", line 1813, in subprocess_exec
+    transport = await self._make_subprocess_transport(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        protocol, popen_args, False, stdin, stdout, stderr,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        bufsize, **kwargs)
+        ^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/unix_events.py", line 213, in _make_subprocess_transport
+    transp = _UnixSubprocessTransport(self, protocol, args, shell,
+                                    stdin, stdout, stderr, bufsize,
+                                    waiter=waiter, extra=extra,
+                                    **kwargs)
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/base_subprocess.py", line 40, in __init__
+    self._start(args=args, shell=shell, stdin=stdin, stdout=stdout,
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                stderr=stderr, bufsize=bufsize, **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/asyncio/unix_events.py", line 855, in _start
+    self._proc = subprocess.Popen(
+                 ~~~~~~~~~~~~~~~~^
+        args, shell=shell, stdin=stdin, stdout=stdout, stderr=stderr,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        universal_newlines=False, bufsize=bufsize, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/subprocess.py", line 1039, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        pass_fds, cwd, env,
+                        ^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+                        gid, gids, uid, umask,
+                        ^^^^^^^^^^^^^^^^^^^^^^
+                        start_new_session, process_group)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/chenyinghao/.local/share/uv/python/cpython-3.13.13-macos-aarch64-none/lib/python3.13/subprocess.py", line 1921, in _execute_child
+    self.pid = _fork_exec(
+               ~~~~~~~~~~^
+            args, executable_list,
+            ^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+            process_group, gid, gids, uid, umask,
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            preexec_fn, _USE_VFORK)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: expected str, bytes or os.PathLike object, not int
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/trial/artifact_handler.py", line 336, in _download_artifact
+    await source_env.service_download_dir_with_exclusions(
+    ...<4 lines>...
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 1295, in service_download_dir_with_exclusions
+    await self.download_dir_with_exclusions(
+    ...<3 lines>...
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 997, in download_dir_with_exclusions
+    await self._download_dir_with_exclusions_impl(
+    ...<4 lines>...
+    )
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 1023, in _download_dir_with_exclusions_impl
+    result = await self.service_exec(
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/base.py", line 1243, in service_exec
+    return await self.exec(
+           ^^^^^^^^^^^^^^^^
+        command, cwd=cwd, env=env, timeout_sec=timeout_sec, user=user
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1563, in exec
+    return await self._ssh_exec(
+           ^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1096, in _ssh_exec
+    stdout, stderr, return_code = await self._ssh_raw(
+                                  ^^^^^^^^^^^^^^^^^^^^
+        remote_command, timeout_sec=timeout_sec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 1040, in _ssh_raw
+    *self._transport_cmd(),
+     ~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/chenyinghao/workspace/PTDBench/harbor/src/harbor/environments/cybertron.py", line 972, in _transport_cmd
+    raise RuntimeError("Devspace SSH host is not resolved yet.")
+RuntimeError: Devspace SSH host is not resolved yet.

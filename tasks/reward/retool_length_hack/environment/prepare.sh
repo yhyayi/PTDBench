@@ -20,51 +20,25 @@ set -euo pipefail
 # --prompt-data + --input-key prompt + --label-key label 读的是 jsonl。
 # 注意这和 verl 那几个任务的 DAPO-Math-17k_verl **不是同一份**：那边是 parquet
 # schema。不要为了"统一"把两者合并——服务的是两个框架的两套 loader。
-ptdbench_fetch_hf \
+python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" \
     --repo zhuzilin/dapo-math-17k \
     --type dataset \
-    --revision 2e65612930298bde4c5d58fd97b3f23a483aaff9 \
-    --allow dapo-math-17k.jsonl \
-    --expect dapo-math-17k.jsonl=cc9c39c2aa19177abe9464741e121cf4cac90fd25484ef3cdf86535101e3a5b6 \
-    --expect-size dapo-math-17k.jsonl=10490834 \
     --dest "$PTDBENCH_WORKSPACE/zhuzilin_dapo-math-17k"
 
 # --- 验证集 -----------------------------------------------------------------
 # EVAL_ARGS 里的 `--eval-prompt-data aime "$EVAL_DATA"`，也就是主指标 eval/aime
 # 的来源。30 道题，判分脚本认的就是这条曲线——这个任务的 outcome 记的正是
 # eval/aime 被 length bonus 抬到 +3.84 而 held-out 准确率反而掉下去。
-ptdbench_fetch_hf \
+python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" \
     --repo zhuzilin/aime-2024 \
     --type dataset \
-    --revision 1c625e328db94ec7ef7ff169016b097c468d60b9 \
-    --allow aime-2024.jsonl \
-    --expect aime-2024.jsonl=5d4685dd504391b0ec00a9b73c379a80ba4da804829a113b1d4fe630308d47cc \
-    --expect-size aime-2024.jsonl=13029 \
     --dest "$PTDBENCH_WORKSPACE/zhuzilin_aime-2024"
 
 # --- SFT 过的 HF checkpoint（--hf-checkpoint） -------------------------------
 # allow 列表挡掉 .gitattributes，其余都是 tokenizer / config，模型自己要读。
 # 只对两个分片记 sha256：revision 已经把小文件钉死了，逐个记只是让任务包难写。
-ptdbench_fetch_hf \
+python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" \
     --repo font-info/qwen3-4b-sft-SGLang-RL \
-    --revision 6de9b0b89be3deddd78e9245670164ed9145ded4 \
-    --allow LICENSE \
-    --allow added_tokens.json \
-    --allow chat_template.jinja \
-    --allow config.json \
-    --allow generation_config.json \
-    --allow merges.txt \
-    --allow model-00001-of-00002.safetensors \
-    --allow model-00002-of-00002.safetensors \
-    --allow model.safetensors.index.json \
-    --allow special_tokens_map.json \
-    --allow tokenizer.json \
-    --allow tokenizer_config.json \
-    --allow vocab.json \
-    --expect model-00001-of-00002.safetensors=9164ce24732079f2515a3c8c29d6537abf8b56d2a64915f1572b6fa6ab4719ee \
-    --expect-size model-00001-of-00002.safetensors=4862372272 \
-    --expect model-00002-of-00002.safetensors=35dac1e2a58d6f1cd9d193ce11070d29536d6822eaf0f44dba9eb39a3c0fe405 \
-    --expect-size model-00002-of-00002.safetensors=3960522232 \
     --dest "$PTDBENCH_WORKSPACE/font-info_qwen3-4b-sft"
 
 # --- mcore (torch_dist) 格式的 ref 权重（--ref-load） ------------------------

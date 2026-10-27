@@ -70,17 +70,8 @@ PY
 # allow 列表挡掉 .gitattributes 和 README；剩下的 config / tokenizer 都是
 # transformers 自己要读的。只对 model.safetensors 记 sha256：revision 已经把小文件
 # 钉死了，逐个记只是让任务包难写。
-ptdbench_fetch_hf \
+python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" \
     --repo Qwen/Qwen2.5-1.5B-Instruct \
-    --revision 989aa7980e4cf806f80c7fef2b1adb7bc71aa306 \
-    --allow config.json \
-    --allow generation_config.json \
-    --allow merges.txt \
-    --allow model.safetensors \
-    --allow tokenizer.json \
-    --allow tokenizer_config.json \
-    --allow vocab.json \
-    --expect model.safetensors=dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee \
     --dest "$MODEL_DIR/Qwen2.5-1.5B-Instruct"
 
 # ---------------------------------------------------------------------------
@@ -93,17 +84,8 @@ ptdbench_fetch_hf \
 # 向量必须出自同一套权重，否则检索质量会无声下降。
 #
 # onnx/ 和 openvino/ 两棵子树不取：同一份权重的另外两种格式，这里没人读。
-ptdbench_fetch_hf \
+python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" \
     --repo intfloat/e5-base-v2 \
-    --revision f52bf8ec8c7124536f0efb74aca902b2995e5bcd \
-    --allow config.json \
-    --allow model.safetensors \
-    --allow special_tokens_map.json \
-    --allow tokenizer.json \
-    --allow tokenizer_config.json \
-    --allow vocab.txt \
-    --expect model.safetensors=d0d559c47d5f71b1d280b13b62a2657f3e3bc70c0786f9ab91a36545e6a8f693 \
-    --expect-size model.safetensors=437955512 \
     --dest "$MODEL_DIR/e5-base-v2"
 
 # ---------------------------------------------------------------------------

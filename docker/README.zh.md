@@ -195,8 +195,8 @@ python3 -m ptdbench build-images --rebuild \
 - `mkdir -p /ptdbench/{prepared,models,datasets}`，让它们是挂载点而不是 docker 临时造的目录；
 - 设 `ENV CUDA_DEVICE_ORDER` 等镜像级变量。
 
-抓取工具（`ptdbench_fetch_hf` 等）和 activate 逻辑都**不再烤进镜像**：前者由
-`install-ptdbench-tooling.sh` 在 prepare 阶段从仓库装进 `/usr/local`，后者见下。
+抓取工具（`ptdbench_fetch.py` 等）和 activate 逻辑都**不再烤进镜像**：前者随各任务放在
+`environment/` 里、prepare.sh 直接 `python3` 调（见"抓取工具"一节），后者见下。
 
 ### activate 逻辑（运行时注入，不再是镜像里的文件）
 
@@ -231,15 +231,16 @@ python3 -m ptdbench build-images --rebuild \
 
 每个阶段的离线相关变量（`HF_HUB_OFFLINE` 等）由 `SandboxRuntime._network_policy_env` 统一给出。
 
-### 镜像内置的抓取工具
+### 抓取工具（随任务放在 environment/ 里）
 
-| 命令 | 作用 |
+| 脚本 | 作用 |
 |---|---|
-| `ptdbench_fetch_hf` / `ptdbench_fetch_url` | 按 pin 死的 revision 取权重和数据集；缓存优先、sha256 校验、**不匹配即硬失败，绝不静默重下** |
-| `ptdbench_dataset` | 跑镜像内置的数据集配方（`docker/ptdbench_datasets/`），处理"需要变换而非下载"的那类数据集 |
+| `ptdbench_fetch.py` | 整仓取权重/数据集到 `$PTDBENCH_{MODELS,DATASETS}` 下按 repo 名（`owner__repo`）命名的目录；目录存在即命中缓存，不再校验 sha256。repo 名会泄题的用 `--cache-as` 落到中性别名下（缓存在 cybertron 上对 agent 只读可见） |
+| `ptdbench_dataset.py` + `ptdbench_datasets/<recipe>.py` | 跑数据集配方，处理"需要变换而非下载"的那类数据集；只下放到用到它的任务里 |
 
-这几个 shim 在调用时才解析 `python3`，所以跑在镜像自带的解释器里，用的是那个镜像的
-huggingface_hub / datasets。
+prepare.sh 直接 `python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" …` 调它们——跑在镜像自带的
+解释器里，用那个镜像的 huggingface_hub / datasets。不再有 `install-ptdbench-tooling.sh`，
+也不再把这些脚本烤进镜像或在运行时装进 `/usr/local`。
 
 ### 离线评测：`warm-cache.sh`
 

@@ -1,0 +1,112 @@
+{
+  "task_ids": [
+    "task_grpo_broadcast"
+  ],
+  "evaluation_level": "issue",
+  "passed": false,
+  "score": 0.0,
+  "n_tasks": 1,
+  "n_completed_tasks": 1,
+  "missing_task_ids": [],
+  "n_trials": 1,
+  "n_passed": 0,
+  "report_dir": "/Users/chenyinghao/workspace/PTDBench/jobs/ptdbench-20261027-031044-8c153d46",
+  "command": {
+    "argv": [
+      "uv",
+      "run",
+      "--project",
+      "harbor",
+      "harbor",
+      "run",
+      "--path",
+      "/private/var/folders/jm/096lpmvd4blc0l4dnwfy952w0000gn/T/ptdbench-harbor-task_grpo_broadcast-issue-hhgtagkj/harbor/tasks",
+      "--job-name",
+      "ptdbench-20261027-031044-8c153d46",
+      "--jobs-dir",
+      "jobs",
+      "--environment-kwarg",
+      "prepare_dir=/Users/chenyinghao/workspace/PTDBench/tasks/algorithm/task_grpo_broadcast/environment",
+      "--mounts-json",
+      "[]",
+      "--agent",
+      "claude-code",
+      "--model",
+      "gpt-5.5",
+      "--env",
+      "cybertron",
+      "--environment-kwarg",
+      "project=xinfer-chenyinghao",
+      "--environment-kwarg",
+      "cluster=sichuan_train",
+      "--environment-kwarg",
+      "resource_pool=speech-sc",
+      "--environment-kwarg",
+      "billing_account_id=N00069",
+      "--environment-kwarg",
+      "devspace_id=1377547"
+    ],
+    "returncode": 0,
+    "stdout": "\n        Environment Variables         \n  Variable         ┃  Phase           \n━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━\n  OPENAI_BASE_URL  │  [verifier.env]  \n  OPENAI_API_KEY   │  [verifier.env]  \n\nTasks in this run will load these from your environment. Proceed? (Y/n):   1/1 Mean: 0.000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:00:00 0:00:00\ntasks • claude-code • gpt-5.5\n┏━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━┓\n┃ Trials ┃ Exceptions ┃  Mean ┃\n┡━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━┩\n│      0 │          1 │ 0.000 │\n└────────┴────────────┴───────┘\n\n┏━━━━━━━━━━━┳━━━━━━━┓\n┃ Exception ┃ Count ┃\n┡━━━━━━━━━━━╇━━━━━━━┩\n│ TypeError │     1 │\n└───────────┴───────┘\n\nJob Info\nTotal runtime: 0s\nResults written to jobs/ptdbench-20261027-031044-8c153d46/result.json\nInspect results by running `harbor view jobs`\nShare results by running `harbor upload jobs/ptdbench-20261027-031044-8c153d46`\n\n",
+    "stderr": "Failed to download logs to jobs/ptdbench-20261027-031044-8c153d46/task_grpo_broadcast-issue__RvYbH5g/agent\n",
+    "timed_out": false,
+    "duration_s": 5.2540898750012275,
+    "cwd": "/Users/chenyinghao/workspace/PTDBench"
+  },
+  "trials": [
+    {
+      "task_id": "task_grpo_broadcast",
+      "evaluation_level": "issue",
+      "passed": false,
+      "score": 0.0,
+      "metrics": {
+        "harbor_rewards": {},
+        "harbor_verifier_mode": "shared",
+        "infrastructure_errors": [
+          "Harbor trial exception: expected str, bytes or os.PathLike object, not int",
+          "Harbor failed to collect /workspace artifact: failed"
+        ]
+      },
+      "report_dir": "/Users/chenyinghao/workspace/PTDBench/jobs/ptdbench-20261027-031044-8c153d46/task_grpo_broadcast-issue__RvYbH5g",
+      "agent_spec": null,
+      "agent_setup": null,
+      "agent": null,
+      "verifier": null,
+      "rerun": null,
+      "workspace_before_hash": "b8e0827acfabb78ff0a7ebdb1a563ac391208634a0450a009ebfb8b1d4447130",
+      "workspace_after_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "metadata": {
+        "title": "algorithm diagnosis: TACO GRPO run",
+        "submitter": {
+          "name": "benchmark_evaluation"
+        },
+        "license": "MIT",
+        "created_date": "2026-09-24",
+        "domain": "post_train",
+        "type": "algorithm",
+        "model": {
+          "name": "Qwen2.5-1.5B-Instruct"
+        },
+        "dataset": {
+          "name": "TACO"
+        },
+        "training": {
+          "framework": "verl",
+          "algo": "grpo",
+          "script": "examples/grpo_trainer/run_qwen2_5_1.5b_instruct_taco_fsdp.sh"
+        },
+        "environment": {
+          "image": "verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12",
+          "env": {
+            "CUDA_VISIBLE_DEVICES": "0,1,2,3,4,5,6,7",
+            "NVIDIA_VISIBLE_DEVICES": "0,1,2,3,4,5,6,7"
+          }
+        },
+        "outcome": {
+          "failure_type": "implementation_bug",
+          "failure_reason": "compute_grpo_outcome_advantage lays the length-B GRPO advantages along the sequence axis (reshape to [1, B], pad to the response length, expand across rows) instead of giving each row its own sample's scalar advantage. The tensor stays [B, S] so nothing crashes, but every row's tokens carry column-indexed advantages (position j gets sample j's value, positions past 128 get 0); the policy gradient is decoupled from each sample's reward. The recorded run keeps critic/rewards/mean near 0.12 while held-out acc stays flat (0.076 at step 0, 0.043-0.071 through step 250), and the token-weighted critic/advantages/mean collapses to ~0 (median |mean| 4.9e-4, 8-19x below correct TACO runs)."
+        }
+      }
+    }
+  ]
+}

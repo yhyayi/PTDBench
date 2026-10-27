@@ -20,7 +20,6 @@ from ptdbench.core.harbor_types import (
 )
 from ptdbench.core.types import (
     DATASETS_DIR,
-    DOCKER_DIR,
     MODELS_DIR,
     PREPARED_DIR,
     PTDBENCH_ENVIRONMENT_DIR,
@@ -1242,8 +1241,6 @@ class RemoteBackendTests(FixtureTestCase):
             [
                 "--environment-kwarg",
                 f"prepare_dir={self.package.paths.environment.resolve()}",
-                "--environment-kwarg",
-                f"tooling_dir={DOCKER_DIR.resolve()}",
             ],
         )
         self.assertEqual(HarborRunner._remote_prepare_args(self._prepared(), ("-e", "docker")), [])
@@ -1255,9 +1252,7 @@ class RemoteBackendTests(FixtureTestCase):
             ("-e", "cybertron", "--environment-kwarg", "prepare_dir=/custom"),
         )
         self.assertNotIn("prepare_dir=/custom", args)
-        self.assertEqual(
-            args, ["--environment-kwarg", f"tooling_dir={DOCKER_DIR.resolve()}"]
-        )
+        self.assertEqual(args, [])
 
     def test_gpus_reaches_the_task_toml_for_a_remote_backend(self) -> None:
         """后端只认 task.toml 的 gpus；不写就会开出 0 卡的 devspace。"""

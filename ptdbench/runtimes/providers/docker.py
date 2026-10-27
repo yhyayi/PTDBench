@@ -15,7 +15,6 @@ from ...core.types import (
     MODELS_DIR,
     PREPARED_DIR,
     PTDBENCH_ENVIRONMENT_DIR,
-    TOOLING_DIR,
     CommandResult,
     EnvironmentImage,
 )
@@ -62,33 +61,17 @@ class DockerRuntime(SandboxRuntime):
     def ensure_environment(
         self, image: EnvironmentImage, *, rebuild: bool = False
     ) -> EnvironmentArtifact:
-        """镜像已存在就直接用，否则照 docker/images/<name>.Dockerfile 构建。
+        """确保环境镜像在本地可用。
 
-        tag 是固定的，所以"已存在"不代表"和 Dockerfile 一致"：改了 Dockerfile 或
-        docker/ 下的工具脚本之后要 rebuild（`ptdbench build-images --rebuild`）。
-        rebuild 走 docker 的层缓存，没变的层不会重跑。
+        Dockerfile 现在只有一行 `FROM <ref>@sha256:...`，没有要构建的层，所以不再
+        `docker build`（而且带 digest 的引用也没法 `-t`）。本地没有这个引用就 pull。
+        rebuild=True 时强制重新 pull（digest 固定，pull 到的还是同一份）。
         """
-        if rebuild or not self._image_exists(image.tag):
-            if not image.dockerfile.is_file():
-                raise RuntimeError(
-                    f"image {image.tag!r} not found locally and {image.dockerfile} "
-                    "does not exist to build it from"
-                )
-            # 构建日志是给人看的进度，不是命令结果；走 stderr，stdout 留给 CLI 的输出。
-            subprocess.run(
-                [
-                    "docker",
-                    "build",
-                    "-f",
-                    str(image.dockerfile),
-                    "-t",
-                    image.tag,
-                    str(image.context),
-                ],
-                stdout=sys.stderr,
-                check=True,
-            )
-        return EnvironmentArtifact(backend=self.name, reference=image.tag)
+        ref = image.tag
+        if rebuild or not self._image_exists(ref):
+            # pull 的进度是给人看的，走 stderr，stdout 留给 CLI 的输出。
+            subprocess.run(["docker", "pull", ref], stdout=sys.stderr, check=True)
+        return EnvironmentArtifact(backend=self.name, reference=ref)
 
     def path(self, request: SandboxRequest, name: str) -> str:
         paths = {
@@ -437,12 +420,6 @@ class DockerRuntime(SandboxRuntime):
                 DockerMount(request.host_visible_task, "/task", read_only=True),
                 DockerMount(request.host_prepared, PREPARED_DIR),
             ]
-            # 仓库 docker/ 只读挂进来：prepare 跑脚本前先用它装最新的 fetch/dataset 工具
-            # （见 TOOLING_DIR / install-ptdbench-tooling.sh）。只有 prepare 需要。
-            if request.host_tooling is not None:
-                mounts.append(
-                    DockerMount(request.host_tooling, TOOLING_DIR, read_only=True)
-                )
         elif request.stage == "agent":
             mounts = [
                 DockerMount(request.host_workspace, "/workspace"),

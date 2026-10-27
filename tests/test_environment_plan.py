@@ -234,24 +234,47 @@ class EnvironmentEnvRuntimeTests(unittest.TestCase):
 
 
 class EnvironmentImageTests(unittest.TestCase):
-    def test_image_name_maps_to_a_fixed_tag_and_its_dockerfile(self):
-        image = EnvironmentImage("verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12")
-        self.assertEqual(image.tag, "ptdbench:verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12")
-        self.assertEqual(image.dockerfile, IMAGES_DIR / "verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12.Dockerfile")
+    def test_image_name_maps_to_its_from_ref_and_dockerfile(self):
+        name = "verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12"
+        image = EnvironmentImage(name)
+        self.assertEqual(image.dockerfile, IMAGES_DIR / f"{name}.Dockerfile")
         self.assertEqual(image.context, IMAGES_DIR.parent)
+        # Nothing is baked anymore: .tag is the reference from the Dockerfile's
+        # single FROM line, i.e. the task runs the pinned upstream image directly.
+        froms = re.findall(
+            r"^FROM\s+(\S+)", image.dockerfile.read_text(encoding="utf-8"), flags=re.MULTILINE
+        )
+        self.assertEqual(image.tag, froms[0])
 
-    def test_every_dockerfile_declares_a_unique_tag(self):
-        # tag 是按栈命名的，一个环境一个；两个环境撞 tag，后构建的会覆盖先构建的。
-        tags = {name: EnvironmentImage(name).tag for name in sorted(known_images())}
-        for name, tag in tags.items():
-            self.assertRegex(tag, r"^ptdbench(:[a-z0-9.-]+|/[a-z0-9.-]+:[A-Za-z0-9._-]+)$", name)
-            self.assertNotIn(":latest", tag, name)
-        self.assertEqual(len(set(tags.values())), len(tags), tags)
-
-    def test_missing_tag_header_is_an_error_not_a_default(self):
+    def test_tag_resolves_from_the_from_line_without_a_header(self):
+        ref = "example.com/base:tag@sha256:" + "0" * 64
         with tempfile.TemporaryDirectory() as temp:
             dockerfile = Path(temp) / "x.Dockerfile"
-            dockerfile.write_text("FROM scratch\n", encoding="utf-8")
+            dockerfile.write_text(f"FROM {ref}\n", encoding="utf-8")
+            with mock.patch.object(
+                EnvironmentImage, "dockerfile", new_callable=mock.PropertyMock,
+                return_value=dockerfile,
+            ):
+                self.assertEqual(EnvironmentImage("x").tag, ref)
+
+    def test_header_overrides_the_from_line(self):
+        # Back-compat: a Dockerfile that still carries the old header wins.
+        with tempfile.TemporaryDirectory() as temp:
+            dockerfile = Path(temp) / "x.Dockerfile"
+            dockerfile.write_text(
+                "# ptdbench-image: custom/name:1\nFROM example.com/base@sha256:" + "0" * 64 + "\n",
+                encoding="utf-8",
+            )
+            with mock.patch.object(
+                EnvironmentImage, "dockerfile", new_callable=mock.PropertyMock,
+                return_value=dockerfile,
+            ):
+                self.assertEqual(EnvironmentImage("x").tag, "custom/name:1")
+
+    def test_neither_header_nor_from_is_an_error(self):
+        with tempfile.TemporaryDirectory() as temp:
+            dockerfile = Path(temp) / "x.Dockerfile"
+            dockerfile.write_text("# just a comment\n", encoding="utf-8")
             with mock.patch.object(
                 EnvironmentImage, "dockerfile", new_callable=mock.PropertyMock,
                 return_value=dockerfile,
@@ -269,55 +292,46 @@ class EnvironmentImageTests(unittest.TestCase):
             for ref in froms:
                 self.assertRegex(ref, r"@sha256:[0-9a-f]{64}$", name)
 
-    def test_tooling_block_is_identical_in_every_dockerfile(self):
-        # 每个镜像都靠同一段工具层（activate hook、fetch shim 等）和 harness 对接；
-        # 哪份漂了，那个环境的任务就会在运行时才以奇怪的方式失败。
-        marker = "# ---- PTDBench tooling: keep identical in every docker/images/*.Dockerfile ----"
-        blocks = {}
-        for name in sorted(known_images()):
-            text = EnvironmentImage(name).dockerfile.read_text(encoding="utf-8")
-            self.assertIn(marker, text, name)
-            blocks[name] = text[text.index(marker):]
-        self.assertEqual(len(set(blocks.values())), 1, sorted(blocks))
-
 
 class EnsureEnvironmentTests(unittest.TestCase):
+    _NAME = "verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12"
+
     def _run(self, *, exists: bool, rebuild: bool = False):
         from ptdbench.runtimes.providers.docker import DockerRuntime
 
         runtime = DockerRuntime()
-        image = EnvironmentImage("verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12")
+        image = EnvironmentImage(self._NAME)
         with mock.patch.object(DockerRuntime, "_image_exists", return_value=exists), \
                 mock.patch("ptdbench.runtimes.providers.docker.subprocess.run") as run:
             artifact = runtime.ensure_environment(image, rebuild=rebuild)
-        self.assertEqual(artifact.reference, "ptdbench:verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12")
-        return run
+        self.assertEqual(artifact.reference, image.tag)
+        return run, image.tag
 
-    def test_existing_image_is_reused_without_building(self):
-        self.assertFalse(self._run(exists=True).called)
+    def test_existing_image_is_reused_without_pulling(self):
+        run, _ = self._run(exists=True)
+        self.assertFalse(run.called)
 
-    def test_missing_image_is_built_from_its_dockerfile(self):
-        run = self._run(exists=False)
-        argv = run.call_args.args[0]
-        self.assertEqual(argv[:2], ["docker", "build"])
-        self.assertEqual(argv[argv.index("-f") + 1], str(IMAGES_DIR / "verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12.Dockerfile"))
-        self.assertEqual(argv[argv.index("-t") + 1], "ptdbench:verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12")
-        self.assertEqual(argv[-1], str(IMAGES_DIR.parent))
+    def test_missing_image_is_pulled(self):
+        # Dockerfiles are FROM-only now, so there is nothing to build; the pinned
+        # reference is pulled.
+        run, ref = self._run(exists=False)
+        self.assertEqual(run.call_args.args[0], ["docker", "pull", ref])
         self.assertTrue(run.call_args.kwargs["check"])
 
-    def test_rebuild_builds_even_when_the_image_exists(self):
-        self.assertTrue(self._run(exists=True, rebuild=True).called)
+    def test_rebuild_pulls_even_when_the_image_exists(self):
+        run, ref = self._run(exists=True, rebuild=True)
+        self.assertEqual(run.call_args.args[0], ["docker", "pull", ref])
 
-    def test_build_failure_propagates(self):
+    def test_pull_failure_propagates(self):
         from ptdbench.runtimes.providers.docker import DockerRuntime
 
         with mock.patch.object(DockerRuntime, "_image_exists", return_value=False), \
                 mock.patch(
                     "ptdbench.runtimes.providers.docker.subprocess.run",
-                    side_effect=subprocess.CalledProcessError(1, ["docker", "build"]),
+                    side_effect=subprocess.CalledProcessError(1, ["docker", "pull"]),
                 ):
             with self.assertRaises(subprocess.CalledProcessError):
-                DockerRuntime().ensure_environment(EnvironmentImage("verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12"))
+                DockerRuntime().ensure_environment(EnvironmentImage(self._NAME))
 
 
 class BuildImagesCommandTests(unittest.TestCase):

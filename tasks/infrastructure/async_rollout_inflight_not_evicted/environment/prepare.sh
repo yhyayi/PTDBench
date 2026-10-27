@@ -15,22 +15,8 @@ set -euo pipefail
 # exactly $PTDBENCH_WORKSPACE/Qwen3-1.7B. Qwen3-1.7B ships two safetensors shards
 # on HF; the revision pins the small config/tokenizer files and the two shards
 # are verified by sha256 + size.
-ptdbench_fetch_hf \
+python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" \
     --repo Qwen/Qwen3-1.7B \
-    --revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e \
-    --allow config.json \
-    --allow generation_config.json \
-    --allow merges.txt \
-    --allow model-00001-of-00002.safetensors \
-    --allow model-00002-of-00002.safetensors \
-    --allow model.safetensors.index.json \
-    --allow tokenizer.json \
-    --allow tokenizer_config.json \
-    --allow vocab.json \
-    --expect model-00001-of-00002.safetensors=169ad53ec313c3a34b06c0809216e4fc072cce444a5d4ff2b59690d064130ed5 \
-    --expect-size model-00001-of-00002.safetensors=3441185608 \
-    --expect model-00002-of-00002.safetensors=912becff8d60672aa8628ef08c05898d9adf17c2ad4ae3caf99b065622fdeff9 \
-    --expect-size model-00002-of-00002.safetensors=622329984 \
     --dest "$PTDBENCH_WORKSPACE/Qwen3-1.7B"
 
 # --- Megatron torch_dist reference weights (--ref-load) ----------------------

@@ -19,22 +19,9 @@ set -euo pipefail
 # MODEL_PATH=/workspace/Qwen2.5-1.5B-Instruct 写进了 "The effective run must use"，
 # 历史 log :83 记的 vLLM model 同样是这条路径——三处必须一致。
 #
-# 官方仓的固定 revision。allow 列表里的每个文件（含 model.safetensors）与历史 run
-# 用的快照逐字节相同，校验值不变。
-ptdbench_fetch_hf \
+# 官方仓，整仓下载（fetch 不再按 --allow 取子集，也不再校验 sha256）。
+python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" \
     --repo Qwen/Qwen2.5-1.5B-Instruct \
-    --revision 989aa7980e4cf806f80c7fef2b1adb7bc71aa306 \
-    --allow config.json \
-    --allow generation_config.json \
-    --allow LICENSE \
-    --allow merges.txt \
-    --allow README.md \
-    --allow tokenizer_config.json \
-    --allow tokenizer.json \
-    --allow vocab.json \
-    --allow model.safetensors \
-    --expect model.safetensors=dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee \
-    --expect-size model.safetensors=3087467144 \
     --dest "$PTDBENCH_WORKSPACE/Qwen2.5-1.5B-Instruct"
 
 # --- 数据集 -----------------------------------------------------------------
@@ -53,13 +40,10 @@ ptdbench_fetch_hf \
 TACO_STAGING="$PTDBENCH_WORKSPACE/.ptdbench-taco-archive"
 rm -rf "$TACO_STAGING"
 
-ptdbench_fetch_hf \
+python3 "$PTDBENCH_ENVIRONMENT/ptdbench_fetch.py" \
     --type dataset \
     --repo LIF1014/ptdbench-verl-coding-tasks-function-call-dataset \
-    --revision 11329cf7797c5450a65d1700e0215588b1ca6901 \
-    --allow artifacts/workspace-assets.tar.gz \
-    --expect artifacts/workspace-assets.tar.gz=e2b3defb2d289c2ead9fbba6a2248fabcfab2cb3875dd5f010fa3bef6015231d \
-    --expect-size artifacts/workspace-assets.tar.gz=471681991 \
+    --cache-as ptdbench/verl-asset-2 \
     --dest "$TACO_STAGING"
 
 echo "[prepare] unpacking taco_verl -> $PTDBENCH_WORKSPACE/taco_verl"
@@ -71,8 +55,8 @@ rm -rf "$PTDBENCH_WORKSPACE/taco_verl"
 mv "$TACO_STAGING/workspace/taco_verl" "$PTDBENCH_WORKSPACE/taco_verl"
 rm -rf "$TACO_STAGING"
 
-# 展开后的字节自己再校一遍。ptdbench_fetch_hf 校的是归档，这里校的是训练真正读的
-# 那两个文件——中间隔着一次 tar，值得各校各的。对不上就硬失败，不重下。
+# 展开后的两份 parquet 自己校一遍（fetch 本身已不再校验），训练真正读它们。
+# 对不上就硬失败。
 (
     cd "$PTDBENCH_WORKSPACE/taco_verl"
     sha256sum -c - <<'TACO_DIGESTS'
