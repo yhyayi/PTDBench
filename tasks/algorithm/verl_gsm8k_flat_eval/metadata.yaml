@@ -1,0 +1,25 @@
+title: "Flat Held-Out GSM8K Score in VERL GRPO"
+submitter:
+  name: Xuyang Yuan
+license: NOASSERTION
+created_date: "2026-10-23"
+type: algorithm
+domain: rollout_sampling
+model:
+  name: Qwen/Qwen3-1.7B
+dataset:
+  name: OpenAI GSM8K main (7,473 train rows; 1,319 test rows; first 256 held-out rows evaluated)
+training:
+  framework: verl
+  algo: grpo
+  script: run.sh
+environment:
+  image: verl-vllm0.8.5-torch2.6.0-flashattn2.7.4-cu124-py3.10
+  env:
+    CUDA_VISIBLE_DEVICES: "0"
+    NVIDIA_VISIBLE_DEVICES: "0"
+outcome:
+  failure_type: implementation_bug
+  failure_reason: >-
+    The observed run's held-out GSM8K reward remains 0.734375 at all ten evaluations
+    from steps 5 through 50, while the comparison run varies from 0.75390625 to 0.8828125.

@@ -101,6 +101,7 @@ flash-attn，你没显式装也得如实填上，否则「缺位 = 没装」就�
 |---|---|---|---|
 | `vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12` | 自建（`FROM nvidia/cuda:12.8.1`） | vLLM 0.11.0，torch 2.8.0 / flash-attn 2.8.3 / CUDA 12.8 / py3.12（veRL 随 workspace 来） | `reward_parser_mismatch`、`proxy_reward_misalignment`、`aime25_single_sample_variance`（ppo_critic 系） |
 | `verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12` | `verlai/verl:vllm017.latest` | vLLM 0.17.0，torch 2.10.0 / flash-attn 2.8.3 / CUDA 12.9 / py3.12.13（veRL 随 workspace 来） | `reward_design/*`、`verl_hyper/*`、`verl_implementation/*` |
+| `verl-vllm0.8.5-torch2.6.0-flashattn2.7.4-cu124-py3.10` | `verlai/verl:app-verl0.4-vllm0.8.5-mcore0.12.2-te2.2` | vLLM 0.8.5，torch 2.6.0 / flash-attn 2.7.4 / CUDA 12.4 / py3.10（veRL 随 workspace 来） | `algorithm/verl_gsm8k_flat_eval` |
 | `slime-v0.5.0rc0-sglang0.5.0rc0-torch2.8.0-flashattn2.7.4-cu126-py3.12` | `slimerl/slime:v0.5.0rc0-cu126` | sglang 0.5.0rc0，torch 2.8.0 / flash-attn 2.7.4 / CUDA 12.6 / py3.12.11 | `rlve_hyper/*` |
 | `slime-v0.3.2-sglang0.5.15-torch2.11.0-flashattn2.8.3-cu129-py3.12` | `slimerl/slime:v0.3.2-cu129` | sglang 0.5.15.post1，torch 2.11.0 / flash-attn 2.8.3 / CUDA 12.9 / py3.12.3 | `slime_retool*`、`slime_search_r1*` |
 | `python3.11-slim` | `python:3.11-slim` | 纯 CPython，无 GPU | `example/swe_slugfix` |
