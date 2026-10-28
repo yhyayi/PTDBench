@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-27",
+  "submitter": "Jinyang Wu",
+  "changes": [
+    "Updated author and submitter to Jinyang Wu",
+    "Aligned solution instructions and oracle with the current report.md submission gate; the verifier continues to drive training",
+    "Corrected README issue pass criteria to match the unchanged upstream judge",
+    "Excluded macOS metadata and Python bytecode",
+    "Documented local evidence checks and tests not rerun"
+  ],
+  "sha256": {
+    "README.md": "ef89388ebfce51fa8af85893ec84188d511d9d13f69ea76f899281b48fda211e",
+    "task.toml": "2c1d81ae526647d5fa5f1c8e7f8b34b5e840a23e95bd896087baa6821f6dc978",
+    "evaluations/solution/instruction.md": "c634913e5a09a90cb987ee78f776ef6c7ebecec575439be7dadec17ba1bdfb10",
+    "evaluations/solution/oracle/solve.sh": "02ce74f819b192e47dea123269063958d9f9726c319590df34cc89cdf7eb4fc9"
+  },
+  "port": {
+    "ported_to": "PTDBench tasks/infrastructure/verl_checkpoint_host_memory_oom",
+    "ported_on": "2026-10-28",
+    "source": "AutoRLBench PR #8 (commit 3d1f0e2), tasks/infrastructure/verl_checkpoint_host_memory_oom",
+    "changes": [
+      "task.toml -> metadata.yaml (PTDBench loader format); environment.image renamed to the shared stack name verl-vllm0.7.4-torch2.5.1 (new docker/images/verl-vllm0.7.4-torch2.5.1.Dockerfile, same pinned hiyouga/verl digest)",
+      "AUTORLBENCH_* env vars renamed to PTDBENCH_* (issue/solution test.sh, issue instruction.md, solve.sh, grade_submission.py); judge.py replaced with the family PTDBench port (env var names only)",
+      "prepare.sh rewritten to per-file ptdbench_fetch_url.py calls (URL/size/sha256 pins unchanged, revision 7ae557604adf67be50417f59c2c2f167def9a775); fetch helper copied from tasks/reward/idea_awm_reward_diagnosis",
+      "grader_spec.json: added protected_source_sha256 pinning all 228 workspace files (215 engine files + frozen data/logs); source_edit_policy narrowed to configs/experiment.yaml",
+      "grade_submission.py: verify protected_source_sha256 before running; reject unexpected workspace files; pre-flight check_checkpoint_failure on the frozen defective-run evidence (previously dead code, now wired)",
+      "solution instruction.md: repair scope narrowed from workspace-wide to configs/experiment.yaml only",
+      "issue oracle.md + readme.md: documented worker_events optimizer_state_bytes instrumentation timing (recorded after optimizer.step(), before post-update offload)",
+      "docker-compose.yaml kept (20 GiB mem/memswap, 1 GPU); PTDBench native docker runtime cannot apply it, so the task must run on Harbor where the compose overlay is injected",
+      "workspace, data, frozen evidence, oracle arms, and judge_prompt.md are byte-identical to the PR"
+    ]
+  }
+}

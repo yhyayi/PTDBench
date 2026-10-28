@@ -10,10 +10,15 @@ from ..core.types import CommandResult, EnvironmentImage
 
 # 以前这段逻辑装在镜像的 /etc/profile.d/ptdbench-activate.sh，靠登录 shell（`sh -lc`）
 # 自动 source。现在不再烤进镜像：harness 在运行时把它拼到每条 shell 命令前面（见
-# CommandSpec.to_argv），改一次 push 一次就生效，不用重建十几个镜像。因为不再用登录
-# shell，/etc/profile 不会重置 PATH，原来的 PATH 恢复（section 0）也就不需要了。
+# CommandSpec.to_argv），改一次 push 一次就生效，不用重建十几个镜像。
 #
-# 做两件事：
+# 做三件事：
+#   0. 恢复镜像的 PATH（section 0，从老 /etc/profile.d 钩子移植回来）。本地 docker
+#      后端确实不再用登录 shell、/etc/profile 不会重置 PATH，但 Harbor/cybertron 后端
+#      的命令经 ssh 走非登录 `bash -c`，PATH 是 sshd 的默认列表，没有镜像 ENV 加的
+#      /opt/venv/bin、/usr/local/cuda/bin —— ray/nvidia-smi 一律 command not found。
+#      Dockerfile 仍把镜像 PATH 记录在 /etc/ptdbench-image-path（老镜像里也有），
+#      缺的目录按镜像顺序补回 PATH 前面；镜像里没这个文件或 PATH 完整时是 no-op。
 #   1. 把 prepare 阶段写进 $PTDBENCH_PREPARED/env 的 KEY=VALUE 行 export 出来
 #      （PYTHONPATH 之类），给 agent / verifier / rerun 阶段用。只认 bare NAME=...，
 #      挡掉命令替换——任务不该能往每个阶段塞任意 shell。
@@ -23,6 +28,26 @@ from ..core.types import CommandResult, EnvironmentImage
 # 让控制流自然落到后面拼接的真实命令。Harbor 后端不走这里，它把同样的内容
 # materialize 成文件、靠 BASH_ENV 加载（见 harbor_evaluator.ACTIVATE_HOOK）。
 PTDBENCH_ACTIVATE_BODY = r"""if [ -n "${PTDBENCH_STAGE:-}" ]; then
+    if [ -r /etc/ptdbench-image-path ]; then
+        _ptdbench_image_path=""
+        IFS= read -r _ptdbench_image_path < /etc/ptdbench-image-path || :
+        _ptdbench_missing=""
+        _ptdbench_ifs=$IFS
+        IFS=:
+        for _ptdbench_dir in $_ptdbench_image_path; do
+            [ -n "$_ptdbench_dir" ] || continue
+            case ":$_ptdbench_missing:$PATH:" in
+                *":$_ptdbench_dir:"*) ;;
+                *) _ptdbench_missing="${_ptdbench_missing:+$_ptdbench_missing:}$_ptdbench_dir" ;;
+            esac
+        done
+        IFS=$_ptdbench_ifs
+        if [ -n "$_ptdbench_missing" ]; then
+            PATH="$_ptdbench_missing${PATH:+:$PATH}"
+            export PATH
+        fi
+        unset _ptdbench_image_path _ptdbench_missing _ptdbench_ifs _ptdbench_dir
+    fi
     PTDBENCH_PREPARED="${PTDBENCH_PREPARED:-/ptdbench/prepared}"
     export PTDBENCH_PREPARED
     if [ -f "$PTDBENCH_PREPARED/env" ]; then

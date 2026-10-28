@@ -52,14 +52,37 @@ _NO_PROXY = "localhost,127.0.0.1,.modelbest.co,.svc.cluster.local"
 
 # The activate hook body, written into the prepared dir by the prepare recipe and
 # auto-sourced by every non-login `bash -c` via BASH_ENV (the task.toml points
-# BASH_ENV at $PTDBENCH_PREPARED/ptdbench-activate.sh). It exports what prepare.sh
-# left in $PTDBENCH_PREPARED/env (only bare NAME=…, to block command substitution)
-# and sets the pip --user base for the agent/rerun stages. No PATH restore: Harbor
-# runs non-login shells, so /etc/profile never wipes the image's ENV PATH.
+# BASH_ENV at $PTDBENCH_PREPARED/ptdbench-activate.sh). Section 0 restores the
+# image's PATH from /etc/ptdbench-image-path: unlike the Docker backend (where
+# /etc/profile never resets PATH), cybertron's sshd hands non-login `bash -c` a
+# stock PATH without /opt/venv/bin, so ray/nvidia-smi would be command-not-found
+# in the verifier/rerun stages. It also exports what prepare.sh left in
+# $PTDBENCH_PREPARED/env (only bare NAME=…, to block command substitution) and
+# sets the pip --user base for the agent/rerun stages.
 #
 # KEEP IN SYNC with ptdbench/runtimes/base.py:PTDBENCH_ACTIVATE_BODY (the Docker
 # backend injects that copy inline; this copy serves the Harbor/cybertron backend).
 PTDBENCH_ACTIVATE_BODY = r"""if [ -n "${PTDBENCH_STAGE:-}" ]; then
+    if [ -r /etc/ptdbench-image-path ]; then
+        _ptdbench_image_path=""
+        IFS= read -r _ptdbench_image_path < /etc/ptdbench-image-path || :
+        _ptdbench_missing=""
+        _ptdbench_ifs=$IFS
+        IFS=:
+        for _ptdbench_dir in $_ptdbench_image_path; do
+            [ -n "$_ptdbench_dir" ] || continue
+            case ":$_ptdbench_missing:$PATH:" in
+                *":$_ptdbench_dir:"*) ;;
+                *) _ptdbench_missing="${_ptdbench_missing:+$_ptdbench_missing:}$_ptdbench_dir" ;;
+            esac
+        done
+        IFS=$_ptdbench_ifs
+        if [ -n "$_ptdbench_missing" ]; then
+            PATH="$_ptdbench_missing${PATH:+:$PATH}"
+            export PATH
+        fi
+        unset _ptdbench_image_path _ptdbench_missing _ptdbench_ifs _ptdbench_dir
+    fi
     PTDBENCH_PREPARED="${PTDBENCH_PREPARED:-/ptdbench/prepared}"
     export PTDBENCH_PREPARED
     if [ -f "$PTDBENCH_PREPARED/env" ]; then
@@ -173,6 +196,9 @@ def build_prepare_recipe(
         # longer bake it; agent/verifier auto-source it via BASH_ENV (non-login).
         f"cat > {shlex.quote(prepared + '/ptdbench-activate.sh')} "
         f"<<'PTDBENCH_ACTIVATE_EOF'\n{PTDBENCH_ACTIVATE_BODY}PTDBENCH_ACTIVATE_EOF\n"
+        # heredoc `cat >` creates the hook with 0644; rerun scripts (e.g.
+        # run_vimpo_critic.sh) exec it directly, so it must be executable.
+        f"chmod +x {shlex.quote(prepared + '/ptdbench-activate.sh')}; "
         f"cd {shlex.quote(environment)}; "
         f"bash {shlex.quote(script)}"
     )

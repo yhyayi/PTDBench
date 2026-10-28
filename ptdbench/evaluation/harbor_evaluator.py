@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import os
 import re
@@ -1213,10 +1214,13 @@ class HarborPreparer:
         # PREPARED_DIR 挂进来，agent / verifier 的 `bash -c` 靠 BASH_ENV=ACTIVATE_HOOK
         # 自动 source（内容是 runtimes.base 的单一来源）。
         if run.prepared is not None:
-            write_text(
-                Path(run.prepared) / "ptdbench-activate.sh",
-                "#!/usr/bin/env sh\n" + PTDBENCH_ACTIVATE_BODY,
-            )
+            hook_path = Path(run.prepared) / "ptdbench-activate.sh"
+            write_text(hook_path, "#!/usr/bin/env sh\n" + PTDBENCH_ACTIVATE_BODY)
+            # rerun 脚本直接 exec 这个 hook（run_vimpo_critic.sh 的用法），不是
+            # 仅 source：write_text 落盘是 0644，exec 报 Permission denied，整个
+            # rerun exit=127（ray: command not found 的上游因）。共享 prepared 目录
+            # 意味着一次写入破坏同 fs 上所有后续 trial 的 verifier。
+            hook_path.chmod(0o755)
         return dataclasses.replace(unit, workspace=run.workspace, prepared=run.prepared)
 
 
@@ -1347,8 +1351,11 @@ class HarborShell:
 
         # _write_task_config() の agent_env と同じ構成。PTDBENCH_RESULTS は
         # /workspace 配下の書き込み可能な場所にする（/logs/artifacts は存在しない）。
+        # PTDBENCH_TASK_ID は agent と同じく空：harbor-shell は harbor-evaluate の
+        # agent コンテナと同一構成なので、タスク id（しばしば欠陥を直接言い当てる）
+        # を env から読み取らせない。runtimes/base.py の agent 段と同じ空文字表記。
         env: Dict[str, str] = {
-            "PTDBENCH_TASK_ID": package.task_id,
+            "PTDBENCH_TASK_ID": "",
             "PTDBENCH_EVALUATION_LEVEL": unit.evaluation.level,
             "PTDBENCH_WORKSPACE": "/workspace",
             "PTDBENCH_RESULTS": "/workspace/ptdbench-results",
@@ -1533,7 +1540,10 @@ class HarborEvaluator:
     ) -> Path:
         if len(units) == 1:
             unit = units[0]
-            safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", unit.package.task_id).strip("-.")
+            # 任务 id 往往直接点出缺陷（verl_grpo_uid_after_repeat），run 目录名
+            # 会进日志和 artifact 路径，等于把答案印在宿主机侧的目录名上。用
+            # sha256 前 8 位做短摘要：目录名仍然每个任务唯一、可对照，但不再可读。
+            safe_id = hashlib.sha256(unit.package.task_id.encode("utf-8")).hexdigest()[:8]
             prefix = f"ptdbench-harbor-{safe_id or 'task'}-{unit.evaluation.level}-"
         else:
             prefix = f"ptdbench-harbor-batch-{len(units)}-"

@@ -404,7 +404,7 @@ trainer:
                 with_npu: true
                 with_stack: false
         profile_steps: null
-        project_name: verl_gsm8k_flat
+        project_name: verl_gsm8k
         ray_wait_register_center_timeout: 300
         resume_from_path: null
         resume_mode: disable

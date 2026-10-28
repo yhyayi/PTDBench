@@ -128,6 +128,9 @@ _DEFAULT_IMAGE_MAP: dict[str, str] = {
     "vllm0.11.0-torch2.8.0-flashattn2.8.3-cu128-py3.12": (
         "infra-platform/ptdbench-vllm0.11-torch2.8-cu128:latest"
     ),
+    # Static-diagnosis issue task whose idea-issue image was never built or
+    # pushed to the registry; the verl image is the sanctioned substitute.
+    "idea-issue": "share-dev/ngc-docker/ptdbench-verl-vllm017:dev-957fee7-cb-bf632efb",
 }
 
 # The registry-less tag prefix harbor-evaluate builds for a PTDBench image
@@ -1230,6 +1233,13 @@ class CybertronEnvironment(BaseEnvironment):
             "/solution",
             "--ro",
             shlex.quote(self._cache_dir),
+            # The activate hook lives at {run_dir}/prepared — a sibling of the
+            # workspace/logs RW entries. bash sources it via BASH_ENV and the
+            # rerun scripts exec it directly, so without this entry every
+            # sandboxed open() of the hook returns EACCES ("Permission denied"
+            # even on a 755 file) and the rerun chain dies with ray-not-found.
+            "--ro",
+            shlex.quote(self._prepared_dir),
             "--ro",
             "/harbor",
         ]

@@ -1,0 +1,38 @@
+title: Qwen3-VL GRPO training case v8k2
+submitter:
+  name: Gaoyuan
+license: Apache-2.0
+created_date: '2026-10-24'
+domain: code
+type: infrastructure
+tags:
+  - verl
+  - grpo
+  - vision-language
+model:
+  name: Qwen/Qwen3-VL-8B-Instruct
+  revision: 0c351dd01ed87e9c1b53cbc748cba10e6187ff3b
+dataset:
+  name: derek-thomas/ScienceQA image-bearing multiple choice
+  revision: f18b0a70359ebfb41f658fd564208d0355b013f4
+training:
+  framework: verl
+  algo: grpo
+  script: scripts/run_training.py
+environment:
+  image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12
+  env:
+    WANDB_MODE: offline
+    PYTHONDONTWRITEBYTECODE: "1"
+    OMP_NUM_THREADS: "2"
+    MKL_NUM_THREADS: "2"
+    OPENBLAS_NUM_THREADS: "2"
+outcome:
+  failure_type: fused_sequence_parallel_label_alignment
+  failure_reason: >-
+    The fused FSDP path does not consistently consume globally shifted SP-sliced
+    labels at local hidden-state positions. Real response-loss positions with
+    nonzero advantages and gradients are affected. Paired forty-step observations
+    show label correction and a 5.3515625pp validation-change improvement;
+    measured before last-five validation change is -2.578125pp against a frozen
+    -5pp quality-decline threshold.

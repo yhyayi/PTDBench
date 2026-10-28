@@ -43,9 +43,9 @@ PY
 mkdir -p "$RUN_DIR/wandb"
 export WANDB_MODE=offline
 export WANDB_DIR="$RUN_DIR/wandb"
-export WANDB_PROJECT=verl_gsm8k_flat
+export WANDB_PROJECT=verl_gsm8k
 export WANDB_NAME="run_${SEED}"
-export WANDB_RUN_GROUP=gsm8k_flat_repro
+export WANDB_RUN_GROUP=gsm8k_repro
 export PYTHONUNBUFFERED=1 HYDRA_FULL_ERROR=1
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
 
@@ -99,7 +99,7 @@ echo "steps=$TRAIN_STEPS eval_every=$EVAL_EVERY eval_rows=$EVAL_LIMIT rollout.n=
   "trainer.save_freq=$SAVE_FREQ" \
   trainer.max_actor_ckpt_to_keep=1 \
   "trainer.test_freq=$EVAL_EVERY" \
-  trainer.project_name=verl_gsm8k_flat \
+  trainer.project_name=verl_gsm8k \
   trainer.experiment_name=run_${SEED} \
   "trainer.default_local_dir=$RUN_DIR/checkpoints" \
   trainer.total_epochs=1 \

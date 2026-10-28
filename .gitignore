@@ -6,8 +6,10 @@ __pycache__/
 
 # 跨 run、跨任务共享的下载缓存（ptdbench evaluate / docker/warm-cache.sh 的默认落点）。
 # 多 GB，且随时可以从 prepare.sh 里钉死的 revision 重新拉出来。
-models/
-datasets/
+# 锚定仓库根：裸 "models/" 会把任务 workspace 里的 verl/models 等源码目录
+# 一并忽略（reward 任务 2026-10-26 就因此丢了 verl.models 导致 rerun 崩）。
+/models/
+/datasets/
 
 raw_tasks/
 task_construct/
@@ -24,3 +26,8 @@ vendor/devspace-cli/*.tar.gz
 vendor/devspace-cli/*.tar.xz
 
 .DS_Store
+
+/page/
+evaluation*
+*.tar.xz
+/.claude/

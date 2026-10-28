@@ -1,0 +1,38 @@
+title: Checkpoint saving exhausts host memory at step 10
+submitter:
+  name: Jinyang Wu
+license: Apache-2.0
+created_date: '2026-10-27'
+domain: infrastructure
+type: infrastructure
+tags:
+  - verl
+  - grpo
+  - fsdp
+  - checkpoint
+  - optimizer-offload
+  - host-memory
+model:
+  name: Qwen/Qwen2.5-0.5B-Instruct
+dataset:
+  name: openai/gsm8k main
+training:
+  framework: verl
+  algo: grpo
+  script: scripts/train.sh
+environment:
+  image: verl-vllm0.7.4-torch2.5.1
+  env:
+    # The 20 GiB host-RAM ceiling is part of the defect contract: launch.py
+    # asserts /sys/fs/cgroup/memory.max equals it. This limit is applied by the
+    # Harbor backend only (environment/docker-compose.yaml); run this task on
+    # Harbor, not the native docker runtime.
+    NVIDIA_VISIBLE_DEVICES: all
+    CONTAINER_MEMORY_LIMIT_BYTES: '21474836480'
+    PYTHONDONTWRITEBYTECODE: '1'
+    PYTHONPATH: /workspace
+    VLLM_USE_V1: '0'
+    OMP_NUM_THREADS: '2'
+outcome:
+  failure_type: resource_exhaustion
+  failure_reason: "CPU-offloaded Adam state leaves insufficient host-memory headroom for native checkpoint serialization at step 10: the FSDP checkpoint writer stages model tensors for disk while the 3.9 GB Adam moments already reside on the host, host memory reaches 95% of the 20 GiB cgroup budget, and Ray's memory monitor evicts the worker inside actor_rollout_save_checkpoint. Retaining optimizer state on GPU lets the same save complete within the same budget."
