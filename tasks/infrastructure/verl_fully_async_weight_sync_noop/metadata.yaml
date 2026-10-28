@@ -1,0 +1,30 @@
+title: "Silent Weight-Sync No-Op in Fully-Async VERL GRPO"
+submitter:
+  name: czx
+license: Apache-2.0
+created_date: "2026-10-28"
+type: infrastructure
+domain: weight_sync
+model:
+  name: Qwen/Qwen3-1.7B
+dataset:
+  name: OpenAI GSM8K main (7,473 train rows; 1,319 test rows held out)
+training:
+  framework: verl
+  algo: grpo
+  script: run.sh
+environment:
+  image: verl-vllm0.17.0-torch2.10.0-flashattn2.8.3-cu129-py3.12
+  env:
+    CUDA_VISIBLE_DEVICES: "0,1"
+    NVIDIA_VISIBLE_DEVICES: "0,1"
+outcome:
+  failure_type: implementation_bug
+  failure_reason: >-
+    The fully-async recipe leaves the checkpoint engine at its dataclass default
+    "naive", the colocated engine, and ActorRolloutRefWorker.update_weights
+    returns without pushing when the worker owns no rollout engine, so every
+    weight push from the trainer pool to the vLLM rollout pool is dropped
+    silently; the observed run's held-out accuracy stays within 0.7195-0.7314
+    across all six evaluation points while the comparison run rises from
+    0.7263 to 0.7743 over the same points.

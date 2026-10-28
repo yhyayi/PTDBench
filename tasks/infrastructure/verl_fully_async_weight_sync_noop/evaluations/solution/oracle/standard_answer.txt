@@ -1,0 +1,23 @@
+STANDARD_ANSWER_V1
+CASE_ID: verl_fully_async_weight_sync_noop
+BENCHMARK_GROUP: B-verl-infrastructure
+EXPECTED_VERDICT: unhealthy
+EXPECTED_ATTRIBUTION: The fully-async recipe leaves the checkpoint engine at its dataclass default "naive", the colocated engine, which cannot reach a rollout engine in another Ray resource pool; ActorRolloutRefWorker.update_weights then returns without pushing because the trainer worker owns no rollout engine, so every weight push is dropped silently and the rollout policy stays at its initial weights for the whole run.
+PRIMARY_METRIC: val-core/openai/gsm8k/acc/mean@4
+
+REQUIRED_ALL:
+- Identify the missing checkpoint_engine.backend pin in verl/experimental/fully_async_policy/config/fully_async_ppo_trainer.yaml, i.e. that the run resolves to the colocated "naive" engine instead of one that can cross resource pools.
+- Identify the silent early return in ActorRolloutRefWorker.update_weights in verl/workers/engine_workers.py, guarded on self.rollout is None, as the reason the dropped push raises nothing.
+- State that the trainer pool's workers own no rollout engine (train_role = Role.Actor under hybrid_engine=False), so the colocated push path has no destination.
+- Conclude that the rollout policy therefore never receives the trainer's updates, and support this with the frozen evidence: the flat held-out accuracy curve, the per-sync "no rollout engine ... skipping" warnings, and/or the flat format component of the reward in the per-sample rollout dumps.
+
+GLOBAL_JUDGE_POLICY:
+- The score must be exactly 0 or 1.
+- Agent A must explicitly classify the run as healthy or unhealthy.
+- Every REQUIRED_ALL item must be satisfied.
+- A verdict mismatch forces score 0.
+- Equivalent technical wording in any language is acceptable.
+- task.yaml may clarify targets and aliases but may not relax REQUIRED_ALL.
+- Naming only one of the two code-level causes earns partial root_cause_score, not a pass.
+- "The model did not learn" or "training did not improve" alone is not the root cause: the trainer's own parameters do keep updating, so the defective run's reward and saved checkpoint drift slightly above the untrained model. The claim is that the rollout policy is frozen.
+- Attributing the symptom to the two-pool topology itself, or proposing to colocate the engines (hybrid_engine=True) or to enable async_training.use_trainer_do_validate, is not a correct diagnosis: those change the topology rather than repair the push.

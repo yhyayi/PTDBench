@@ -1,0 +1,29 @@
+task_id: verl_fully_async_weight_sync_noop
+category: infrastructure
+framework: verl
+algo: grpo
+model: Qwen/Qwen3-1.7B
+dataset: OpenAI GSM8K main
+eval_metric_key: val-core/openai/gsm8k/acc/mean@4
+last_eval_step: 100
+source_type: raw_buggy_and_baseline_workspaces
+expected_verdict: unhealthy
+evidence_kind: buggy_baseline_ab_run
+causes:
+  - path: verl/experimental/fully_async_policy/config/fully_async_ppo_trainer.yaml
+    kind: hparam
+    observed: "actor_rollout_ref.rollout carries no checkpoint_engine.backend, so the CheckpointEngineConfig dataclass default selects the colocated naive engine."
+    expected: "The stanza pins checkpoint_engine.backend to nccl, an engine that can cross Ray resource pools."
+  - path: verl/workers/engine_workers.py
+    kind: symbol
+    observed: "ActorRolloutRefWorker.update_weights returns after logging a warning when self.rollout is None, so the push is dropped without raising."
+    expected: "No silent early return on the missing-rollout path; the guard is removed, or it raises."
+key_files:
+  - run.sh
+  - verl/experimental/fully_async_policy/config/fully_async_ppo_trainer.yaml
+  - verl/workers/engine_workers.py
+  - verl/checkpoint_engine/base.py
+  - verl/experimental/fully_async_policy/fully_async_trainer.py
+external_assets_not_in_git:
+  - Qwen/Qwen3-1.7B pinned to 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e; prepare.sh verifies selected file hashes and sizes.
+  - OpenAI GSM8K main transformed to VERL's row schema by the PTDBench gsm8k recipe; prepare.sh verifies output hashes and sizes taken from inside this task's image.

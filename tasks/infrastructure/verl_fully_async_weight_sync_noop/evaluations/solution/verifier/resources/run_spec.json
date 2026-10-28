@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "command": "mkdir -p \"$PTDBENCH_RESULTS/experiment_logs\" && bash run.sh",
+  "env": {
+    "TOTAL_ROLLOUT_STEPS": "1632",
+    "TEST_FREQ": "20",
+    "VAL_N": "4",
+    "VAL_TEMPERATURE": "1.0"
+  },
+  "timeout_s": 21600,
+  "log_roots": ["experiment_logs"]
+}

@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "buggy_baseline_ab_run",
+  "task_id": "verl_fully_async_weight_sync_noop",
+  "family": "verl_infrastructure",
+  "metric_key": "val-core/openai/gsm8k/acc/mean@4",
+  "metric_status": "log_reconstructed",
+  "runs_per_arm": 2,
+  "notes": "Held-out accuracy over all 1,319 GSM8K test rows at n=4, temperature 1.0, produced by the rollouter's own validation pass. Step 0 is recorded by trainer.val_before_train=True and is the untrained model in both arms. All four runs used the same two workspaces, the same host and the same two GPUs, in sequence on 2026-10-28.",
+  "observed_run": {
+    "final_step": 100,
+    "eval_points": [
+      {"step": 0, "eval_score": 0.7259287338893101},
+      {"step": 20, "eval_score": 0.7194844579226687},
+      {"step": 40, "eval_score": 0.7227065959059894},
+      {"step": 60, "eval_score": 0.7314253222137983},
+      {"step": 80, "eval_score": 0.7256633813495072},
+      {"step": 100, "eval_score": 0.7247536012130402}
+    ],
+    "source_log": "workspace/experiment_logs/train.log"
+  },
+  "observed_run_pass2": {
+    "final_step": 100,
+    "eval_points": [
+      {"step": 0, "eval_score": 0.7221379833206975},
+      {"step": 20, "eval_score": 0.7208112206216831},
+      {"step": 40, "eval_score": 0.7263078089461713},
+      {"step": 60, "eval_score": 0.7270659590598939},
+      {"step": 80, "eval_score": 0.7285822592873389},
+      {"step": 100, "eval_score": 0.7198635329795300}
+    ],
+    "source_log": "repeat_pass2/defective_train.log"
+  },
+  "baseline_run": {
+    "final_step": 100,
+    "eval_points": [
+      {"step": 0, "eval_score": 0.7263078089461713},
+      {"step": 20, "eval_score": 0.7363532979529946},
+      {"step": 40, "eval_score": 0.7503790750568613},
+      {"step": 60, "eval_score": 0.7562547384382108},
+      {"step": 80, "eval_score": 0.7689537528430629},
+      {"step": 100, "eval_score": 0.7742608036391205}
+    ],
+    "source_log": "control_run/train.log"
+  },
+  "baseline_run_pass2": {
+    "final_step": 100,
+    "eval_points": [
+      {"step": 0, "eval_score": 0.7234647460197119},
+      {"step": 20, "eval_score": 0.7359742228961335},
+      {"step": 40, "eval_score": 0.7468157695223654},
+      {"step": 60, "eval_score": 0.7539613343442002},
+      {"step": 80, "eval_score": 0.7530325246398787},
+      {"step": 100, "eval_score": 0.7604245640636846}
+    ],
+    "source_log": "repeat_pass2/control_train.log"
+  },
+  "threshold_calibration": {
+    "score_mode": "best",
+    "required_final_score": 0.746,
+    "observed_max_any_step": 0.7314253222137983,
+    "baseline_min_judged": 0.7604245640636846,
+    "step0_max_either_arm": 0.7263078089461713,
+    "above_observed_max_by": 0.0145746777862017,
+    "below_baseline_min_by": 0.0144245640636846,
+    "above_step0_by": 0.0196921910538287,
+    "runs_per_arm": 2,
+    "variance_claim": false
+  }
+}
