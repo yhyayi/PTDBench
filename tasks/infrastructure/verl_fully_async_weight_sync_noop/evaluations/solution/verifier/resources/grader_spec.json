@@ -1,0 +1,13 @@
+{
+  "schema_version": 2,
+  "task_id": "verl_fully_async_weight_sync_noop",
+  "metric_key": "val-core/openai/gsm8k/acc/mean@4",
+  "final_step": 100,
+  "historical_final_baseline": "0.7248",
+  "required_final_score": "0.746",
+  "required_final_score_max": "1.0",
+  "score_mode": "best",
+  "log_roots": [
+    "experiment_logs"
+  ]
+}
