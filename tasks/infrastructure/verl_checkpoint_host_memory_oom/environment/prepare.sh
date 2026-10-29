@@ -10,9 +10,12 @@ DEST="${PTDBENCH_WORKSPACE}/model"
 
 fetch() {
   local file="$1" sha="$2" size="$3"
+  # Mirrored HF endpoint; huggingface.co itself is not on the cluster egress
+  # whitelist, so the mirror is the default and HF_ENDPOINT overrides it.
+  local endpoint="${HF_ENDPOINT:-https://hf-mirror.com}"
   python3 "${PTDBENCH_ENVIRONMENT}/ptdbench_fetch_url.py" \
     --type model \
-    --url "https://huggingface.co/${REPO}/resolve/${REV}/${file}" \
+    --url "${endpoint%/}/${REPO}/resolve/${REV}/${file}" \
     --sha256 "${sha}" \
     --size "${size}" \
     --dest "${DEST}/${file}"

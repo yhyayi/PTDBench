@@ -131,6 +131,12 @@ _DEFAULT_IMAGE_MAP: dict[str, str] = {
     # Static-diagnosis issue task whose idea-issue image was never built or
     # pushed to the registry; the verl image is the sanctioned substitute.
     "idea-issue": "share-dev/ngc-docker/ptdbench-verl-vllm017:dev-957fee7-cb-bf632efb",
+    # Issue-level diagnosis task on a verl workspace whose dedicated image was
+    # never pushed; the verl image is the sanctioned substitute (the 20 GiB
+    # cgroup limit is a solution-level Harbor-only contract, not needed here).
+    "verl-vllm0.7.4-torch2.5.1": (
+        "share-dev/ngc-docker/ptdbench-verl-vllm017:dev-957fee7-cb-bf632efb"
+    ),
 }
 
 # The registry-less tag prefix harbor-evaluate builds for a PTDBench image

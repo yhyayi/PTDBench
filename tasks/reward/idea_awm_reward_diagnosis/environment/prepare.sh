@@ -9,13 +9,17 @@ while IFS=$'\t' read -r url sha256 size relative; do
     python3 "$env_dir/ptdbench_fetch_url.py" --type dataset --url "$url" \
         --sha256 "$sha256" --size "$size" --dest "$workspace/$relative"
 done < <(python3 - "$env_dir/data_manifest.json" <<'PY'
+import os
 import json
 import sys
 from pathlib import PurePosixPath
 
 manifest = json.load(open(sys.argv[1]))
 source = manifest['download']
-base = f"https://huggingface.co/datasets/{source['repo']}/resolve/{source['revision']}"
+# Mirrored HF endpoint; huggingface.co itself is not on the cluster egress
+# whitelist, so the mirror is the default and HF_ENDPOINT overrides it.
+endpoint = os.environ.get('HF_ENDPOINT', 'https://hf-mirror.com').rstrip('/')
+base = f"{endpoint}/datasets/{source['repo']}/resolve/{source['revision']}"
 for entry in manifest['files']:
     relative = PurePosixPath(entry['path']).relative_to(source['destination'])
     print(f"{base}/{relative}\t{entry['sha256']}\t{entry['bytes']}\t{entry['path']}")
